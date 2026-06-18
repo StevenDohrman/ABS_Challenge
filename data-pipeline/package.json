@@ -1,0 +1,26 @@
+{
+  "name": "@abs/data-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MLB live game ingestion and Baseball Savant postgame pipeline",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "axios": "^1.7.9"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.17.9",
+    "axios-mock-adapter": "^2.1.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}
