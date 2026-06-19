@@ -206,7 +206,8 @@ export interface MlbLinescore {
 export interface MlbLiveData {
   plays: {
     allPlays: MlbPlay[];
-    currentPlay: MlbPlay;
+    /** Absent before the first pitch of the game. */
+    currentPlay?: MlbPlay;
   };
   linescore: MlbLinescore;
 }
