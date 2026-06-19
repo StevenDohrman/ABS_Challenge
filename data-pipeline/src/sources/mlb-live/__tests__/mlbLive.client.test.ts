@@ -103,7 +103,7 @@ describe("fetchLiveFeed", () => {
       .reply(200, fixture);
 
     const result = await fetchLiveFeed(824991);
-    const { matchup } = result.liveData.plays.currentPlay;
+    const { matchup } = result.liveData.plays.currentPlay!;
 
     expect(matchup.batter.fullName).toBe("Jacob Wilson");
     expect(matchup.pitcher.fullName).toBe("Gregory Soto");
