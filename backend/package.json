@@ -1,0 +1,38 @@
+{
+  "name": "@abs/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API and orchestration layer for the Strike Zone Challenge Recommendation System",
+  "main": "dist/server.js",
+  "dependencies": {
+    "@abs/engine": "*",
+    "@prisma/client": "^6.19.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.17.9",
+    "jest": "^30.0.0",
+    "prisma": "^6.19.3",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  }
+}
