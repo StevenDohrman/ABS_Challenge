@@ -112,6 +112,12 @@ model LivePitchEvent {
   callCode        String? // e.g. "C" for called strike, "B" for ball
   callDescription String? // e.g. "Called Strike", "Ball"
 
+  // ABS challenge review data — populated when the pitch triggered a manager/batter challenge.
+  hasReview        Boolean  @default(false)
+  isOverturned     Boolean?
+  challengerName   String?
+  challengerTeamId Int?
+
   fetchedAt DateTime
 
   // Raw MlbPlayEvent object preserved for debugging and future field additions.
@@ -224,5 +230,95 @@ model ChallengeRecommendation {
   @@unique([gamePk, atBatIndex, balls, strikes])
   @@index([gamePk, triggeredAt])
   @@map("challenge_recommendations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// player_spray_profiles
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Batter batted-ball spray profile. Ingested by SavantDailyJob.
+// One row per (playerId, season); upserted on each daily run.
+model PlayerSprayProfile {
+  id         Int    @id @default(autoincrement())
+  playerId   Int
+  playerName String
+  season     Int
+
+  pa Int
+
+  // Directional tendencies (0–100 as stored by Savant).
+  pullPercent        Float?
+  straightawayPercent Float?
+  oppoPercent        Float?
+
+  // Batted-ball type mix (0–100).
+  gbPercent Float?
+  fbPercent Float?
+  ldPercent Float?
+
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, season])
+  @@index([playerId])
+  @@map("player_spray_profiles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fielder_oaa
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Fielder Outs Above Average by position. Ingested by SavantDailyJob.
+// One row per (playerId, season, position); upserted on each daily run.
+model FielderOaa {
+  id         Int    @id @default(autoincrement())
+  playerId   Int
+  playerName String
+  season     Int
+
+  // Fielding position abbreviation: "1B", "2B", "3B", "SS", "LF", "CF", "RF".
+  position String
+
+  oaa      Float?
+  oaaVsRhh Float?
+  oaaVsLhh Float?
+
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, season, position])
+  @@index([playerId])
+  @@map("fielder_oaa")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// outfield_directional_oaa
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Outfielder directional OAA and jump metrics. Ingested by SavantDailyJob.
+// One row per (playerId, season); upserted on each daily run.
+model OutfieldDirectionalOaa {
+  id         Int    @id @default(autoincrement())
+  playerId   Int
+  playerName String
+  season     Int
+  position   String
+
+  oaa         Float?
+  oaaLeft     Float?
+  oaaStraight Float?
+  oaaRight    Float?
+
+  // Jump metrics.
+  reaction Float?
+  burst    Float?
+  route    Float?
+
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, season])
+  @@index([playerId])
+  @@map("outfield_directional_oaa")
 }
 

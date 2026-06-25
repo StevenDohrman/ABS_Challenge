@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AtBatHistoryItem } from "../api/types";
+import type { AtBatHistoryItem, ChallengeOutcome } from "../api/types";
 import { CountGrid } from "./CountGrid";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
@@ -41,6 +41,31 @@ function ordinalSuffix(n: number): string {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
+// ── Challenge outcome badge ────────────────────────────────────────────────
+
+function ChallengeBadge({ outcome }: { outcome: ChallengeOutcome }) {
+  const overturned = outcome.isOverturned;
+  const inProgress = outcome.isOverturned === null;
+
+  const colorCls = inProgress
+    ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+    : overturned
+      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+      : "bg-red-500/15 border-red-500/30 text-red-300";
+
+  const resultLabel = inProgress ? "In Review" : overturned ? "Overturned" : "Upheld";
+  const sideLabel = outcome.challengerSide === "batter" ? "Batter" : "Fielding";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${colorCls}`}
+      title={outcome.challengerName ? `${outcome.challengerName} challenged` : undefined}
+    >
+      {sideLabel} · {resultLabel}
+    </span>
+  );
+}
+
 // ── At-bat row ─────────────────────────────────────────────────────────────
 
 function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
@@ -70,6 +95,12 @@ function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
             <span className="text-xs text-white/30">·</span>
             <span className="text-xs font-mono text-white/50">{ab.baseState}</span>
           </div>
+          {/* Challenge outcome badge on the left */}
+          {ab.challengeOutcome && (
+            <div className="mt-0.5">
+              <ChallengeBadge outcome={ab.challengeOutcome} />
+            </div>
+          )}
         </div>
 
         {/* Triggered recommendation (if any) */}
@@ -117,6 +148,53 @@ function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
   );
 }
 
+// ── Inning section with collapse ────────────────────────────────────────────
+
+function InningSection({ group, defaultOpen }: { group: InningGroup; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const challengeCount = group.atBats.filter((ab) => ab.challengeOutcome !== null).length;
+  const overturnedCount = group.atBats.filter(
+    (ab) => ab.challengeOutcome?.isOverturned === true
+  ).length;
+
+  return (
+    <section className="space-y-0">
+      {/* Inning header — clickable to collapse */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 py-1 group"
+      >
+        <span className="text-xs font-mono text-white/50 font-semibold tracking-wide">
+          {group.label}
+        </span>
+
+        {/* Per-inning challenge summary */}
+        {challengeCount > 0 && (
+          <span className="text-[10px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
+            {challengeCount} challenge{challengeCount !== 1 ? "s" : ""}
+            {overturnedCount > 0 && ` · ${overturnedCount} overturned`}
+          </span>
+        )}
+
+        <div className="flex-1 h-px bg-white/10" />
+
+        <span className={`text-white/20 text-xs transition-transform duration-200 ${open ? "rotate-90" : ""}`}>
+          ▶
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-2 pt-1">
+          {group.atBats.map((ab) => (
+            <AtBatRow key={ab.atBatIndex} ab={ab} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function AtBatHistory({ atBats }: Props) {
@@ -130,45 +208,47 @@ export function AtBatHistory({ atBats }: Props) {
     );
   }
 
-  const challengeCount = atBats.filter((ab) => ab.triggeredCount !== null).length;
-  const autoAllowCount = atBats.filter((ab) => ab.triggeredRecommendation === "AUTO_ALLOW").length;
+  const challengeCount  = atBats.filter((ab) => ab.challengeOutcome !== null).length;
+  const overturnedCount = atBats.filter((ab) => ab.challengeOutcome?.isOverturned === true).length;
+  const autoAllowCount  = atBats.filter((ab) => ab.triggeredRecommendation === "AUTO_ALLOW").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <StatChip label="At-bats tracked" value={atBats.length} />
-        <StatChip label="Called strikes" value={challengeCount} />
+        <StatChip label="Called strikes" value={atBats.filter((ab) => ab.triggeredCount !== null).length} />
+        <StatChip
+          label="Challenges"
+          value={challengeCount}
+          sub={challengeCount > 0 ? `${overturnedCount} overturned` : undefined}
+          accent="text-orange-300"
+        />
         <StatChip label="Auto-allow" value={autoAllowCount} accent="text-emerald-300" />
       </div>
 
       {/* Inning sections */}
-      {groups.map((group) => (
-        <section key={`${group.inning}-${group.half}`} className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-white/50 font-semibold tracking-wide">
-              {group.label}
-            </span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
-          <div className="space-y-2">
-            {group.atBats.map((ab) => (
-              <AtBatRow key={ab.atBatIndex} ab={ab} />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div className="space-y-4">
+        {groups.map((group, i) => (
+          <InningSection
+            key={`${group.inning}-${group.half}`}
+            group={group}
+            defaultOpen={i === groups.length - 1}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 function StatChip({
-  label, value, accent = "text-white",
-}: { label: string; value: number; accent?: string }) {
+  label, value, sub, accent = "text-white",
+}: { label: string; value: number; sub?: string; accent?: string }) {
   return (
     <div className="rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-center">
       <p className={`text-xl font-bold font-mono ${accent}`}>{value}</p>
-      <p className="text-[11px] text-white/35 mt-0.5">{label}</p>
+      <p className="text-[11px] text-white/35 mt-0.5 leading-tight">{label}</p>
+      {sub && <p className="text-[10px] text-white/25 mt-0.5 leading-tight">{sub}</p>}
     </div>
   );
 }

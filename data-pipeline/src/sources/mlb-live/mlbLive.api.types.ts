@@ -123,6 +123,18 @@ export interface MlbPitchDetails {
     code: string;
     description: string;
   };
+  /** True when this pitch triggered a manager/batter review. */
+  hasReview?: boolean;
+}
+
+export interface MlbReviewDetails {
+  isOverturned: boolean;
+  inProgress: boolean;
+  reviewType: string;
+  /** The team that initiated the challenge. */
+  challengeTeamId: number;
+  /** The player most associated with the challenge (batter or catcher). */
+  player: { id: number; fullName: string; link: string };
 }
 
 export interface MlbPlayEvent {
@@ -133,6 +145,8 @@ export interface MlbPlayEvent {
   isPitch: boolean;
   type: "pitch" | "action" | "no_pitch" | "pickoff";
   playId?: string;
+  /** Populated when this pitch triggered an ABS challenge review. */
+  reviewDetails?: MlbReviewDetails;
 }
 
 export interface MlbMatchup {

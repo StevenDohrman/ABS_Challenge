@@ -8,8 +8,7 @@
  * No user input enters the recommendation system.
  */
 
-import type { ChallengeRecommendation as DbRecommendation } from "@prisma/client";
-import type { LiveGameSnapshot } from "@prisma/client";
+import type { ChallengeRecommendation as DbRecommendation, LiveGameSnapshot, LivePitchEvent } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Recommendation response
@@ -138,6 +137,11 @@ export interface ScheduleGameDto {
   isTracked: boolean;
   /** True if at least one recommendation has been triggered for this game. */
   hasTriggeredRecommendation: boolean;
+
+  /** Challenges remaining for the home team (null when game is not tracked). */
+  homeChallengesRemaining: number | null;
+  /** Challenges remaining for the away team (null when game is not tracked). */
+  awayChallengesRemaining: number | null;
 }
 
 export interface ScheduleResponseDto {
@@ -148,6 +152,16 @@ export interface ScheduleResponseDto {
 // ─────────────────────────────────────────────────────────────────────────────
 // Game at-bat history (post-game / in-game audit)
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** ABS challenge outcome for a single at-bat. Populated when a review occurred. */
+export interface ChallengeOutcomeDto {
+  wasChallenge: true;
+  challengerName: string | null;
+  /** "batter" when the batting team challenged a called strike; "fielding" when the fielding team challenged a ball. */
+  challengerSide: "batter" | "fielding";
+  /** True if the original call was reversed. Null when the review is still in progress. */
+  isOverturned: boolean | null;
+}
 
 export interface AtBatHistoryItemDto {
   atBatIndex: number;
@@ -166,6 +180,9 @@ export interface AtBatHistoryItemDto {
   /** The triggered recommendation's expected value. Null if none triggered. */
   triggeredExpectedValue: number | null;
 
+  /** Present when an ABS review (challenge) was recorded for any pitch in this at-bat. */
+  challengeOutcome: ChallengeOutcomeDto | null;
+
   /** All 12 pre-computed count state recommendations. */
   recommendations: CountStateRecommendationDto[];
 }
@@ -178,17 +195,31 @@ export interface GameAtBatHistoryDto {
 
 /**
  * Build the game at-bat history DTO from DB rows.
+ *
+ * @param reviewPitchEvents Pitch events with hasReview=true for this game.
+ *   Used to populate challengeOutcome on each at-bat row.
  */
 export function toGameAtBatHistoryDto(
   gamePk: number,
   snapshots: LiveGameSnapshot[],
-  allRecs: DbRecommendation[]
+  allRecs: DbRecommendation[],
+  reviewPitchEvents: Pick<LivePitchEvent, "atBatIndex" | "isOverturned" | "challengerName" | "challengerTeamId">[] = []
 ): GameAtBatHistoryDto {
   const recsByAtBat = new Map<number, DbRecommendation[]>();
   for (const r of allRecs) {
     const arr = recsByAtBat.get(r.atBatIndex) ?? [];
     arr.push(r);
     recsByAtBat.set(r.atBatIndex, arr);
+  }
+
+  // Index review events by atBatIndex for O(1) lookup.
+  const reviewByAtBat = new Map<
+    number,
+    Pick<LivePitchEvent, "atBatIndex" | "isOverturned" | "challengerName" | "challengerTeamId">
+  >();
+  for (const pe of reviewPitchEvents) {
+    // Keep only the first review per at-bat (multiple reviews are extremely rare).
+    if (!reviewByAtBat.has(pe.atBatIndex)) reviewByAtBat.set(pe.atBatIndex, pe);
   }
 
   const atBats: AtBatHistoryItemDto[] = snapshots.map((snap) => {
@@ -208,6 +239,17 @@ export function toGameAtBatHistoryDto(
         displayMessage: RECOMMENDATION_DISPLAY_MESSAGES[r.recommendation] ?? r.recommendation,
       }));
 
+    const reviewEvent = reviewByAtBat.get(snap.atBatIndex) ?? null;
+    const challengeOutcome: ChallengeOutcomeDto | null = reviewEvent
+      ? {
+          wasChallenge: true,
+          challengerName: reviewEvent.challengerName,
+          challengerSide:
+            reviewEvent.challengerTeamId === snap.battingTeamId ? "batter" : "fielding",
+          isOverturned: reviewEvent.isOverturned,
+        }
+      : null;
+
     return {
       atBatIndex: snap.atBatIndex,
       inning: snap.inning,
@@ -219,6 +261,7 @@ export function toGameAtBatHistoryDto(
       triggeredCount: triggered ? `${triggered.balls}-${triggered.strikes}` : null,
       triggeredRecommendation: triggered?.recommendation ?? null,
       triggeredExpectedValue: triggered?.expectedValue ?? null,
+      challengeOutcome,
       recommendations,
     };
   });

@@ -27,6 +27,15 @@ export interface MlbLivePitchEvent {
   callCode?: string;
   callDescription?: string;
 
+  /** True when an ABS challenge review was triggered on this pitch. */
+  hasReview: boolean;
+  /** Whether the challenge overturned the original call. Null when no review or still in progress. */
+  isOverturned: boolean | null;
+  /** Full name of the player associated with the challenge (batter or catcher). */
+  challengerName: string | null;
+  /** Team ID of the team that issued the challenge. Compare to battingTeamId/fieldingTeamId to determine side. */
+  challengerTeamId: number | null;
+
   raw: unknown;
   fetchedAt: string;
 }

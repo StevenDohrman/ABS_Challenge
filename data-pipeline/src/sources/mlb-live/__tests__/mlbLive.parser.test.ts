@@ -390,6 +390,10 @@ describe("pitchKey", () => {
     outs: 1,
     batterId: 1,
     pitcherId: 2,
+    hasReview: false,
+    isOverturned: null,
+    challengerName: null,
+    challengerTeamId: null,
     raw: {},
     fetchedAt: FETCHED_AT,
   };

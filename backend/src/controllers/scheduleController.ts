@@ -84,13 +84,20 @@ export async function getTodaySchedule(
   const gamePks = rawGames.map((g) => g.gamePk);
   let trackedSet = new Set<number>();
   let triggeredSet = new Set<number>();
+  let challengeMap = new Map<number, { home: number; away: number }>();
 
   try {
     const trackedGames = await prisma.game.findMany({
       where: { gamePk: { in: gamePks } },
-      select: { gamePk: true },
+      select: { gamePk: true, homeChallengesRemaining: true, awayChallengesRemaining: true },
     });
     trackedSet = new Set(trackedGames.map((g) => g.gamePk));
+    challengeMap = new Map(
+      trackedGames.map((g) => [
+        g.gamePk,
+        { home: g.homeChallengesRemaining, away: g.awayChallengesRemaining },
+      ])
+    );
 
     // ── 3. Check which tracked games have triggered recommendations ─────────
     const triggeredFlags = await Promise.all(
@@ -136,6 +143,8 @@ export async function getTodaySchedule(
 
       isTracked: trackedSet.has(g.gamePk),
       hasTriggeredRecommendation: triggeredSet.has(g.gamePk),
+      homeChallengesRemaining: challengeMap.get(g.gamePk)?.home ?? null,
+      awayChallengesRemaining: challengeMap.get(g.gamePk)?.away ?? null,
     };
   });
 

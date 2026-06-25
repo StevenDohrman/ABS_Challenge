@@ -34,6 +34,11 @@ export interface ScheduleGame {
 
   isTracked: boolean;
   hasTriggeredRecommendation: boolean;
+
+  /** Challenges remaining for the home team (null when not tracked). */
+  homeChallengesRemaining: number | null;
+  /** Challenges remaining for the away team (null when not tracked). */
+  awayChallengesRemaining: number | null;
 }
 
 export interface ScheduleResponse {
@@ -95,6 +100,13 @@ export interface AtBatRecommendationGridResponse {
 // Game at-bat history
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ChallengeOutcome {
+  wasChallenge: true;
+  challengerName: string | null;
+  challengerSide: "batter" | "fielding";
+  isOverturned: boolean | null;
+}
+
 export interface AtBatHistoryItem {
   atBatIndex: number;
   inning: number;
@@ -107,6 +119,8 @@ export interface AtBatHistoryItem {
   triggeredCount: string | null;
   triggeredRecommendation: string | null;
   triggeredExpectedValue: number | null;
+
+  challengeOutcome: ChallengeOutcome | null;
 
   recommendations: CountStateRecommendation[];
 }

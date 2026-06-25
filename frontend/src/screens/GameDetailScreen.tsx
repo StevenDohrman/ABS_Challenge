@@ -39,6 +39,39 @@ function PulsingDot() {
   );
 }
 
+function ChallengeBar({
+  abbrev,
+  remaining,
+  label,
+}: {
+  abbrev: string;
+  remaining: number | null;
+  label: string;
+}) {
+  if (remaining === null) return null;
+  const total = 3;
+  return (
+    <div className="flex flex-col items-center gap-1.5" title={label}>
+      <span className="text-[10px] font-mono text-white/35">{abbrev}</span>
+      <div className="flex items-center gap-1">
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            className={`w-3 h-3 rounded-sm ${
+              i < remaining
+                ? "bg-emerald-500/70 border border-emerald-400/50"
+                : "bg-white/10 border border-white/10"
+            }`}
+          />
+        ))}
+      </div>
+      <span className={`text-[10px] font-mono ${remaining === 0 ? "text-red-400" : "text-white/40"}`}>
+        {remaining}/{total}
+      </span>
+    </div>
+  );
+}
+
 function ScorePill({ abbrev, score, isWinner }: { abbrev: string; score: number | null; isWinner: boolean }) {
   return (
     <div className={`text-center ${isWinner ? "text-white" : "text-white/45"}`}>
@@ -201,6 +234,23 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
             <ScorePill abbrev={homeAbbrev} score={game.homeScore} isWinner={homeWins} />
           </div>
         </div>
+
+        {/* Challenge counts */}
+        {game.isTracked && (game.homeChallengesRemaining !== null || game.awayChallengesRemaining !== null) && (
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-center gap-6">
+            <ChallengeBar
+              abbrev={awayAbbrev}
+              remaining={game.awayChallengesRemaining}
+              label="Away challenges"
+            />
+            <div className="h-6 w-px bg-white/10" />
+            <ChallengeBar
+              abbrev={homeAbbrev}
+              remaining={game.homeChallengesRemaining}
+              label="Home challenges"
+            />
+          </div>
+        )}
 
         {/* Tracking badge */}
         {!game.isTracked && (

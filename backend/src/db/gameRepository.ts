@@ -71,6 +71,31 @@ export async function decrementChallengesRemaining(
   }
 }
 
+/**
+ * Decrement the challenge count for a specific team (identified by teamId).
+ * Resolves home vs. away by comparing teamId to the stored game row.
+ * Used when the challenging team is known precisely (ABS review events).
+ */
+export async function decrementChallengesByTeam(
+  gamePk: number,
+  challengerTeamId: number
+): Promise<void> {
+  const game = await prisma.game.findUnique({ where: { gamePk } });
+  if (!game) return;
+
+  if (challengerTeamId === game.homeTeamId) {
+    await prisma.game.updateMany({
+      where: { gamePk, homeChallengesRemaining: { gt: 0 } },
+      data: { homeChallengesRemaining: { decrement: 1 }, updatedAt: new Date() },
+    });
+  } else if (challengerTeamId === game.awayTeamId) {
+    await prisma.game.updateMany({
+      where: { gamePk, awayChallengesRemaining: { gt: 0 } },
+      data: { awayChallengesRemaining: { decrement: 1 }, updatedAt: new Date() },
+    });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // live_game_snapshots
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,6 +155,10 @@ export async function upsertPitchEvent(
   const sharedFields = {
     callCode: event.callCode,
     callDescription: event.callDescription,
+    hasReview: event.hasReview,
+    isOverturned: event.isOverturned ?? null,
+    challengerName: event.challengerName ?? null,
+    challengerTeamId: event.challengerTeamId ?? null,
     fetchedAt: new Date(event.fetchedAt),
     rawPayload: event.raw as object,
   };

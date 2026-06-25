@@ -224,6 +224,7 @@ function parsePitchEventsFromPlay(
   for (const playEvent of play.playEvents) {
     if (!playEvent.isPitch) continue;
 
+    const rd = playEvent.reviewDetails;
     events.push({
       gamePk,
       playId: playEvent.playId,
@@ -240,6 +241,10 @@ function parsePitchEventsFromPlay(
       pitcherId: play.matchup.pitcher.id,
       callCode: playEvent.details.call.code,
       callDescription: playEvent.details.call.description,
+      hasReview: playEvent.details.hasReview === true,
+      isOverturned: rd ? (rd.inProgress ? null : rd.isOverturned) : null,
+      challengerName: rd?.player?.fullName ?? null,
+      challengerTeamId: rd?.challengeTeamId ?? null,
       raw: playEvent,
       fetchedAt,
     });
