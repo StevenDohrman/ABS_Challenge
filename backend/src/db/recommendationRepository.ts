@@ -114,3 +114,44 @@ export async function findRecommendation(
     },
   });
 }
+
+/**
+ * Returns all 12 pre-computed recommendations for a specific at-bat.
+ * Used by the pre-at-bat banner to show the full count-state grid.
+ */
+export async function findAllForAtBat(
+  gamePk: number,
+  atBatIndex: number
+): Promise<ChallengeRecommendation[]> {
+  return prisma.challengeRecommendation.findMany({
+    where: { gamePk, atBatIndex },
+    orderBy: [{ balls: "asc" }, { strikes: "asc" }],
+  });
+}
+
+/**
+ * Returns all pre-computed recommendations for every at-bat in a game.
+ * Used by the post-game at-bat history view.
+ */
+export async function findAllForGame(
+  gamePk: number
+): Promise<ChallengeRecommendation[]> {
+  return prisma.challengeRecommendation.findMany({
+    where: { gamePk },
+    orderBy: [{ atBatIndex: "asc" }, { balls: "asc" }, { strikes: "asc" }],
+  });
+}
+
+/**
+ * Returns true if any recommendation for this game has been triggered.
+ * Used to annotate games in the schedule response.
+ */
+export async function gameHasTriggeredRecommendation(
+  gamePk: number
+): Promise<boolean> {
+  const row = await prisma.challengeRecommendation.findFirst({
+    where: { gamePk, triggeredAt: { not: null } },
+    select: { id: true },
+  });
+  return row !== null;
+}

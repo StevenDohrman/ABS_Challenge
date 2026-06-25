@@ -1,0 +1,18 @@
+{
+  "name": "@abs/root",
+  "private": true,
+  "workspaces": [
+    "engine",
+    "data-pipeline",
+    "backend",
+    "shared",
+    "frontend"
+  ],
+  "scripts": {
+    "frontend:dev": "npm run dev --workspace=frontend",
+    "backend:dev": "npm run build --workspace=data-pipeline && npm run dev --workspace=backend",
+    "frontend:build": "npm run build --workspace=frontend",
+    "pipeline:build": "npm run build --workspace=data-pipeline",
+    "typecheck": "npm run typecheck --workspace=frontend && npm run typecheck --workspace=backend"
+  }
+}

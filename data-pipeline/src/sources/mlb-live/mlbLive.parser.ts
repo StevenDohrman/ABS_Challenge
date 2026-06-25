@@ -32,23 +32,24 @@ export function parseGameSnapshot(
   const { linescore } = feed.liveData;
   const { teams, status } = feed.gameData;
 
+  // linescore and team refs can be partially populated during warmup/pregame.
   return {
     gamePk: feed.gamePk,
-    inning: linescore.currentInning ?? 1,
-    halfInning: linescore.inningHalf === "Top" ? "top" : "bottom",
+    inning: linescore?.currentInning ?? 1,
+    halfInning: linescore?.inningHalf === "Top" ? "top" : "bottom",
     detailedState: status.detailedState,
-    outs: linescore.outs,
-    balls: linescore.balls,
-    strikes: linescore.strikes,
-    runnerOnFirst: !!linescore.offense.first,
-    runnerOnSecond: !!linescore.offense.second,
-    runnerOnThird: !!linescore.offense.third,
-    homeScore: linescore.teams.home.runs,
-    awayScore: linescore.teams.away.runs,
-    homeTeamId: teams.home.team.id,
-    awayTeamId: teams.away.team.id,
-    batterId: linescore.offense.batter?.id,
-    pitcherId: linescore.defense.pitcher?.id,
+    outs: linescore?.outs ?? 0,
+    balls: linescore?.balls ?? 0,
+    strikes: linescore?.strikes ?? 0,
+    runnerOnFirst: !!linescore?.offense?.first,
+    runnerOnSecond: !!linescore?.offense?.second,
+    runnerOnThird: !!linescore?.offense?.third,
+    homeScore: linescore?.teams?.home?.runs ?? 0,
+    awayScore: linescore?.teams?.away?.runs ?? 0,
+    homeTeamId: teams?.home?.team?.id ?? 0,
+    awayTeamId: teams?.away?.team?.id ?? 0,
+    batterId: linescore?.offense?.batter?.id,
+    pitcherId: linescore?.defense?.pitcher?.id,
     fetchedAt,
   };
 }
@@ -69,34 +70,134 @@ export function parseAtBatSnapshot(
   if (!currentPlay) return null;
 
   const { linescore } = feed.liveData;
-  const { home, away } = feed.gameData.teams;
+  const homeTeamId = feed.gameData.teams?.home?.team?.id ?? 0;
+  const awayTeamId = feed.gameData.teams?.away?.team?.id ?? 0;
   const halfInning = currentPlay.about.halfInning;
 
+  // matchup may be absent in very early feed snapshots
+  const batterId = currentPlay.matchup?.batter?.id;
+  const pitcherId = currentPlay.matchup?.pitcher?.id;
+  if (!batterId || !pitcherId) return null;
+
   const battingTeamId =
-    linescore.defense.battingTeam?.id ??
-    (halfInning === "top" ? away.team.id : home.team.id);
+    linescore?.defense?.battingTeam?.id ??
+    (halfInning === "top" ? awayTeamId : homeTeamId);
 
   const fieldingTeamId =
-    linescore.defense.fieldingTeam?.id ??
-    (halfInning === "top" ? home.team.id : away.team.id);
+    linescore?.defense?.fieldingTeam?.id ??
+    (halfInning === "top" ? homeTeamId : awayTeamId);
 
   return {
     gamePk: feed.gamePk,
     atBatIndex: currentPlay.about.atBatIndex,
-    batterId: currentPlay.matchup.batter.id,
-    pitcherId: currentPlay.matchup.pitcher.id,
+    batterId,
+    pitcherId,
     inning: currentPlay.about.inning,
     halfInning,
-    outs: linescore.outs,
-    runnerOnFirst: !!linescore.offense.first,
-    runnerOnSecond: !!linescore.offense.second,
-    runnerOnThird: !!linescore.offense.third,
-    homeScore: linescore.teams.home.runs,
-    awayScore: linescore.teams.away.runs,
+    outs: linescore?.outs ?? 0,
+    runnerOnFirst: !!linescore?.offense?.first,
+    runnerOnSecond: !!linescore?.offense?.second,
+    runnerOnThird: !!linescore?.offense?.third,
+    homeScore: linescore?.teams?.home?.runs ?? 0,
+    awayScore: linescore?.teams?.away?.runs ?? 0,
     battingTeamId,
     fieldingTeamId,
     fetchedAt,
   };
+}
+
+/**
+ * Internal helper: extract at-bat snapshots for all plays whose atBatIndex
+ * falls in the half-open range (afterIndex, beforeIndex).
+ *
+ * Pass afterIndex = -1 to start from the beginning.
+ * Pass beforeIndex = Infinity to go to the end.
+ *
+ * Outs are tracked sequentially per half-inning across the whole allPlays
+ * array so the outs value is correct even when the range starts mid-inning.
+ * Runners and score are approximated as 0/false since the play object doesn't
+ * carry per-at-bat state; the engine still produces a useful recommendation.
+ */
+function parsePlaysInIndexRange(
+  feed: MlbLiveFeedResponse,
+  fetchedAt: string,
+  afterIndex: number,
+  beforeIndex: number
+): MlbAtBatSnapshot[] {
+  if (!feed.gameData?.teams || !feed.liveData?.plays) return [];
+
+  const homeTeamId = feed.gameData.teams?.home?.team?.id ?? 0;
+  const awayTeamId = feed.gameData.teams?.away?.team?.id ?? 0;
+  const snapshots: MlbAtBatSnapshot[] = [];
+
+  let outsInHalfInning = 0;
+  let prevHalfInningKey = "";
+
+  for (const play of feed.liveData.plays.allPlays) {
+    const idx = play.about.atBatIndex;
+
+    // Track outs across the whole history so in-range plays have correct outs.
+    const halfInningKey = `${play.about.inning}-${play.about.halfInning}`;
+    if (halfInningKey !== prevHalfInningKey) {
+      outsInHalfInning = 0;
+      prevHalfInningKey = halfInningKey;
+    }
+
+    if (idx > afterIndex && idx < beforeIndex) {
+      const batterId = play.matchup?.batter?.id;
+      const pitcherId = play.matchup?.pitcher?.id;
+      if (batterId && pitcherId) {
+        const { halfInning } = play.about;
+        snapshots.push({
+          gamePk: feed.gamePk,
+          atBatIndex: idx,
+          batterId,
+          pitcherId,
+          inning: play.about.inning,
+          halfInning,
+          outs: outsInHalfInning,
+          runnerOnFirst: false,
+          runnerOnSecond: false,
+          runnerOnThird: false,
+          homeScore: 0,
+          awayScore: 0,
+          battingTeamId: halfInning === "top" ? awayTeamId : homeTeamId,
+          fieldingTeamId: halfInning === "top" ? homeTeamId : awayTeamId,
+          fetchedAt,
+        });
+      }
+    }
+
+    outsInHalfInning = play.count?.outs ?? outsInHalfInning;
+  }
+
+  return snapshots;
+}
+
+/**
+ * Snapshots for all COMPLETED plays (everything except the active play).
+ * Used on the very first poll for startup backfill.
+ */
+export function parseHistoricalAtBatSnapshots(
+  feed: MlbLiveFeedResponse,
+  fetchedAt: string
+): MlbAtBatSnapshot[] {
+  const currentIndex = feed.liveData?.plays?.currentPlay?.about.atBatIndex ?? -1;
+  return parsePlaysInIndexRange(feed, fetchedAt, -1, currentIndex);
+}
+
+/**
+ * Snapshots for completed plays whose index falls strictly between
+ * afterIndex and beforeIndex (both exclusive). Used to catch at-bats that
+ * completed between two consecutive polls when the index jumped by > 1.
+ */
+export function parseMissedAtBatSnapshots(
+  feed: MlbLiveFeedResponse,
+  fetchedAt: string,
+  afterIndex: number,
+  beforeIndex: number
+): MlbAtBatSnapshot[] {
+  return parsePlaysInIndexRange(feed, fetchedAt, afterIndex, beforeIndex);
 }
 
 /**

@@ -20,7 +20,10 @@ const GAME_CHECK_INTERVAL_MS = 5 * 60_000;
  *   await job.start();
  */
 export interface LivePollJob {
+  on(event: "gameDiscovered", listener: (game: ActiveGame) => void): this;
   on(event: "atBatStart", listener: (snapshot: MlbAtBatSnapshot) => void): this;
+  /** All historical at-bats from a mid-game first poll, delivered as one batch. */
+  on(event: "gameBackfill", listener: (snapshots: MlbAtBatSnapshot[]) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
@@ -83,10 +86,15 @@ export class LivePollJob extends EventEmitter {
   }
 
   private startPoller(game: ActiveGame): void {
+    // Notify the backend that this game exists so it can write the games row
+    // before any atBatStart / pitchEvent writes try to reference it via FK.
+    this.emit("gameDiscovered", game);
+
     const poller = new GamePoller(game.gamePk);
 
     poller.on("pitchEvent", (event) => this.emit("pitchEvent", event));
     poller.on("atBatStart", (snapshot) => this.emit("atBatStart", snapshot));
+    poller.on("gameBackfill", (snapshots) => this.emit("gameBackfill", snapshots));
     poller.on("error", (err) => this.emit("error", err));
     poller.on("gameOver", ({ gamePk }) => {
       this.emit("gameOver", { gamePk });

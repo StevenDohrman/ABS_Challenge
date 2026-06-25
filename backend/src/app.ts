@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import { recommendationsRouter } from "./routes/recommendations";
+import { scheduleRouter } from "./routes/schedule";
+import { prisma } from "./db/prisma";
 
 const app = express();
 
@@ -15,8 +17,15 @@ app.use(express.json());
  * GET /health
  * Lightweight liveness check for load balancers and monitoring.
  */
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+app.get("/health", async (_req, res) => {
+  let db: "connected" | "disconnected" = "disconnected";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    db = "connected";
+  } catch {
+    // DB unreachable — server is still up, just report the state.
+  }
+  res.json({ status: "ok", db });
 });
 
 /**
@@ -27,6 +36,7 @@ app.get("/health", (_req, res) => {
  *   POST /api/games/:gamePk/confidence
  */
 app.use("/api/games", recommendationsRouter);
+app.use("/api/schedule", scheduleRouter);
 
 // ── Catch-all error handler ─────────────────────────────────────────────────
 

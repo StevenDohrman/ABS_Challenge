@@ -12,7 +12,7 @@
  */
 
 import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, ActiveGame } from "@abs/data-pipeline";
-import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent } from "../db/gameRepository";
+import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,6 +61,32 @@ export async function handleAtBatStart(
   snapshot: MlbAtBatSnapshot
 ): Promise<void> {
   try {
+    // Safety net: ensure the game row exists before writing the snapshot.
+    // Under normal operation gameDiscovered fires first, but on pipeline
+    // restarts or race conditions the game row may be missing.
+    const existing = await findGame(snapshot.gamePk);
+    if (!existing) {
+      console.warn(
+        `[ingestService] game ${snapshot.gamePk} missing at atBatStart — creating from snapshot`
+      );
+      const homeTeamId = snapshot.halfInning === "top"
+        ? snapshot.fieldingTeamId
+        : snapshot.battingTeamId;
+      const awayTeamId = snapshot.halfInning === "top"
+        ? snapshot.battingTeamId
+        : snapshot.fieldingTeamId;
+      await upsertGame({
+        gamePk: snapshot.gamePk,
+        officialDate: new Date().toISOString().slice(0, 10),
+        scheduledStartTime: new Date().toISOString(),
+        status: "Live",
+        detailedState: "In Progress",
+        homeTeamId,
+        homeTeamName: String(homeTeamId),
+        awayTeamId,
+        awayTeamName: String(awayTeamId),
+      });
+    }
     await upsertAtBatSnapshot(snapshot);
   } catch (err) {
     console.error(

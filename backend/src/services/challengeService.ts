@@ -192,13 +192,8 @@ export async function triggerRecommendationIfCalledStrike(
   );
 
   if (!existing) {
-    // The at-bat recommendation wasn't pre-computed yet (race condition or
-    // pipeline startup). Log it and move on — the frontend will see no
-    // recommendation for this pitch rather than crashing.
-    console.warn(
-      `[challengeService] no pre-computed recommendation found for ` +
-      `game ${event.gamePk} at-bat ${event.atBatIndex} count ${event.ballsBefore}-${event.strikesBefore}`
-    );
+    // Pre-computation races or pipeline startup before this at-bat: skip silently.
+    // The frontend simply shows no recommendation card for this pitch.
     return;
   }
 

@@ -20,7 +20,6 @@ The system should answer questions such as:
 - How confident should the player be before challenging?
 - Is this situation valuable enough to justify using a challenge?
 - Are we being too conservative or too aggressive with challenges?
-- Which players are reliable when signaling confidence?
 - Which missed challenges had the highest expected value?
 
 ---
@@ -48,7 +47,6 @@ Live inputs include:
 - Current call
 - Game status
 - Remaining challenge count
-- Player-submitted confidence
 
 The live engine should not depend on Baseball Savant pitch-location data because Savant is not treated as the real-time source for this system. However it can be used for postgame analysis such as missed challenge opportunities based on pitch locations.
 
@@ -68,9 +66,13 @@ Examples:
 - Hitter splits vs left-handed pitchers
 - Hitter splits vs right-handed pitchers
 - Historical player challenge success rate
-- Defensive metrics such as Outs Above Average in locations and where the batter usually gets hits
+- Batter spray profile (pull%, straightaway%, oppo%, GB/FB/LD mix)
+- Fielder Outs Above Average (OAA) by position and by batter handedness
+- Outfield directional OAA (left, straight, right) and jump metrics (reaction, burst, route)
 - Run expectancy tables
 - Win probability inputs, if available
+
+All of the above defensive and spray metrics are already fetched daily by `SavantDailyJob`. They are pregame computations keyed to the players confirmed in the lineup, so no additional API calls are required at decision time — the data simply needs to be stored and wired into the engine.
 
 ### Postgame Data
 
@@ -80,7 +82,6 @@ Postgame analysis can answer:
 
 - Which pitches should have been challenged?
 - Which allowed challenges were bad decisions?
-- Which players were accurate when reporting confidence?
 - Which game states produced missed challenge opportunities?
 - How should thresholds be adjusted in the future?
 
@@ -290,7 +291,6 @@ It should be responsible for:
 - Calling the challenge engine
 - Saving recommendations
 - Serving frontend-ready DTOs
-- Managing player confidence submissions
 
 Backend DTOs should be different from raw engine types when necessary. The backend should convert engine outputs into frontend-friendly responses.
 
@@ -326,7 +326,6 @@ It should be responsible for:
 - Showing the current game state
 - Showing the challenge recommendation
 - Displaying explanation text
-- Collecting player confidence
 - Showing challenge history
 - Showing postgame review results
 
@@ -405,8 +404,7 @@ shared = common language
 5. Store normalized game snapshot.
 6. Store normalized pitch event.
 7. Combine live state with pregame player context.
-8. Collect player confidence.
-9. Send clean input to challenge engine.
+8. Send clean input to challenge engine.
 10. Store recommendation output.
 11. Serve recommendation to frontend.
 ```
@@ -609,7 +607,6 @@ live_game_snapshots
 live_pitch_events
 player_stat_snapshots
 challenge_recommendations
-player_confidence_inputs
 savant_pitch_events
 postgame_challenge_audits
 ingestion_runs
@@ -699,20 +696,6 @@ expected_value
 score
 explanation_json
 created_at
-```
-
-### `player_confidence_inputs`
-
-Stores player or coach confidence signals.
-
-Useful fields:
-
-```txt
-game_pk
-pitch_id
-player_id
-confidence
-submitted_at
 ```
 
 ### `savant_pitch_events`
@@ -852,6 +835,17 @@ Focus on:
 - Defensive context
 - Run expectancy tables
 
+**Defensive and spray data — already fetched, not yet wired:**
+
+`SavantDailyJob` already fetches and emits batter spray profiles, fielder OAA, outfield directional OAA, and sprint speed. The data pipeline does its job. What is missing is:
+
+1. Storage — `player_stat_snapshots` does not have OAA or spray columns. A new table or additional columns are needed.
+2. Orchestrator handlers — `batterStatlines` is handled; `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` are emitted but nothing reads them.
+3. Engine input — `PlayerChallengeContext` has no OAA or spray fields. New fields and a new feature computation module are needed.
+4. RE delta adjustment — the current RE table uses league-average defensive conversion rates. OAA and spray data would allow a small multiplier correction: a pull-heavy batter facing an elite fielder in the pull zone is worth less to keep at the plate than the raw RE table implies.
+
+This is low-cost incremental work because all the data is already available at decision time.
+
 ### Phase 3: Basic Recommendation Engine
 
 Build a rule-based challenge engine.
@@ -873,10 +867,23 @@ Expose recommendations through the backend and display them in the frontend.
 Focus on:
 
 - Recommendation endpoint
-- Player confidence input
 - Challenge card UI
 - Explanation display
 - Game situation display
+
+**Wire OAA and spray profiles into the live engine (Phase 4 scope):**
+
+This belongs in Phase 4 rather than Phase 6 because the data is already ingested by the pipeline — it is a wiring task, not a modelling task.
+
+Steps:
+
+1. Add `spray_profiles`, `fielder_oaa`, and `outfield_directional_oaa` tables (or extend `player_stat_snapshots`) in the Prisma schema.
+2. Register `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` handlers in `orchestrator.ts` to write the emitted data to those tables.
+3. Add `sprayProfile` and `defensiveOaa` fields to `PlayerChallengeContext` in the engine.
+4. Create a `defensiveContext.ts` feature module in the engine that computes a small RE delta multiplier from the batter's spray tendencies and the relevant fielder's OAA.
+5. Apply the multiplier inside `decideChallenge` after the offensive value step.
+
+The expected effect is small — a ±5–10% correction to the RE delta — but it moves the system toward a more accurate expected value in situations where the defense is clearly elite or clearly poor in the batter's spray zone.
 
 ### Phase 5: Postgame Savant Analysis
 
@@ -897,29 +904,92 @@ Use postgame audit data to improve the recommendation engine.
 Focus on:
 
 - Threshold tuning
-- Player-specific confidence calibration
 - Historical backtesting
 - Feature importance
 - Optional machine learning model
 
 ---
 
-## Current Priority
+## Current Status (as of June 2026)
 
-The current priority is the data ingestion engine.
+Phase 4 is complete. The full stack is running end-to-end:
 
-Focus only on:
+- **Data pipeline**: `LivePollJob` polls active games every 15 s, detects new at-bats (including gap-fill for multiple at-bats completing between polls), backfills historical at-bats on startup, and emits pitch events with deduplication.
+- **Backend**: pre-computes 12-count recommendation grids per at-bat, triggers called-strike recommendations, serves schedule/live/history APIs, runs daily data-retention cleanup (configurable via `DATA_RETENTION_DAYS`, default 7 days).
+- **Frontend**: React + Tailwind SPA at `frontend/`. Shows today's games dashboard, live game detail (score, inning, count auto-refreshes every 30 s), pre-at-bat banner with count grid, called-strike card, and at-bat history with expandable recommendation grids.
 
-```txt
-1. MLB live game polling
-2. Live game state normalization
-3. Pitch event normalization
-4. Pregame player context ingestion
-5. Database storage
-6. Clean mapping into engine-ready types
+---
+
+## Next Features for the Next Agent
+
+### 1. ABS Challenge Outcome Display
+
+The MLB Stats API already records ABS challenge results on pitch events. No new API calls are needed — the data is already stored in `live_pitch_events.rawPayload`.
+
+**What the API gives you (confirmed from real game data):**
+
+Each challenged pitch has `details.hasReview: true` and a `reviewDetails` object:
+
+```json
+{
+  "isOverturned": true,
+  "inProgress": false,
+  "reviewType": "MJ",
+  "challengeTeamId": 111,
+  "player": {
+    "id": 678882,
+    "fullName": "Ceddanne Rafaela"
+  }
+}
 ```
 
-Baseball Savant should be added later for postgame analysis, not as part of the real-time decision loop.
+- `hasReview` — the pitch was challenged
+- `isOverturned` — whether the original call was reversed
+- `challengeTeamId` — which team challenged (compare to `battingTeamId` / `fieldingTeamId` to determine batter-side vs pitcher-side)
+- `player` — the exact player who triggered the challenge
+
+**Implementation steps:**
+
+1. **Type**: Add `reviewDetails` to `MlbPlayEvent` in `data-pipeline/src/sources/mlb-live/mlbLive.api.types.ts`:
+   ```ts
+   reviewDetails?: {
+     isOverturned: boolean;
+     inProgress: boolean;
+     reviewType: string;
+     challengeTeamId: number;
+     player: { id: number; fullName: string; link: string };
+   };
+   ```
+
+2. **Internal type**: Add `hasReview`, `isOverturned`, `challengerName`, `challengerTeamId` to `MlbLivePitchEvent` in `mlbLive.types.ts`.
+
+3. **Parser**: Propagate from `MlbPlayEvent.reviewDetails` in `parsePitchEventsFromPlay` inside `mlbLive.parser.ts`.
+
+4. **DB schema**: Add `hasReview Boolean @default(false)`, `isOverturned Boolean?`, `challengerName String?`, `challengerTeamId Int?` columns to `LivePitchEvent` in `prisma/schema.prisma` and run `prisma migrate dev`.
+
+5. **DTO**: Extend `AtBatHistoryItemDto` in `challenge.dto.ts` to include challenge outcome per at-bat.
+
+6. **Frontend**: In the at-bat history view (`AtBatHistory.tsx`), show a challenge badge on rows where `hasReview` is true — display the challenger's name, which side challenged, and whether it was overturned. This is already a requested feature.
+
+### 2. Wire OAA + Spray Profiles into the Engine
+
+`SavantDailyJob` already emits `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` events but the orchestrator drops them. See Phase 4 notes above for the full wiring plan.
+
+### 3. Phase 5: Postgame Savant Enrichment
+
+Pull Savant pitch-location data after game completion, join to `live_pitch_events`, and populate `postgame_challenge_audits` to audit missed challenges and bad allowed challenges.
+
+---
+
+## Live Polling Intervals (current implementation)
+
+```txt
+Pregame / Warmup:  every 5 minutes
+In Progress:       every 15 seconds   (reduced from 30 s to catch fast at-bats)
+Between innings:   every 30 seconds
+Error retry:       every 10 seconds
+Game check:        every 5 minutes    (LivePollJob discovers new games)
+```
 
 ---
 
