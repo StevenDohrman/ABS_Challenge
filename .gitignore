@@ -1,41 +1,82 @@
+# ─────────────────────────────────────────────────────────────────────────────
 # Dependencies
+# ─────────────────────────────────────────────────────────────────────────────
+
 node_modules/
 .pnp
 .pnp.js
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Build output
+# ─────────────────────────────────────────────────────────────────────────────
+
 dist/
 build/
 out/
 *.tsbuildinfo
 
-# Environment
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment — never commit real secrets
+# ─────────────────────────────────────────────────────────────────────────────
+
 .env
 .env.*
 !.env.example
+!.env.*.example
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Prisma
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Generated Prisma Client — regenerated from schema.prisma on any machine.
+# Only committed if your project explicitly bundles the client (rare).
+# Keep schema.prisma and migrations/ committed.
+**/prisma/generated/
+
+# Migration lock file is committed, but the SQLite dev DB is not.
+*.db
+*.db-journal
+dev.db
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Logs
+# ─────────────────────────────────────────────────────────────────────────────
+
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# OS
+# ─────────────────────────────────────────────────────────────────────────────
+# Test coverage
+# ─────────────────────────────────────────────────────────────────────────────
+
+coverage/
+.nyc_output/
+*.lcov
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OS & editor artifacts
+# ─────────────────────────────────────────────────────────────────────────────
+
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# TypeScript cache
-*.tsbuildinfo
+# ─────────────────────────────────────────────────────────────────────────────
+# Temporary / misc
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Test coverage
-coverage/
-
-# Misc
 *.local
+.cache/
+tmp/
+temp/

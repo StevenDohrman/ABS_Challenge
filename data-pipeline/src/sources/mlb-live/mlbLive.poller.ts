@@ -4,6 +4,8 @@ import {
   parsePitchEvents,
   parseGameSnapshot,
   parseAtBatSnapshot,
+  parseHistoricalAtBatSnapshots,
+  parseMissedAtBatSnapshots,
   pitchKey,
 } from "./mlbLive.parser";
 import {
@@ -12,8 +14,8 @@ import {
   MlbAtBatSnapshot,
 } from "./mlbLive.types";
 
-const ACTIVE_PLAY_INTERVAL_MS = 30_000;
-const SLOW_INTERVAL_MS = 60_000;
+const ACTIVE_PLAY_INTERVAL_MS = 15_000;   // reduced: multiple at-bats can happen in 30 s
+const SLOW_INTERVAL_MS = 30_000;           // between-innings, pitching changes, etc.
 const PREGAME_INTERVAL_MS = 5 * 60_000;
 const ERROR_RETRY_INTERVAL_MS = 10_000;
 
@@ -23,10 +25,17 @@ const ERROR_RETRY_INTERVAL_MS = 10_000;
  */
 export interface GamePoller {
   on(event: "atBatStart", listener: (snapshot: MlbAtBatSnapshot) => void): this;
+  /**
+   * Fired once on the first poll with ALL completed historical at-bats as a
+   * batch. The orchestrator processes them sequentially (store + pre-compute)
+   * to avoid saturating the DB connection pool.
+   */
+  on(event: "gameBackfill", listener: (snapshots: MlbAtBatSnapshot[]) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
   emit(event: "atBatStart", snapshot: MlbAtBatSnapshot): boolean;
+  emit(event: "gameBackfill", snapshots: MlbAtBatSnapshot[]): boolean;
   emit(event: "pitchEvent", pitchEvent: MlbLivePitchEvent): boolean;
   emit(event: "gameOver", payload: { gamePk: number }): boolean;
   emit(event: "error", err: Error): boolean;
@@ -85,18 +94,49 @@ export class GamePoller extends EventEmitter {
         ? await fetchLiveFeedDiff(this.gamePk, this.lastTimestamp)
         : await fetchLiveFeed(this.gamePk);
 
-      this.lastTimestamp = feed.metaData.timeStamp;
+      // metaData is absent on warmup/pregame partial feeds — keep the last
+      // known timestamp so the next poll uses the diff endpoint correctly.
+      this.lastTimestamp = feed.metaData?.timeStamp ?? this.lastTimestamp;
 
-      if (feed.gameData.status.abstractGameState === "Final") {
+      // gameData / liveData may be absent on pre-game partial responses
+      if (feed.gameData?.status?.abstractGameState === "Final") {
         this.emit("gameOver", { gamePk: this.gamePk });
         this.stop();
+        return;
+      }
+
+      if (!feed.gameData || !feed.liveData?.plays) {
+        // Partial feed with no game data yet — nothing to parse, try again soon
+        this.scheduleNextPoll(PREGAME_INTERVAL_MS);
         return;
       }
 
       const snapshot = parseGameSnapshot(feed, fetchedAt);
 
       const currentAtBatIndex = feed.liveData.plays.currentPlay?.about.atBatIndex ?? -1;
+
       if (currentAtBatIndex !== this.lastAtBatIndex) {
+        if (this.lastAtBatIndex === -1) {
+          // ── First poll ────────────────────────────────────────────────────
+          // Emit all completed at-bats as a single batch. The orchestrator
+          // processes them sequentially (store + full pre-compute) so DB
+          // connections never exceed 12 at once.
+          const historical = parseHistoricalAtBatSnapshots(feed, fetchedAt);
+          if (historical.length > 0) {
+            this.emit("gameBackfill", historical);
+          }
+        } else if (currentAtBatIndex > this.lastAtBatIndex + 1) {
+          // ── Subsequent polls: index jumped by > 1 ─────────────────────────
+          // At-bats completed faster than our poll interval. Emit atBatStart
+          // (full pre-computation) for every missed play so their called
+          // strikes can trigger recommendations.
+          for (const snap of parseMissedAtBatSnapshots(
+            feed, fetchedAt, this.lastAtBatIndex, currentAtBatIndex
+          )) {
+            this.emit("atBatStart", snap);
+          }
+        }
+
         this.lastAtBatIndex = currentAtBatIndex;
         const atBatSnapshot = parseAtBatSnapshot(feed, fetchedAt);
         if (atBatSnapshot) {

@@ -1,0 +1,228 @@
+// Prisma schema for the Strike Zone Challenge Recommendation System.
+//
+// Table responsibilities:
+//   games                     — One row per MLB game; tracks metadata and challenge counts.
+//   live_game_snapshots        — Game state at the start of each new at-bat.
+//   live_pitch_events          — Every pitch emitted by the MLB live feed, deduplicated.
+//   player_stat_snapshots      — Daily Savant batter metrics; one row per player per season.
+//   challenge_recommendations  — Engine output pre-computed for every count state per at-bat.
+//
+// All data flows from MLB Live API and Baseball Savant only. No user input enters
+// the recommendation system.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// games
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Game {
+  id     Int @id @default(autoincrement())
+  gamePk Int @unique
+
+  gameDate   String // YYYY-MM-DD official MLB game date
+  homeTeamId Int
+  awayTeamId Int
+  status     String // "Preview" | "Live" | "Final" — mirrors MLB abstractGameState
+
+  // Challenge resources remaining for each team.
+  // Decremented each time a challenge is used. Never goes below zero.
+  homeChallengesRemaining Int @default(3)
+  awayChallengesRemaining Int @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshots       LiveGameSnapshot[]
+  pitchEvents     LivePitchEvent[]
+  recommendations ChallengeRecommendation[]
+
+  @@map("games")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// live_game_snapshots
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Stores the game state at the start of each new at-bat.
+// Written by the backend when the LivePollJob emits an `atBatStart` event.
+// One row per at-bat; updated if the same at-bat index is seen again.
+model LiveGameSnapshot {
+  id            Int    @id @default(autoincrement())
+  gamePk        Int
+  atBatIndex    Int
+  inning        Int
+  halfInning    String // "top" | "bottom"
+  outs          Int
+  runnerOnFirst  Boolean
+  runnerOnSecond Boolean
+  runnerOnThird  Boolean
+  homeScore     Int
+  awayScore     Int
+  batterId      Int
+  pitcherId     Int
+  battingTeamId  Int
+  fieldingTeamId Int
+  fetchedAt     DateTime
+
+  // Full MlbAtBatSnapshot object preserved for debugging and reprocessing.
+  rawPayload Json
+
+  game Game @relation(fields: [gamePk], references: [gamePk])
+
+  @@unique([gamePk, atBatIndex])
+  @@index([gamePk])
+  @@map("live_game_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// live_pitch_events
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Stores every pitch emitted by the MLB live feed.
+// Deduplicated by playId when available; falls back to (gamePk, atBatIndex, pitchNumber).
+model LivePitchEvent {
+  id          Int     @id @default(autoincrement())
+  gamePk      Int
+  playId      String? @unique // MLB play UUID; null for older feed versions
+  atBatIndex  Int
+  pitchNumber Int
+  inning      Int
+  halfInning  String
+
+  // Count BEFORE this pitch (used to look up the pre-computed recommendation).
+  ballsBefore   Int
+  strikesBefore Int
+
+  // Count AFTER this pitch (as recorded by the MLB API).
+  balls   Int
+  strikes Int
+  outs    Int
+
+  batterId  Int
+  pitcherId Int
+
+  callCode        String? // e.g. "C" for called strike, "B" for ball
+  callDescription String? // e.g. "Called Strike", "Ball"
+
+  fetchedAt DateTime
+
+  // Raw MlbPlayEvent object preserved for debugging and future field additions.
+  rawPayload Json
+
+  game            Game                      @relation(fields: [gamePk], references: [gamePk])
+  recommendations ChallengeRecommendation[]
+
+  @@unique([gamePk, atBatIndex, pitchNumber])
+  @@index([gamePk])
+  @@map("live_pitch_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// player_stat_snapshots
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Daily Savant batter metrics ingested by SavantDailyJob.
+// One row per player per season; upserted on each daily run.
+//
+// Plate discipline fields (kPercent, bbPercent, chasePercent, whiffPercent, zonePercent)
+// are stored as percentages (0–100) matching the Savant leaderboard format.
+// The backend service divides by 100 before passing them to the engine as rates (0–1).
+model PlayerStatSnapshot {
+  id         Int    @id @default(autoincrement())
+  playerId   Int
+  playerName String
+  season     Int
+
+  // Batter stance — populated from the MLB Stats API (not Savant).
+  // Null until enriched. The engine handles null gracefully (no handedness adjustment).
+  battingHand String? // "L" | "R" | "S"
+
+  // Plate appearances sampled from.
+  pa Int
+
+  // Traditional stats (Savant leaderboard).
+  ba  Float? // batting average
+  obp Float? // on-base percentage — from MLB Stats API
+  slg Float? // slugging percentage
+  ops Float? // OBP + SLG — from MLB Stats API
+
+  // Expected / model-derived metrics.
+  woba  Float? // weighted on-base average
+  xba   Float? // expected batting average
+  xslg  Float? // expected slugging
+  xwoba Float? // expected wOBA
+
+  // Plate discipline percentages (0–100 as stored by Savant).
+  kPercent     Float? // strikeout rate %
+  bbPercent    Float? // walk rate %
+  chasePercent Float? // out-of-zone swing % (oz_swing_percent)
+  whiffPercent Float? // whiff %
+  zonePercent  Float? // in-zone swing %
+
+  // Contact quality.
+  hardHitPercent Float?
+  barrelPercent  Float?
+
+  // Historical challenge accuracy derived from challenge_recommendations
+  // joined with postgame Savant audit data (Phase 5).
+  historicalChallengeAttempts    Int   @default(0)
+  historicalChallengeSuccessRate Float? // null when no challenge history exists
+
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, season])
+  @@index([playerId])
+  @@map("player_stat_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// challenge_recommendations
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Engine output pre-computed for all 12 count states when a new at-bat starts.
+// One row per (gamePk, atBatIndex, balls, strikes).
+//
+// triggeredAt is set when a called-strike pitch event matches this count state,
+// making it the "active" recommendation the frontend should display.
+model ChallengeRecommendation {
+  id         Int @id @default(autoincrement())
+  gamePk     Int
+  atBatIndex Int
+
+  // Count BEFORE the pitch that would be challenged.
+  balls   Int
+  strikes Int
+
+  // Engine output fields.
+  recommendation            String  // "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY"
+  minimumConfidenceRequired Int     // 0–100 confidence the player must report
+  expectedValue             Float   // situation-adjusted EV in runs
+  score                     Float   // 0–100 composite score
+
+  // Ordered list of human-readable sentences from the engine.
+  explanationJson Json // string[]
+
+  createdAt DateTime @default(now())
+
+  // Set when a called-strike pitch with this count arrives.
+  // Null for pre-computed rows that were never triggered.
+  triggeredAt  DateTime?
+  pitchEventId Int?
+
+  game       Game            @relation(fields: [gamePk], references: [gamePk])
+  pitchEvent LivePitchEvent? @relation(fields: [pitchEventId], references: [id])
+
+  @@unique([gamePk, atBatIndex, balls, strikes])
+  @@index([gamePk, triggeredAt])
+  @@map("challenge_recommendations")
+}
+
