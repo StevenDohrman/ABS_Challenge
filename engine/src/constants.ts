@@ -232,12 +232,18 @@ export const SITUATION = {
 
 export const SCARCITY = {
   /**
-   * Teams with at least this many challenges are considered to have "plenty".
-   * No threshold or confidence penalty is applied.
+   * Teams with at least this many challenges are considered to have "plenty"
+   * (their full allotment) — no threshold or confidence penalty is applied.
+   * Under the current ABS rules a team starts with 2 challenges, so 2 is the
+   * full-allotment baseline.
    */
-  PLENTY_MIN_CHALLENGES: 3,
+  PLENTY_MIN_CHALLENGES: 2,
 
-  /** Teams with exactly this many challenges are in "moderate" scarcity. */
+  /**
+   * Teams with exactly this many challenges are in "moderate" scarcity.
+   * With a 2-challenge allotment this tier is currently unreachable (2 counts as
+   * plenty); retained for flexibility if the allotment changes.
+   */
   MODERATE_CHALLENGES: 2,
 
   /** Teams with exactly this many challenges are in "scarce" territory. */

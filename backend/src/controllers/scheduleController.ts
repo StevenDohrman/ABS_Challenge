@@ -139,7 +139,7 @@ export async function getTodaySchedule(
       currentInningHalf: isLive ? formatHalf(ls?.inningHalf) : null,
       balls: isLive ? (ls?.balls ?? null) : null,
       strikes: isLive ? (ls?.strikes ?? null) : null,
-      outs: isLive ? (ls?.outs ?? null) : null,
+      outs: isLive ? normalizeLiveOuts(ls?.outs ?? null) : null,
 
       isTracked: trackedSet.has(g.gamePk),
       hasTriggeredRecommendation: triggeredSet.has(g.gamePk),
@@ -171,6 +171,12 @@ function formatHalf(half?: string): string | null {
   if (lower === "top") return "Top";
   if (lower === "bottom") return "Bot";
   return half;
+}
+
+/** Live linescore outs are 0–2 during play; the feed may briefly report 3 after the third out. */
+function normalizeLiveOuts(outs: number | null): number | null {
+  if (outs === null) return null;
+  return Math.min(Math.max(0, outs), 2);
 }
 
 /**

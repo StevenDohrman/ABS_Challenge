@@ -3,10 +3,11 @@
  *
  * Models the opportunity cost of using a challenge.
  *
- * Each team has a finite number of challenges per game (typically 3 but can
- * vary). Using a challenge on a low-EV situation risks having no challenges
- * left for a high-EV situation later in the game. This module penalizes
- * challenge use based on how many challenges remain.
+ * Each team has a finite number of challenges per game (2 under the current ABS
+ * rules, and a successful challenge is retained — so the count can hold steady
+ * all game). Using a challenge on a low-EV situation risks having none left for
+ * a high-EV situation later. This module penalizes challenge use based on how
+ * many challenges remain.
  *
  * Scarcity affects the engine in two ways:
  *
@@ -21,8 +22,10 @@
  * only computes the scarcity level and shift values. The decision layer
  * (thresholds.ts) applies them.
  *
- * 0 challenges remaining is a hard gate and never reaches this module
- * (the engine short-circuits to DENY before computing anything).
+ * 0 challenges remaining returns the "none" level with no penalty: the engine
+ * produces a value-based recommendation regardless of availability so that a
+ * high-value call a team cannot challenge still surfaces as a missed opportunity.
+ * Whether the team can actually challenge is tracked by the backend, not here.
  */
 
 import { SCARCITY } from "../constants";
@@ -39,9 +42,9 @@ export interface ChallengeScarcityResult {
    * How many points to ADD to score thresholds.
    * A positive shift makes it harder to reach AUTO_ALLOW, ALLOW, or WARN.
    *
-   *   3 challenges:  0  (no penalty — spend freely)
-   *   2 challenges:  8  (mild caution)
-   *   1 challenge:  20  (significant caution — save it for a great spot)
+   *   2+ challenges:  0  (no penalty — a full allotment, spend freely)
+   *   1 challenge:   20  (significant caution — save it for a great spot)
+   *   0 challenges:   0  (no penalty — show the call's raw value for auditing)
    */
   thresholdShift: number;
 
@@ -49,14 +52,14 @@ export interface ChallengeScarcityResult {
    * How many points to ADD to the minimum confidence required.
    * Stacks on top of the base confidence from the score.
    *
-   *   3 challenges:  0
-   *   2 challenges:  5
-   *   1 challenge:  15
+   *   2+ challenges:  0
+   *   1 challenge:   15
+   *   0 challenges:   0  (no penalty — show the call's raw value for auditing)
    */
   confidenceShift: number;
 
   /** Convenience label for explanation generation. */
-  scarcityLevel: "plenty" | "moderate" | "scarce";
+  scarcityLevel: "plenty" | "moderate" | "scarce" | "none";
 }
 
 // ---------------------------------------------------------------------------
@@ -65,12 +68,22 @@ export interface ChallengeScarcityResult {
 
 /**
  * Computes the scarcity profile for the given number of challenges remaining.
- * Callers should check for 0 challenges and short-circuit to DENY before
- * calling this function — behavior with 0 is undefined here.
+ *
+ * 0 (or fewer) returns the "none" level with no shifts; the recommendation
+ * remains value-based and availability is handled outside the engine.
  */
 export function computeChallengeScarcity(
   challengesRemaining: number
 ): ChallengeScarcityResult {
+  if (challengesRemaining <= 0) {
+    return {
+      challengesRemaining,
+      thresholdShift: 0,
+      confidenceShift: 0,
+      scarcityLevel: "none",
+    };
+  }
+
   if (challengesRemaining >= SCARCITY.PLENTY_MIN_CHALLENGES) {
     return {
       challengesRemaining,

@@ -63,6 +63,9 @@ export interface ChallengeRecommendationResponse {
   expectedValue: number;
   score: number;
 
+  /** False when the team is out of challenges — a positive call is a missed opportunity. */
+  challengeAvailable: boolean;
+
   displayMessage: string;
   reasons: string[];
   triggeredAt: string;
@@ -80,6 +83,8 @@ export interface CountStateRecommendation {
   minimumConfidenceThreshold: number;
   expectedValue: number;
   score: number;
+  /** False when the team is out of challenges — a positive call is a missed opportunity. */
+  challengeAvailable: boolean;
   displayMessage: string;
 }
 

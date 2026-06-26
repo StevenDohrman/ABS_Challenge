@@ -16,7 +16,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Runtime connection — Supabase transaction pooler (pgBouncer, port 6543).
   url      = env("DATABASE_URL")
+  // Migrations only — direct/session connection (port 5432). prisma migrate
+  // cannot run through the transaction pooler (it takes an advisory lock and
+  // runs DDL that pgBouncer's transaction mode does not support), so it must use
+  // this URL instead or it hangs.
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,10 +38,12 @@ model Game {
   awayTeamId Int
   status     String // "Preview" | "Live" | "Final" — mirrors MLB abstractGameState
 
-  // Challenge resources remaining for each team.
-  // Decremented each time a challenge is used. Never goes below zero.
-  homeChallengesRemaining Int @default(3)
-  awayChallengesRemaining Int @default(3)
+  // Challenge resources remaining for each team. Each team starts with 2 under
+  // ABS rules; a successful (overturned) challenge is retained, so only failed
+  // challenges consume the allotment. Derived from review pitch events by
+  // recomputeChallengesRemaining; never goes below zero.
+  homeChallengesRemaining Int @default(2)
+  awayChallengesRemaining Int @default(2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -213,6 +221,12 @@ model ChallengeRecommendation {
   minimumConfidenceRequired Int     // 0–100 confidence the player must report
   expectedValue             Float   // situation-adjusted EV in runs
   score                     Float   // 0–100 composite score
+
+  // Whether the batting team could physically challenge this at-bat (had at least
+  // one challenge available). The recommendation above is value-based regardless;
+  // false here means "would be worth it, but the team is out of challenges" — a
+  // missed-opportunity signal for the UI and post-game audit.
+  challengeAvailable Boolean @default(true)
 
   // Ordered list of human-readable sentences from the engine.
   explanationJson Json // string[]

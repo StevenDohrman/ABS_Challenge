@@ -62,6 +62,10 @@ const mockFindGame = gameRepo.findGame as jest.MockedFunction<typeof gameRepo.fi
 const mockFindLatestAtBatSnapshot = gameRepo.findLatestAtBatSnapshot as jest.MockedFunction<
   typeof gameRepo.findLatestAtBatSnapshot
 >;
+const mockComputeTeamChallengesRemaining =
+  gameRepo.computeTeamChallengesRemaining as jest.MockedFunction<
+    typeof gameRepo.computeTeamChallengesRemaining
+  >;
 const mockFindPlayerStatSnapshot = playerRepo.findPlayerStatSnapshot as jest.MockedFunction<
   typeof playerRepo.findPlayerStatSnapshot
 >;
@@ -123,6 +127,7 @@ describe("precomputeAtBatRecommendations", () => {
     mockUpsertRecommendation.mockResolvedValue(makeChallengeRecommendation());
     mockBuildDefaultPlayerChallengeContext.mockReturnValue(DEFAULT_PLAYER_CONTEXT);
     mockBuildPlayerChallengeContext.mockReturnValue(DEFAULT_PLAYER_CONTEXT);
+    mockComputeTeamChallengesRemaining.mockResolvedValue(2);
   });
 
   describe("when the game is not in the database", () => {
@@ -183,30 +188,47 @@ describe("precomputeAtBatRecommendations", () => {
       expect(writtenCountKeys.sort()).toEqual(expectedKeys.sort());
     });
 
-    it("uses the home team's challenges when the batting team is home (bottom half)", async () => {
-      const snapshot = makeMlbAtBatSnapshot({ halfInning: "bottom" });
-      const game = makeGame({ homeChallengesRemaining: 2, awayChallengesRemaining: 3 });
-      mockFindGame.mockResolvedValue(game);
+    it("derives the batting team's challenges (by team + inning) and passes them to the engine", async () => {
+      const snapshot = makeMlbAtBatSnapshot({
+        halfInning: "bottom",
+        battingTeamId: 133,
+        inning: 7,
+      });
+      mockComputeTeamChallengesRemaining.mockResolvedValue(2);
 
       await precomputeAtBatRecommendations(snapshot);
 
-      // Every decideChallenge call should have received 2 (home challenges)
+      // Derivation is keyed on the batting team and the at-bat's inning so the
+      // extra-innings rule can be applied correctly.
+      expect(mockComputeTeamChallengesRemaining).toHaveBeenCalledWith(
+        snapshot.gamePk,
+        133,
+        7
+      );
       for (const call of decideChallenge.mock.calls) {
         const input = call[0] as { gameState: { challengesRemaining: number } };
         expect(input.gameState.challengesRemaining).toBe(2);
       }
     });
 
-    it("uses the away team's challenges when the batting team is away (top half)", async () => {
-      const snapshot = makeMlbAtBatSnapshot({ halfInning: "top" });
-      const game = makeGame({ homeChallengesRemaining: 3, awayChallengesRemaining: 1 });
-      mockFindGame.mockResolvedValue(game);
+    it("flags challengeAvailable=false on every count when the batting team is out of challenges", async () => {
+      mockComputeTeamChallengesRemaining.mockResolvedValue(0);
 
-      await precomputeAtBatRecommendations(snapshot);
+      await precomputeAtBatRecommendations(makeMlbAtBatSnapshot());
 
-      for (const call of decideChallenge.mock.calls) {
-        const input = call[0] as { gameState: { challengesRemaining: number } };
-        expect(input.gameState.challengesRemaining).toBe(1);
+      expect(mockUpsertRecommendation).toHaveBeenCalledTimes(ALL_COUNT_STATES.length);
+      for (const call of mockUpsertRecommendation.mock.calls) {
+        expect(call[0].challengeAvailable).toBe(false);
+      }
+    });
+
+    it("flags challengeAvailable=true on every count when at least one challenge remains", async () => {
+      mockComputeTeamChallengesRemaining.mockResolvedValue(1);
+
+      await precomputeAtBatRecommendations(makeMlbAtBatSnapshot());
+
+      for (const call of mockUpsertRecommendation.mock.calls) {
+        expect(call[0].challengeAvailable).toBe(true);
       }
     });
 

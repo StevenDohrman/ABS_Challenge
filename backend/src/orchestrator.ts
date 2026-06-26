@@ -31,6 +31,7 @@ import {
   handlePitchEvent,
   handleGameOver,
   handleBatterStatlines,
+  reconcileChallengeCounts,
 } from "./services/ingestService";
 import {
   precomputeAtBatRecommendations,
@@ -50,8 +51,20 @@ const DATA_RETENTION_DAYS = parseInt(process.env["DATA_RETENTION_DAYS"] ?? "7", 
  * Called once at server startup.
  */
 export async function startOrchestrator(): Promise<void> {
+  // Load pregame Savant data FIRST, before live polling starts. Two reasons:
+  //   1. The Savant batch is a large bulk upsert; running it before the live
+  //      poll begins means the two never contend for the connection pool at
+  //      startup (the original cause of the P2024 pool-timeout errors).
+  //   2. Player stats are then already in the DB when the first at-bat is
+  //      precomputed, so recommendations use real stats instead of defaults.
+  // The daily rerun is concurrency-capped (DB_LIMITS.WRITE_CONCURRENCY), so it
+  // is safe to run alongside live polling later in the process lifetime.
+  await runSavantDailyJob();
+  // Repair any challenge counts left corrupted by earlier restarts BEFORE live
+  // polling begins, so the first poll's backfill re-precomputes historical
+  // at-bats using the corrected counts (a 0 count forces every grid to DENY).
+  await reconcileChallengeCounts();
   startLivePollJob();
-  await runSavantDailyJob(); // Run immediately at startup to load pregame data.
   scheduleSavantDailyJob();  // Then schedule daily reruns.
   await runCleanupJob();     // Purge old data at startup and schedule daily reruns.
   scheduleCleanupJob();

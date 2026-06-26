@@ -2,6 +2,7 @@ import {
   parsePitchEvents,
   parseGameSnapshot,
   parseAtBatSnapshot,
+  parseHistoricalAtBatSnapshots,
   pitchKey,
 } from "../mlbLive.parser";
 import {
@@ -10,6 +11,7 @@ import {
   buildPlayEvent,
   buildBallEvent,
   buildLinescore,
+  buildCount,
 } from "./fixtures/mlbLiveFeed.fixture";
 import { MlbLiveFeedResponse, MlbLiveData } from "../mlbLive.api.types";
 import { MlbLivePitchEvent } from "../mlbLive.types";
@@ -297,12 +299,13 @@ describe("parseAtBatSnapshot", () => {
     expect(snapshot?.pitcherId).toBe(656731);
   });
 
-  it("maps inning, halfInning, and outs", () => {
+  it("maps inning, halfInning, and outs at the start of the at-bat", () => {
     const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
 
     expect(snapshot?.inning).toBe(9);
     expect(snapshot?.halfInning).toBe("bottom");
-    expect(snapshot?.outs).toBe(2);
+    // First pitch in the default fixture has outs=0 — the state when this at-bat began.
+    expect(snapshot?.outs).toBe(0);
   });
 
   it("maps runner occupancy from linescore offense", () => {
@@ -369,6 +372,78 @@ describe("parseAtBatSnapshot", () => {
     const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
 
     expect(snapshot?.fetchedAt).toBe(FETCHED_AT);
+  });
+
+  it("caps outs at 2 — the feed may briefly report 3 after the third out", () => {
+    const play = buildPlay({
+      about: {
+        atBatIndex: 2,
+        halfInning: "top",
+        isTopInning: true,
+        inning: 1,
+        startTime: "2026-06-17T04:30:00Z",
+        isComplete: false,
+      },
+      playEvents: [
+        buildPlayEvent({ count: buildCount({ balls: 0, strikes: 0, outs: 3 }) }),
+      ],
+      count: buildCount({ outs: 3 }),
+    });
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [play], currentPlay: play },
+        linescore: buildLinescore({ inningHalf: "Top", isTopInning: true, outs: 3 }),
+      },
+    });
+
+    expect(parseAtBatSnapshot(feed, FETCHED_AT)?.outs).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseHistoricalAtBatSnapshots — outs normalization
+// ---------------------------------------------------------------------------
+
+describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
+  const aboutTop1 = {
+    halfInning: "top" as const,
+    isTopInning: true,
+    inning: 1,
+    startTime: "2026-06-17T04:30:00Z",
+    isComplete: true,
+  };
+
+  it("never records more than 2 outs at the start of an at-bat", () => {
+    const play0 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 0 },
+      count: buildCount({ outs: 1 }),
+    });
+    const play1 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 1 },
+      count: buildCount({ outs: 2 }),
+    });
+    // MLB sometimes reports outs=3 on the play that records the third out.
+    const play2 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 2 },
+      count: buildCount({ outs: 3 }),
+    });
+    const play3 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 3, isComplete: false },
+      count: buildCount({ outs: 0 }),
+    });
+
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: {
+          allPlays: [play0, play1, play2, play3],
+          currentPlay: play3,
+        },
+        linescore: buildLinescore({ inningHalf: "Top", isTopInning: true, outs: 0 }),
+      },
+    });
+
+    const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
+    expect(historical.map((s) => s.outs)).toEqual([0, 1, 2]);
   });
 });
 

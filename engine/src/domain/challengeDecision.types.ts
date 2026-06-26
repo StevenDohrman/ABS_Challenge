@@ -58,7 +58,11 @@ export interface ChallengeDecisionInput {
  *   AUTO_ALLOW  High EV; recommend challenging regardless of player confidence.
  *   ALLOW       Positive EV; recommend if the player feels confident.
  *   WARN        Marginal or negative EV; caution, do not challenge lightly.
- *   DENY        Insufficient EV or no challenges remaining; do not challenge.
+ *   DENY        Insufficient EV; not worth a challenge.
+ *
+ * The label is purely value-based: it does not consider whether the team has
+ * challenges left. Availability is tracked separately by the backend so that a
+ * high-value call a team cannot challenge still surfaces as a missed opportunity.
  *
  * minimumPlayerConfidenceRequired — 0-100 threshold the player must meet.
  *   At AUTO_ALLOW this is 0 (challenge without asking).

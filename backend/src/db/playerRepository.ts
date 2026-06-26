@@ -1,4 +1,6 @@
 import { prisma } from "./prisma";
+import { DB_LIMITS } from "./constants";
+import { mapSettledWithConcurrency } from "../utils/concurrency";
 import type { SavantBatterStatline } from "@abs/data-pipeline";
 import type { PlayerStatSnapshot } from "@prisma/client";
 
@@ -57,14 +59,18 @@ export async function upsertBatterStatline(
 
 /**
  * Bulk upsert an entire batch of batter statlines.
- * Runs upserts in parallel for throughput; failures are logged individually
- * so one bad row does not abort the entire batch.
+ *
+ * Upserts run with bounded concurrency (DB_LIMITS.WRITE_CONCURRENCY) so the
+ * batch — typically a few hundred rows — cannot exhaust the connection pool.
+ * Failures are logged individually so one bad row does not abort the batch.
  */
 export async function upsertBatterStatlines(
   statlines: SavantBatterStatline[]
 ): Promise<void> {
-  const results = await Promise.allSettled(
-    statlines.map((s) => upsertBatterStatline(s))
+  const results = await mapSettledWithConcurrency(
+    statlines,
+    DB_LIMITS.WRITE_CONCURRENCY,
+    (s) => upsertBatterStatline(s)
   );
 
   const failures = results.filter((r) => r.status === "rejected");

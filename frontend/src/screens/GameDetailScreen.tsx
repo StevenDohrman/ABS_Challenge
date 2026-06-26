@@ -39,6 +39,8 @@ function PulsingDot() {
   );
 }
 
+const CHALLENGES_PER_TEAM = 2;
+
 function ChallengeBar({
   abbrev,
   remaining,
@@ -49,7 +51,7 @@ function ChallengeBar({
   label: string;
 }) {
   if (remaining === null) return null;
-  const total = 3;
+  const total = CHALLENGES_PER_TEAM;
   return (
     <div className="flex flex-col items-center gap-1.5" title={label}>
       <span className="text-[10px] font-mono text-white/35">{abbrev}</span>

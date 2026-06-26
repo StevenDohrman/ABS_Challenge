@@ -109,6 +109,39 @@ describe("toRecommendationDto — display messages", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// toRecommendationDto — challenge availability (missed opportunities)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("toRecommendationDto — challenge availability", () => {
+  const snapshot = makeLiveGameSnapshot();
+
+  it("passes through challengeAvailable", () => {
+    const rec = makeChallengeRecommendation({ challengeAvailable: false });
+    const dto = toRecommendationDto(rec, snapshot);
+    expect(dto.challengeAvailable).toBe(false);
+  });
+
+  it("reframes a positive call as a missed opportunity when out of challenges", () => {
+    const rec = makeChallengeRecommendation({
+      recommendation: "AUTO_ALLOW",
+      challengeAvailable: false,
+    });
+    const dto = toRecommendationDto(rec, snapshot);
+    expect(dto.displayMessage.toLowerCase()).toContain("out of challenges");
+    expect(dto.displayMessage.toLowerCase()).toContain("missed opportunity");
+  });
+
+  it("uses the normal positive message when challenges are available", () => {
+    const rec = makeChallengeRecommendation({
+      recommendation: "AUTO_ALLOW",
+      challengeAvailable: true,
+    });
+    const dto = toRecommendationDto(rec, snapshot);
+    expect(dto.displayMessage.toLowerCase()).not.toContain("missed opportunity");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // toRecommendationDto — base state formatting
 // ─────────────────────────────────────────────────────────────────────────────
 

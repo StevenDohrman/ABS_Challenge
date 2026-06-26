@@ -12,7 +12,7 @@
  */
 
 import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantOutfieldDirectionalOaa, ActiveGame } from "@abs/data-pipeline";
-import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, decrementChallengesByTeam } from "../db/gameRepository";
+import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa, upsertOutfieldDirectionalOaa } from "../db/defensiveRepository";
 
@@ -32,6 +32,22 @@ export async function handleGameDiscovered(game: ActiveGame): Promise<void> {
       `[ingestService] failed to upsert game ${game.gamePk}:`,
       err
     );
+  }
+}
+
+/**
+ * Recompute every tracked game's challenge counts from their stored review
+ * events. Run once at startup to repair counts that earlier decrement-on-restart
+ * behavior left corrupted (often floored at zero, which forced every
+ * recommendation into a hard DENY with zero expected value). Idempotent — the
+ * counts are derived from the source of truth, so re-running is always safe.
+ */
+export async function reconcileChallengeCounts(): Promise<void> {
+  try {
+    const reconciled = await reconcileAllChallengeCounts();
+    console.log(`[ingestService] reconciled challenge counts for ${reconciled} games`);
+  } catch (err) {
+    console.error("[ingestService] failed to reconcile challenge counts:", err);
   }
 }
 
@@ -106,7 +122,7 @@ export async function handleAtBatStart(
  * when no DB row was created.
  *
  * Side effect: when the event has `hasReview=true` and a `challengerTeamId`,
- * decrements that team's challenge count in the games table.
+ * recomputes that game's challenge counts from all stored review events.
  */
 export async function handlePitchEvent(
   event: MlbLivePitchEvent
@@ -114,9 +130,12 @@ export async function handlePitchEvent(
   try {
     const row = await upsertPitchEvent(event);
 
-    // A new review event means a challenge was used — decrement the team's count.
+    // A review event means a challenge was used. Recompute (rather than
+    // decrement) so reprocessing the same pitch — which happens on every
+    // process restart, since the poller re-emits the full feed — never
+    // double-counts. The just-upserted row is included in the derivation.
     if (event.hasReview && event.challengerTeamId) {
-      await decrementChallengesByTeam(event.gamePk, event.challengerTeamId);
+      await recomputeChallengesRemaining(event.gamePk);
     }
 
     return row.id;
