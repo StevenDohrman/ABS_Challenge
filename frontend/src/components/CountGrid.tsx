@@ -63,14 +63,30 @@ export function CountGrid({ recommendations, activeCount }: Props) {
               );
             }
 
+            // Out of challenges: the value-based recommendation still shows, but
+            // the cell is dimmed and flagged so a high-value call reads as a
+            // missed opportunity rather than an action to take.
+            const isMissed = !rec.challengeAvailable;
+
             return (
               <div
                 key={s}
-                className={`h-14 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition-all
+                title={
+                  isMissed
+                    ? `Out of challenges — would be ${rec.recommendation}`
+                    : undefined
+                }
+                className={`relative h-14 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition-all
                   ${TONE[rec.recommendation]}
+                  ${isMissed ? "opacity-40" : ""}
                   ${isActive ? "ring-2 ring-white/60 scale-105 shadow-lg" : ""}
                 `}
               >
+                {isMissed && (
+                  <span className="absolute top-0.5 right-1 text-[8px] font-mono uppercase tracking-wider text-white/70">
+                    no chal
+                  </span>
+                )}
                 <span className="text-xs font-mono font-semibold tracking-widest">
                   {SHORT_LABEL[rec.recommendation]}
                 </span>
@@ -89,6 +105,7 @@ export function CountGrid({ recommendations, activeCount }: Props) {
         <span>Columns = strikes before pitch</span>
         <span>Rows = balls before pitch</span>
         <span>Value = expected runs gained</span>
+        <span>Dimmed = out of challenges (missed opportunity)</span>
       </div>
     </div>
   );

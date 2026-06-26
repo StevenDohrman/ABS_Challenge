@@ -9,6 +9,7 @@
  *   CALL_CODES      — MLB Stats API pitch call codes
  *   COUNT_STATES    — Every valid count state in a standard at-bat
  *   SEASONS         — Season-level defaults
+ *   DB_LIMITS       — Database concurrency guardrails
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,15 +19,32 @@
 export const GAME_RULES = {
   /**
    * Number of challenges each team starts with at the beginning of every game.
-   * Under the current ABS challenge system, each team receives three challenges.
+   * Under the current ABS challenge system, each team receives two challenges,
+   * and a successful (overturned) challenge is retained — so only failed
+   * challenges actually consume the allotment. See recomputeChallengesRemaining.
    * Update this constant if MLB changes the rule.
    */
-  DEFAULT_CHALLENGES_PER_TEAM: 3,
+  DEFAULT_CHALLENGES_PER_TEAM: 2,
 
   /**
-   * The minimum number of challenges remaining before the system treats the
-   * resource as depleted and issues a hard DENY regardless of expected value.
-   * Zero means the team has no challenges left.
+   * Last inning of regulation play. Any inning beyond this is "extra innings"
+   * and follows the per-inning challenge rule below.
+   */
+  LAST_REGULATION_INNING: 9,
+
+  /**
+   * Challenges granted per extra inning. In extra innings the regulation
+   * allotment and any carryover are wiped: every team gets exactly this many
+   * challenges, refreshed each extra inning (a successful challenge is still
+   * retained within that inning). A team that reaches extras with two
+   * challenges drops to one; a team that was out gets one back.
+   */
+  EXTRA_INNING_CHALLENGES_PER_INNING: 1,
+
+  /**
+   * Sentinel for "no challenges available". A team at zero cannot physically
+   * challenge, but the engine still produces a value-based recommendation so the
+   * system can surface missed opportunities — this is no longer a hard DENY gate.
    */
   ZERO_CHALLENGES_REMAINING: 0,
 } as const;
@@ -85,4 +103,23 @@ export const STAT_CONVERSION = {
 export const SEASONS = {
   /** Current MLB season. Update at the start of each year. */
   CURRENT: 2026,
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Database concurrency guardrails
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DB_LIMITS = {
+  /**
+   * Maximum number of write queries to keep in flight at once when persisting a
+   * bulk batch — the daily Savant statline/spray/OAA upserts and the 12
+   * per-at-bat recommendation rows pre-computed on every at-bat start.
+   *
+   * This is deliberately kept well below the Prisma connection-pool limit
+   * (default num_cpus*2+1) so a bulk batch can never check out every connection
+   * and starve the live-poll loop and the API, which share the same pool.
+   * Raising this past the pool size reintroduces the `P2024` connection-pool
+   * timeout errors. The work itself is unchanged — only the fan-out is capped.
+   */
+  WRITE_CONCURRENCY: 8,
 } as const;

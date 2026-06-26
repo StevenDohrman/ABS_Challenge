@@ -11,9 +11,13 @@
  * Algorithm summary
  * ─────────────────────────────────────────────────────────────────────────────
  *
- *  1. Hard gates
- *     Short-circuit to DENY immediately if the situation rules out any chance
- *     of recommending a challenge (no challenges left, non-challengeable call).
+ *  1. Hard gate
+ *     Short-circuit to DENY only when the call type itself is not a challengeable
+ *     called strike — the expected value of challenging is structurally undefined
+ *     there. Being out of challenges is NOT a gate: the engine still produces a
+ *     value-based recommendation so the system can audit missed opportunities.
+ *     Whether the team can physically challenge is tracked separately by the
+ *     backend (challengeAvailable on the persisted recommendation).
  *
  *  2. Run expectancy delta
  *     reDelta = runExpectancyIfSuccessful - runExpectancyIfFailed
@@ -44,8 +48,10 @@
  *
  *  7. Threshold application + scarcity
  *     Recommendation label and minimum confidence are derived from the score.
- *     When challenges are scarce (1–2 remaining), thresholds are raised to
- *     encourage conserving challenges. See decision/thresholds.ts.
+ *     When challenges are scarce (1 remaining), thresholds are raised to
+ *     encourage conserving challenges. A team with 0 challenges receives no
+ *     penalty — the recommendation reflects the call's raw value so a missed
+ *     opportunity is visible. See decision/thresholds.ts.
  *
  *  8. Explanation
  *     A short ordered list of human-readable sentences describing the key
@@ -73,11 +79,14 @@ import { LEAGUE_AVERAGES } from "../constants";
 // ---------------------------------------------------------------------------
 
 export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecision {
-  // ── Step 1: Hard gates ──────────────────────────────────────────────────────
-
-  if (input.gameState.challengesRemaining === 0) {
-    return hardDeny("No challenges remaining — cannot challenge this call.");
-  }
+  // ── Step 1: Hard gate ───────────────────────────────────────────────────────
+  // Only a non-challengeable call type short-circuits with a zero value, because
+  // the expected value of challenging is structurally undefined there.
+  //
+  // Being out of challenges is deliberately NOT a gate: the recommendation is
+  // value-based regardless of how many challenges remain, so the system can
+  // surface high-value calls a team could not challenge (a "missed opportunity").
+  // Whether the team can actually challenge is recorded separately by the backend.
 
   if (input.pitchContext.callType !== "called_strike") {
     return hardDeny(

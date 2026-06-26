@@ -46,6 +46,10 @@ export interface ExplanationInput {
 // ---------------------------------------------------------------------------
 
 export function buildExplanation(input: ExplanationInput): string[] {
+  // The explanation describes the value of the call only. Whether the team can
+  // actually challenge (it may be out of challenges) is an availability concern
+  // surfaced separately by the backend/DTO layer, so it is intentionally not
+  // mentioned here.
   const sentences: string[] = [];
 
   sentences.push(buildPrimaryStatement(input));
@@ -154,6 +158,10 @@ function buildScarcitySentence(scarcity: ChallengeScarcityResult): string | null
     case "moderate":
       return `2 challenges remaining — a slight premium has been applied to the recommendation threshold.`;
     case "plenty":
+      return null;
+    case "none":
+      // Out of challenges adds no scarcity penalty (the recommendation reflects
+      // the call's raw value); availability is surfaced by the backend/DTO layer.
       return null;
   }
 }

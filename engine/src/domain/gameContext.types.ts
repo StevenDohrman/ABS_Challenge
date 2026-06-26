@@ -45,8 +45,13 @@ export interface GameStateContext {
   pitcherId: number;
 
   /**
-   * How many challenges the batting team has left this game.
-   * Zero challenges remaining → hard DENY regardless of expected value.
+   * How many challenges the batting team has available right now.
+   *
+   * Under ABS rules this is the regulation allotment minus failed challenges
+   * (a successful challenge is retained); in extra innings it is the flat
+   * per-inning grant. Used only to tune scarcity — it does NOT gate the
+   * recommendation. A value of 0 still yields a value-based recommendation so
+   * missed opportunities are auditable.
    */
   challengesRemaining: number;
 }

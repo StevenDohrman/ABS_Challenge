@@ -79,6 +79,43 @@ function LiveSituation({ game }: { game: ScheduleGame }) {
   );
 }
 
+// ── Challenge count chips ──────────────────────────────────────────────────
+
+function ChallengeChip({ abbrev, remaining }: { abbrev: string; remaining: number }) {
+  const isEmpty = remaining === 0;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+        isEmpty
+          ? "text-red-400/70 bg-red-500/10 border-red-500/20"
+          : "text-white/50 bg-white/5 border-white/10"
+      }`}
+    >
+      {abbrev} {remaining}
+    </span>
+  );
+}
+
+function ChallengeCounts({ game }: { game: ScheduleGame }) {
+  if (!game.isTracked) return null;
+  if (game.homeChallengesRemaining === null && game.awayChallengesRemaining === null) return null;
+
+  const awayAbbrev = game.awayTeamAbbrev || game.awayTeamName.slice(0, 3).toUpperCase();
+  const homeAbbrev = game.homeTeamAbbrev || game.homeTeamName.slice(0, 3).toUpperCase();
+
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-white/10 flex items-center gap-1.5">
+      <span className="text-[10px] font-mono text-white/30 mr-0.5">Challenges</span>
+      {game.awayChallengesRemaining !== null && (
+        <ChallengeChip abbrev={awayAbbrev} remaining={game.awayChallengesRemaining} />
+      )}
+      {game.homeChallengesRemaining !== null && (
+        <ChallengeChip abbrev={homeAbbrev} remaining={game.homeChallengesRemaining} />
+      )}
+    </div>
+  );
+}
+
 // ── Main card ─────────────────────────────────────────────────────────────
 
 export function GameCard({ game, onClick }: Props) {
@@ -139,6 +176,7 @@ export function GameCard({ game, onClick }: Props) {
       </div>
 
       <LiveSituation game={game} />
+      <ChallengeCounts game={game} />
     </button>
   );
 }

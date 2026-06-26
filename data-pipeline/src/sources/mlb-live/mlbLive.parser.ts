@@ -5,6 +5,18 @@ import {
   MlbAtBatSnapshot,
 } from "./mlbLive.types";
 
+/** Outs at the start of an at-bat are always 0, 1, or 2. The MLB feed sometimes reports 3 after the third out of a half-inning. */
+function normalizeOutsAtAtBatStart(outs: number): number {
+  return Math.min(Math.max(0, outs), 2);
+}
+
+/** Prefer the first pitch's count — that reflects the game state when the at-bat began. */
+function outsAtPlayStart(play: MlbPlay, fallback: number): number {
+  const firstPitch = play.playEvents?.find((e) => e.isPitch);
+  const raw = firstPitch?.count?.outs ?? play.count?.outs ?? fallback;
+  return normalizeOutsAtAtBatStart(raw);
+}
+
 /**
  * Extract all pitch events from every completed and in-progress at-bat.
  * Walks allPlays in sequence, computing the pre-pitch count for each event
@@ -38,7 +50,7 @@ export function parseGameSnapshot(
     inning: linescore?.currentInning ?? 1,
     halfInning: linescore?.inningHalf === "Top" ? "top" : "bottom",
     detailedState: status.detailedState,
-    outs: linescore?.outs ?? 0,
+    outs: normalizeOutsAtAtBatStart(linescore?.outs ?? 0),
     balls: linescore?.balls ?? 0,
     strikes: linescore?.strikes ?? 0,
     runnerOnFirst: !!linescore?.offense?.first,
@@ -94,7 +106,7 @@ export function parseAtBatSnapshot(
     pitcherId,
     inning: currentPlay.about.inning,
     halfInning,
-    outs: linescore?.outs ?? 0,
+    outs: outsAtPlayStart(currentPlay, linescore?.outs ?? 0),
     runnerOnFirst: !!linescore?.offense?.first,
     runnerOnSecond: !!linescore?.offense?.second,
     runnerOnThird: !!linescore?.offense?.third,
@@ -155,7 +167,7 @@ function parsePlaysInIndexRange(
           pitcherId,
           inning: play.about.inning,
           halfInning,
-          outs: outsInHalfInning,
+          outs: normalizeOutsAtAtBatStart(outsInHalfInning),
           runnerOnFirst: false,
           runnerOnSecond: false,
           runnerOnThird: false,
@@ -168,7 +180,9 @@ function parsePlaysInIndexRange(
       }
     }
 
-    outsInHalfInning = play.count?.outs ?? outsInHalfInning;
+    outsInHalfInning = normalizeOutsAtAtBatStart(
+      play.count?.outs ?? outsInHalfInning
+    );
   }
 
   return snapshots;
@@ -224,6 +238,7 @@ function parsePitchEventsFromPlay(
   for (const playEvent of play.playEvents) {
     if (!playEvent.isPitch) continue;
 
+    const rd = playEvent.reviewDetails;
     events.push({
       gamePk,
       playId: playEvent.playId,
@@ -240,6 +255,10 @@ function parsePitchEventsFromPlay(
       pitcherId: play.matchup.pitcher.id,
       callCode: playEvent.details.call.code,
       callDescription: playEvent.details.call.description,
+      hasReview: playEvent.details.hasReview === true,
+      isOverturned: rd ? (rd.inProgress ? null : rd.isOverturned) : null,
+      challengerName: rd?.player?.fullName ?? null,
+      challengerTeamId: rd?.challengeTeamId ?? null,
       raw: playEvent,
       fetchedAt,
     });

@@ -17,6 +17,12 @@ export interface WriteRecommendationInput {
   balls: number;
   strikes: number;
   decision: ChallengeDecision;
+  /**
+   * Whether the batting team can physically challenge for this at-bat (it has at
+   * least one challenge available). The engine recommendation is value-based and
+   * independent of this; the flag lets the frontend mark missed opportunities.
+   */
+  challengeAvailable: boolean;
 }
 
 /**
@@ -35,6 +41,7 @@ export async function upsertRecommendation(
     minimumConfidenceRequired: input.decision.minimumPlayerConfidenceRequired,
     expectedValue: input.decision.expectedValueOfChallenge,
     score: input.decision.score,
+    challengeAvailable: input.challengeAvailable,
     explanationJson: input.decision.explanation as object,
   };
 

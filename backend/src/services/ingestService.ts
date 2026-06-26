@@ -11,9 +11,10 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, ActiveGame } from "@abs/data-pipeline";
-import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame } from "../db/gameRepository";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantOutfieldDirectionalOaa, ActiveGame } from "@abs/data-pipeline";
+import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
+import { upsertSprayProfiles, upsertFielderOaa, upsertOutfieldDirectionalOaa } from "../db/defensiveRepository";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Game lifecycle
@@ -31,6 +32,22 @@ export async function handleGameDiscovered(game: ActiveGame): Promise<void> {
       `[ingestService] failed to upsert game ${game.gamePk}:`,
       err
     );
+  }
+}
+
+/**
+ * Recompute every tracked game's challenge counts from their stored review
+ * events. Run once at startup to repair counts that earlier decrement-on-restart
+ * behavior left corrupted (often floored at zero, which forced every
+ * recommendation into a hard DENY with zero expected value). Idempotent — the
+ * counts are derived from the source of truth, so re-running is always safe.
+ */
+export async function reconcileChallengeCounts(): Promise<void> {
+  try {
+    const reconciled = await reconcileAllChallengeCounts();
+    console.log(`[ingestService] reconciled challenge counts for ${reconciled} games`);
+  } catch (err) {
+    console.error("[ingestService] failed to reconcile challenge counts:", err);
   }
 }
 
@@ -103,12 +120,24 @@ export async function handleAtBatStart(
  *
  * Returns null on failure — the orchestrator skips recommendation triggering
  * when no DB row was created.
+ *
+ * Side effect: when the event has `hasReview=true` and a `challengerTeamId`,
+ * recomputes that game's challenge counts from all stored review events.
  */
 export async function handlePitchEvent(
   event: MlbLivePitchEvent
 ): Promise<number | null> {
   try {
     const row = await upsertPitchEvent(event);
+
+    // A review event means a challenge was used. Recompute (rather than
+    // decrement) so reprocessing the same pitch — which happens on every
+    // process restart, since the poller re-emits the full feed — never
+    // double-counts. The just-upserted row is included in the derivation.
+    if (event.hasReview && event.challengerTeamId) {
+      await recomputeChallengesRemaining(event.gamePk);
+    }
+
     return row.id;
   } catch (err) {
     console.error(
@@ -126,19 +155,56 @@ export async function handlePitchEvent(
 
 /**
  * Persist a batch of batter statlines from the SavantDailyJob.
- * Individual row failures are handled inside upsertBatterStatlines.
- * A batch-level failure (e.g. DB unreachable) is caught here so it cannot
- * crash the orchestrator loop.
  */
 export async function handleBatterStatlines(
   statlines: SavantBatterStatline[]
 ): Promise<void> {
   try {
-    console.log(
-      `[ingestService] upserting ${statlines.length} batter statlines`
-    );
+    console.log(`[ingestService] upserting ${statlines.length} batter statlines`);
     await upsertBatterStatlines(statlines);
   } catch (err) {
     console.error("[ingestService] failed to upsert batter statlines batch:", err);
+  }
+}
+
+/**
+ * Persist a batch of batter spray profiles from the SavantDailyJob.
+ */
+export async function handleSprayProfiles(
+  profiles: SavantBatterSprayProfile[]
+): Promise<void> {
+  try {
+    console.log(`[ingestService] upserting ${profiles.length} spray profiles`);
+    await upsertSprayProfiles(profiles);
+  } catch (err) {
+    console.error("[ingestService] failed to upsert spray profiles batch:", err);
+  }
+}
+
+/**
+ * Persist a batch of fielder OAA rows from the SavantDailyJob.
+ */
+export async function handleFielderOaa(
+  oaaRows: SavantFielderOaa[]
+): Promise<void> {
+  try {
+    console.log(`[ingestService] upserting ${oaaRows.length} fielder OAA rows`);
+    await upsertFielderOaa(oaaRows);
+  } catch (err) {
+    console.error("[ingestService] failed to upsert fielder OAA batch:", err);
+  }
+}
+
+/**
+ * Persist a batch of outfield directional OAA rows from the SavantDailyJob.
+ */
+export async function handleOutfieldDirectionalOaa(
+  oaaRows: SavantOutfieldDirectionalOaa[]
+): Promise<void> {
+  try {
+    console.log(`[ingestService] upserting ${oaaRows.length} outfield directional OAA rows`);
+    await upsertOutfieldDirectionalOaa(oaaRows);
+  } catch (err) {
+    console.error("[ingestService] failed to upsert outfield directional OAA batch:", err);
   }
 }

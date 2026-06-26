@@ -29,8 +29,13 @@ import {
   type ChallengeDecisionInput,
 } from "@abs/engine";
 import type { MlbAtBatSnapshot, MlbLivePitchEvent } from "@abs/data-pipeline";
-import { ALL_COUNT_STATES, SEASONS, CALL_CODES } from "../db/constants";
-import { findGame, findLatestAtBatSnapshot } from "../db/gameRepository";
+import { ALL_COUNT_STATES, SEASONS, CALL_CODES, DB_LIMITS } from "../db/constants";
+import { mapSettledWithConcurrency } from "../utils/concurrency";
+import {
+  findGame,
+  findLatestAtBatSnapshot,
+  computeTeamChallengesRemaining,
+} from "../db/gameRepository";
 import { findPlayerStatSnapshot } from "../db/playerRepository";
 import {
   upsertRecommendation,
@@ -75,11 +80,20 @@ export async function precomputeAtBatRecommendations(
     return;
   }
 
-  // Determine how many challenges the batting team has left this game.
-  const challengesRemaining =
-    snapshot.halfInning === "top"
-      ? game.awayChallengesRemaining
-      : game.homeChallengesRemaining;
+  // Determine how many challenges the batting team has available for this at-bat.
+  // Derived per inning so the extra-innings rule (flat 1 per extra inning, with
+  // regulation carryover wiped) is applied correctly. This is the same for all
+  // 12 count states in the at-bat.
+  const challengesRemaining = await computeTeamChallengesRemaining(
+    snapshot.gamePk,
+    snapshot.battingTeamId,
+    snapshot.inning
+  );
+
+  // Whether the team can physically challenge. The engine recommendation is
+  // value-based regardless; this flag lets the UI flag missed opportunities
+  // (a high-value call the team is out of challenges for).
+  const challengeAvailable = challengesRemaining > 0;
 
   // Run differential from the batting team's perspective.
   const runDifferential =
@@ -110,8 +124,13 @@ export async function precomputeAtBatRecommendations(
   };
 
   // Compute and store a recommendation for every valid count state.
-  await Promise.allSettled(
-    ALL_COUNT_STATES.map(async ([balls, strikes]) => {
+  // Each count's decision is computed in memory (pure engine call) and then
+  // persisted; only the DB writes are concurrency-capped so a busy startup —
+  // many games backfilling at once — cannot exhaust the connection pool.
+  const results = await mapSettledWithConcurrency(
+    ALL_COUNT_STATES,
+    DB_LIMITS.WRITE_CONCURRENCY,
+    async ([balls, strikes]) => {
       const gameState: GameStateContext = {
         gamePk: snapshot.gamePk,
         inning: snapshot.inning,
@@ -156,9 +175,23 @@ export async function precomputeAtBatRecommendations(
         balls,
         strikes,
         decision,
+        challengeAvailable,
       });
-    })
+    }
   );
+
+  // Surface dropped writes: a failed upsert means a count state has no stored
+  // recommendation, so the frontend would show no card for that count. Logged
+  // (not thrown) so one bad write never crashes the pipeline.
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(
+      `[challengeService] ${failures.length} of ${ALL_COUNT_STATES.length} ` +
+      `recommendation upserts failed for game=${snapshot.gamePk} ` +
+      `atBat=${snapshot.atBatIndex}`,
+      failures.map((f) => (f as PromiseRejectedResult).reason)
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

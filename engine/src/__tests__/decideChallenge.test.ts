@@ -111,14 +111,30 @@ function makeInput(
 // ---------------------------------------------------------------------------
 
 describe("decideChallenge — hard gates", () => {
-  test("returns DENY with no challenges remaining", () => {
-    const input = makeInput(makeGameState({ challengesRemaining: 0 }));
-    const result = decideChallenge(input);
+  test("out of challenges does NOT change the recommendation — value is decoupled from availability", () => {
+    // A team with its full allotment (2, no scarcity penalty) and a team with 0
+    // challenges (no penalty either — the 'none' level) should produce an
+    // identical, purely value-based decision. Availability is tracked by the
+    // backend, not by forcing DENY here, so missed opportunities stay visible.
+    const withChallenges = decideChallenge(
+      makeInput(makeGameState({ challengesRemaining: 2 }))
+    );
+    const noChallenges = decideChallenge(
+      makeInput(makeGameState({ challengesRemaining: 0 }))
+    );
 
-    expect(result.recommendation).toBe("DENY");
-    expect(result.score).toBe(0);
-    expect(result.minimumPlayerConfidenceRequired).toBe(100);
-    expect(result.explanation.length).toBeGreaterThan(0);
+    expect(noChallenges.recommendation).toBe(withChallenges.recommendation);
+    expect(noChallenges.minimumPlayerConfidenceRequired).toBe(
+      withChallenges.minimumPlayerConfidenceRequired
+    );
+    expect(noChallenges.expectedValueOfChallenge).toBe(
+      withChallenges.expectedValueOfChallenge
+    );
+    expect(noChallenges.score).toBe(withChallenges.score);
+
+    // The engine explanation never mentions challenge availability — that is a
+    // backend/DTO concern now.
+    expect(noChallenges.explanation.join(" ")).not.toMatch(/no challenges/i);
   });
 
   test("returns DENY for non-challengeable call type", () => {
