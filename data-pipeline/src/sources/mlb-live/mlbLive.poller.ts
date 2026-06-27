@@ -12,6 +12,8 @@ import {
   MlbLivePitchEvent,
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
+  GameBackfillPayload,
+  CALLED_STRIKE_CALL_CODE,
 } from "./mlbLive.types";
 
 const ACTIVE_PLAY_INTERVAL_MS = 15_000;   // reduced: multiple at-bats can happen in 30 s
@@ -27,15 +29,15 @@ export interface GamePoller {
   on(event: "atBatStart", listener: (snapshot: MlbAtBatSnapshot) => void): this;
   /**
    * Fired once on the first poll with ALL completed historical at-bats as a
-   * batch. The orchestrator processes them sequentially (store + pre-compute)
-   * to avoid saturating the DB connection pool.
+   * batch, plus at-bat indices that contain called strikes (needed before
+   * historical pitch replay). Remaining at-bats are pre-computed in background.
    */
-  on(event: "gameBackfill", listener: (snapshots: MlbAtBatSnapshot[]) => void): this;
+  on(event: "gameBackfill", listener: (payload: GameBackfillPayload) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
   emit(event: "atBatStart", snapshot: MlbAtBatSnapshot): boolean;
-  emit(event: "gameBackfill", snapshots: MlbAtBatSnapshot[]): boolean;
+  emit(event: "gameBackfill", payload: GameBackfillPayload): boolean;
   emit(event: "pitchEvent", pitchEvent: MlbLivePitchEvent): boolean;
   emit(event: "gameOver", payload: { gamePk: number }): boolean;
   emit(event: "error", err: Error): boolean;
@@ -123,7 +125,16 @@ export class GamePoller extends EventEmitter {
           // connections never exceed 12 at once.
           const historical = parseHistoricalAtBatSnapshots(feed, fetchedAt);
           if (historical.length > 0) {
-            this.emit("gameBackfill", historical);
+            const calledStrikeAtBatIndices = new Set<number>();
+            for (const event of parsePitchEvents(feed, fetchedAt)) {
+              if (event.callCode === CALLED_STRIKE_CALL_CODE) {
+                calledStrikeAtBatIndices.add(event.atBatIndex);
+              }
+            }
+            this.emit("gameBackfill", {
+              snapshots: historical,
+              calledStrikeAtBatIndices: [...calledStrikeAtBatIndices],
+            });
           }
         } else if (currentAtBatIndex > this.lastAtBatIndex + 1) {
           // ── Subsequent polls: index jumped by > 1 ─────────────────────────

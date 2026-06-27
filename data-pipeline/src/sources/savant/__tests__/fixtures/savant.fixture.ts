@@ -29,14 +29,16 @@ export const PLATE_DISCIPLINE_CSV = [
 
 // ---------------------------------------------------------------------------
 // Spray profile leaderboard
+// Matches the /leaderboard/batted-ball endpoint (column names changed in 2026).
+// Values are decimal rates (0–1); parsePercent() normalises them to 0–100.
 // ---------------------------------------------------------------------------
 
 export const SPRAY_PROFILE_CSV = [
-  "player_id,player_name,year,pa,pull_percent,straightaway_percent,oppo_percent,gb_percent,fb_percent,ld_percent",
-  "682998,Jacob Wilson,2026,550,41.2,34.8,24.0,45.1,31.2,23.7",
-  "665742,Juan Soto,2026,620,36.5,38.2,25.3,38.4,37.0,24.6",
+  '"id","name","year","bbe","pull_rate","straight_rate","oppo_rate","gb_rate","fb_rate","ld_rate"',
+  '682998,"Wilson, Jacob",2026,550,0.412,0.348,0.240,0.451,0.312,0.237',
+  '665742,"Soto, Juan",2026,620,0.365,0.382,0.253,0.384,0.370,0.246',
   // Row with empty spray fields
-  "999002,Empty Player,2026,105,,,,,,,",
+  '999002,"Empty Player",2026,105,,,,,',
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -73,18 +75,6 @@ export const HEADER_ONLY_CSV =
 
 /** Completely empty CSV */
 export const EMPTY_CSV = "";
-
-// ---------------------------------------------------------------------------
-// Outfield directional OAA leaderboard
-// ---------------------------------------------------------------------------
-
-export const OUTFIELD_DIRECTIONAL_OAA_CSV = [
-  "player_id,name,year,pos,outs_above_average,outs_above_average_left,outs_above_average_straight,outs_above_average_right,reaction,burst,route",
-  "682998,Jacob Wilson,2026,CF,8,3,2,3,0.32,1.8,95.4",
-  "641355,Steven Kwan,2026,LF,12,5,4,3,0.28,2.1,97.2",
-  // Row with missing jump metrics
-  "545361,Mike Trout,2026,CF,3,1,1,1,,,",
-].join("\n");
 
 // ---------------------------------------------------------------------------
 // Sprint speed leaderboard

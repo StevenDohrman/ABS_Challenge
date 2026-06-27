@@ -68,7 +68,6 @@ Examples:
 - Historical player challenge success rate
 - Batter spray profile (pull%, straightaway%, oppo%, GB/FB/LD mix)
 - Fielder Outs Above Average (OAA) by position and by batter handedness
-- Outfield directional OAA (left, straight, right) and jump metrics (reaction, burst, route)
 - Run expectancy tables
 - Win probability inputs, if available
 
@@ -837,10 +836,10 @@ Focus on:
 
 **Defensive and spray data — already fetched, not yet wired:**
 
-`SavantDailyJob` already fetches and emits batter spray profiles, fielder OAA, outfield directional OAA, and sprint speed. The data pipeline does its job. What is missing is:
+`SavantDailyJob` already fetches and emits batter spray profiles, fielder OAA, and sprint speed. The data pipeline does its job. What is missing is:
 
 1. Storage — `player_stat_snapshots` does not have OAA or spray columns. A new table or additional columns are needed.
-2. Orchestrator handlers — `batterStatlines` is handled; `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` are emitted but nothing reads them.
+2. Orchestrator handlers — `batterStatlines`, `sprayProfiles`, and `fielderOaa` are wired; sprint speed is fetched but not yet stored.
 3. Engine input — `PlayerChallengeContext` has no OAA or spray fields. New fields and a new feature computation module are needed.
 4. RE delta adjustment — the current RE table uses league-average defensive conversion rates. OAA and spray data would allow a small multiplier correction: a pull-heavy batter facing an elite fielder in the pull zone is worth less to keep at the plate than the raw RE table implies.
 
@@ -873,12 +872,12 @@ Focus on:
 
 **Wire OAA and spray profiles into the live engine (Phase 4 scope):**
 
-This belongs in Phase 4 rather than Phase 6 because the data is already ingested by the pipeline — it is a wiring task, not a modelling task.
+This belongs in Phase 4 rather than Phase 7 because the data is already ingested by the pipeline — it is a wiring task, not a modelling task.
 
 Steps:
 
-1. Add `spray_profiles`, `fielder_oaa`, and `outfield_directional_oaa` tables (or extend `player_stat_snapshots`) in the Prisma schema.
-2. Register `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` handlers in `orchestrator.ts` to write the emitted data to those tables.
+1. Add `spray_profiles` and `fielder_oaa` tables (or extend `player_stat_snapshots`) in the Prisma schema.
+2. Register `sprayProfiles` and `fielderOaa` handlers in `orchestrator.ts` to write the emitted data to those tables.
 3. Add `sprayProfile` and `defensiveOaa` fields to `PlayerChallengeContext` in the engine.
 4. Create a `defensiveContext.ts` feature module in the engine that computes a small RE delta multiplier from the batter's spray tendencies and the relevant fielder's OAA.
 5. Apply the multiplier inside `decideChallenge` after the offensive value step.
@@ -897,9 +896,23 @@ Focus on:
 - Detecting bad allowed challenges
 - Building audit reports
 
-### Phase 6: Model Improvement
+### Phase 6: Product Quality of Life
 
-Use postgame audit data to improve the recommendation engine.
+Frontend and API polish after the live + postgame core is working. Build these **before** engine tuning so the product is usable and explorable while audit data accumulates.
+
+Focus on:
+
+- **Recent games (7-day window)** — Dashboard or schedule view showing tracked games from the last 7 days when they exist in the DB (aligned with `DATA_RETENTION_DAYS` default). Today’s live games remain primary; past days are browsable without re-polling MLB.
+- **Challenge rankings — players** — Leaderboard of batters (and/or challengers) ranked by challenge activity and outcomes: attempts, overturn rate, missed high-value opportunities (once Phase 5 audits exist), etc.
+- **Challenge rankings — teams** — Same rankings page with a selector to switch between **Players** and **Teams**; team aggregates roll up batter-side and fielding-side challenge usage.
+- **About page** — Static page: what the project is, data sources (MLB live feed, Savant), disclaimer that recommendations are strategic guidance not real-time zone calls.
+- **How it works page** — Static page walking through the pipeline (ingest → precompute → called-strike trigger → recommendation labels) and how to read the UI (count grid, live card, history, postgame audit when available).
+
+Backend work for Phase 6 is mostly read APIs aggregating existing `games`, `live_pitch_events`, `challenge_recommendations`, and (after Phase 5) `postgame_challenge_audits` — no new ingestion sources required for the static pages.
+
+### Phase 7: Model Improvement
+
+Use postgame audit data to improve the recommendation engine. Defer until Phase 5 audits and Phase 6 product surfaces exist so tuning has data to validate against.
 
 Focus on:
 
@@ -908,15 +921,20 @@ Focus on:
 - Feature importance
 - Optional machine learning model
 
+See **Future Engine Calculation Features (Phase 7+)** below for planned engine inputs (lineup window, count splits, sprint speed) that belong in this phase.
+
 ---
 
 ## Current Status (as of June 2026)
 
 Phase 4 is complete. The full stack is running end-to-end:
 
-- **Data pipeline**: `LivePollJob` polls active games every 15 s, detects new at-bats (including gap-fill for multiple at-bats completing between polls), backfills historical at-bats on startup, and emits pitch events with deduplication.
+- **Data pipeline**: `LivePollJob` polls active games every 15 s, detects new at-bats (including gap-fill for multiple at-bats completing between polls), backfills historical at-bats on startup (resume-from-DB skips work already stored), and emits pitch events with deduplication.
 - **Backend**: pre-computes 12-count recommendation grids per at-bat, triggers called-strike recommendations, serves schedule/live/history APIs, runs daily data-retention cleanup (configurable via `DATA_RETENTION_DAYS`, default 7 days).
+- **Engine**: run expectancy, player credibility (plate discipline + fixed count modifier), offensive value (current batter OPS), defensive context (spray profile + per-fielder OAA), situation weight, challenge scarcity.
 - **Frontend**: React + Tailwind SPA at `frontend/`. Shows today's games dashboard, live game detail (score, inning, count auto-refreshes every 30 s), pre-at-bat banner with count grid, called-strike card, and at-bat history with expandable recommendation grids.
+
+**Next up:** Phase 5 (postgame Savant audits), then Phase 6 (7-day game history, rankings, About / How it works), then Phase 7 (engine tuning).
 
 ---
 
@@ -971,13 +989,88 @@ Each challenged pitch has `details.hasReview: true` and a `reviewDetails` object
 
 6. **Frontend**: In the at-bat history view (`AtBatHistory.tsx`), show a challenge badge on rows where `hasReview` is true — display the challenger's name, which side challenged, and whether it was overturned. This is already a requested feature.
 
-### 2. Wire OAA + Spray Profiles into the Engine
+### 2. ~~Wire OAA + Spray Profiles into the Engine~~ (done)
 
-`SavantDailyJob` already emits `sprayProfiles`, `fielderOaa`, and `outfieldDirectionalOaa` events but the orchestrator drops them. See Phase 4 notes above for the full wiring plan.
+Spray profiles, fielder OAA, and per-fielder defensive context are wired end-to-end. See **Future Engine Calculation Features** below for the next modelling gaps (lineup window, count splits, sprint speed).
 
 ### 3. Phase 5: Postgame Savant Enrichment
 
 Pull Savant pitch-location data after game completion, join to `live_pitch_events`, and populate `postgame_challenge_audits` to audit missed challenges and bad allowed challenges.
+
+### 4. Phase 6: Product quality of life
+
+See **Phase 6** under Development Phases: 7-day game browser, player/team challenge rankings (shared page with selector), About page, How it works page.
+
+---
+
+## Future Engine Calculation Features (Phase 7+)
+
+These are **not implemented yet** (except where noted). They extend the challenge engine beyond the current batter-only, league-average count heuristics. Do not build them until Phase 5 audit data is in place and Phase 6 product surfaces exist unless explicitly prioritized.
+
+### Upcoming batters window (lineup context)
+
+**Status:** Planned — not in engine or live feed parsing today.
+
+**Goal:** When deciding whether the current batter should challenge, account for who is likely to bat later this half-inning. Use a sliding window keyed to outs remaining:
+
+- Example: 2 outs left → consider the current batter plus the next 2 batters due up.
+- If the current batter reaches base safely, the window slides forward (same outs, new batter at the plate, next batters still in the queue).
+- Weight upcoming batters' offensive profiles (OPS, wOBA, etc.) to adjust how valuable it is for the **current** batter to stay alive or reach base via a successful challenge — extending the inning for a strong on-deck hitter is worth more than doing so for a weak tail of the order.
+
+**Current system:** `offensiveValue.ts` only scales the run-expectancy delta for the **current** batter. No batting order, on-deck, or “due up this inning” context exists in `GameStateContext` or `PlayerChallengeContext`.
+
+**Dependencies (future work):**
+
+- Parse batting order and current spot from the MLB live feed (or a pregame lineup snapshot).
+- Pregame stats for every active lineup player (already available via daily ingest; needs per-game lineup binding).
+- New engine feature module (e.g. `lineupContext.ts`) and fields on `ChallengeDecisionInput`.
+
+---
+
+### Batter performance by count state
+
+**Status:** Partial — league-average count heuristics only; batter-specific splits planned.
+
+**Goal:** Batters perform very differently by count (0-1, 0-2, 1-2, etc.). Being down in the count is generally bad for the hitter; some batters collapse in 0-2 while others remain dangerous. Use **historical count splits** (wOBA, K%, chase%, whiff%, etc.) to adjust challenge value and credibility for the specific batter at the specific count.
+
+**What exists today:**
+
+- `playerCredibility.ts` applies a **fixed** count modifier for all batters (e.g. 0-2 → slightly higher P(call wrong) because pitchers work the edges; 3-0 → lower because grooved strikes are more likely correct). This is pitcher-behavior logic, not batter skill by count.
+- The run-expectancy table includes generic count-based RE adjustments (e.g. 0-2 subtracts ~0.106 runs vs 0-0).
+- `SavantLineupJob` can fetch per-player Statcast pitch history at lineup confirmation (includes balls/strikes per pitch) but is **not wired** to the backend or engine.
+
+**Planned:**
+
+- Ingest or compute batter count-state splits (Savant daily aggregates or lineup-time pitch history rollups).
+- Replace or blend the fixed count modifier with batter-specific “performance when behind/ahead in the count” signals in credibility and/or offensive value.
+
+---
+
+### Runner speed and base-path value
+
+**Status:** Partial — pipeline fetch only; not stored or used in decisions.
+
+**Goal:** When runners are on base, factor in **sprint speed** (and related base-running value) when estimating how much a successful challenge helps the offense — a fast runner on first increases the value of the batter reaching or staying alive; a slow runner less so.
+
+**What exists today:**
+
+- `SavantDailyJob` fetches the sprint speed leaderboard (`sprintSpeed`, `homeTo1b`, `competitiveRuns`) and emits a `sprintSpeed` event.
+- The orchestrator does **not** persist sprint speed; the engine has no runner-quality fields. Run expectancy uses generic base/out states only.
+
+**Planned:**
+
+- Store sprint speed per player (new table or column on `player_stat_snapshots`).
+- When `runnerOnFirst` / `runnerOnSecond` / `runnerOnThird` is true, apply a small RE-delta or situation multiplier based on the occupying runner(s)' speed vs league average (~27 ft/s).
+
+---
+
+### Summary table
+
+| Feature | In pipeline? | In engine? | Notes |
+|--------|--------------|------------|-------|
+| Upcoming batters window | No | No | Needs lineup order + sliding window logic |
+| Batter count-state splits | Partial (`SavantLineupJob` exists, unwired) | Partial (fixed count modifier only) | Batter-specific splits are the gap |
+| Runner sprint speed | Yes (daily fetch) | No | Needs storage + RE multiplier when runners on |
 
 ---
 

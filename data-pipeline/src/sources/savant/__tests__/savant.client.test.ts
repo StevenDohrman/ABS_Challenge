@@ -5,7 +5,6 @@ import {
   fetchPlateDisciplineCsv,
   fetchSprayProfileCsv,
   fetchFielderOaaCsv,
-  fetchOutfieldDirectionalOaaCsv,
   fetchSprintSpeedCsv,
   fetchPlayerStatcastHistoryCsv,
 } from "../savant.client";
@@ -14,7 +13,6 @@ import {
   PLATE_DISCIPLINE_CSV,
   SPRAY_PROFILE_CSV,
   FIELDER_OAA_CSV,
-  OUTFIELD_DIRECTIONAL_OAA_CSV,
   SPRINT_SPEED_CSV,
   PLAYER_STATCAST_HISTORY_CSV,
 } from "./fixtures/savant.fixture";
@@ -104,16 +102,16 @@ describe("fetchPlateDisciplineCsv", () => {
 // ---------------------------------------------------------------------------
 
 describe("fetchSprayProfileCsv", () => {
-  it("requests the batted-ball-profile endpoint", async () => {
-    mock.onGet(`${BASE}/leaderboard/batted-ball-profile`).reply(200, SPRAY_PROFILE_CSV);
+  it("requests the batted-ball endpoint", async () => {
+    mock.onGet(`${BASE}/leaderboard/batted-ball`).reply(200, SPRAY_PROFILE_CSV);
 
     await fetchSprayProfileCsv(2026);
 
-    expect(mock.history.get[0].url).toBe(`${BASE}/leaderboard/batted-ball-profile`);
+    expect(mock.history.get[0].url).toBe(`${BASE}/leaderboard/batted-ball`);
   });
 
   it("sends the correct year param", async () => {
-    mock.onGet(`${BASE}/leaderboard/batted-ball-profile`).reply(200, SPRAY_PROFILE_CSV);
+    mock.onGet(`${BASE}/leaderboard/batted-ball`).reply(200, SPRAY_PROFILE_CSV);
 
     await fetchSprayProfileCsv(2026);
 
@@ -121,7 +119,7 @@ describe("fetchSprayProfileCsv", () => {
   });
 
   it("returns the raw CSV string", async () => {
-    mock.onGet(`${BASE}/leaderboard/batted-ball-profile`).reply(200, SPRAY_PROFILE_CSV);
+    mock.onGet(`${BASE}/leaderboard/batted-ball`).reply(200, SPRAY_PROFILE_CSV);
 
     const result = await fetchSprayProfileCsv(2026);
 
@@ -142,17 +140,25 @@ describe("fetchFielderOaaCsv", () => {
     expect(mock.history.get[0].url).toBe(`${BASE}/leaderboard/outs_above_average`);
   });
 
-  it("sends type=Fielder, pos=all, and year params", async () => {
+  it("sends minimal params that return CSV (not the HTML leaderboard page)", async () => {
     mock.onGet(`${BASE}/leaderboard/outs_above_average`).reply(200, FIELDER_OAA_CSV);
 
     await fetchFielderOaaCsv(2026);
 
     expect(mock.history.get[0].params).toMatchObject({
-      type: "Fielder",
-      pos: "all",
       year: 2026,
+      type: "Fielder",
       csv: "true",
     });
+    expect(mock.history.get[0].params).not.toHaveProperty("pos");
+  });
+
+  it("throws when Savant returns HTML instead of CSV", async () => {
+    mock
+      .onGet(`${BASE}/leaderboard/outs_above_average`)
+      .reply(200, "<!DOCTYPE html><html></html>");
+
+    await expect(fetchFielderOaaCsv(2026)).rejects.toThrow(/HTML instead of CSV/);
   });
 
   it("returns the raw CSV string", async () => {
@@ -167,36 +173,6 @@ describe("fetchFielderOaaCsv", () => {
     mock.onGet(`${BASE}/leaderboard/outs_above_average`).networkError();
 
     await expect(fetchFielderOaaCsv(2026)).rejects.toThrow();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// fetchOutfieldDirectionalOaaCsv
-// ---------------------------------------------------------------------------
-
-describe("fetchOutfieldDirectionalOaaCsv", () => {
-  it("requests the outfield_directional_oaa endpoint", async () => {
-    mock.onGet(`${BASE}/leaderboard/outfield_directional_oaa`).reply(200, OUTFIELD_DIRECTIONAL_OAA_CSV);
-
-    await fetchOutfieldDirectionalOaaCsv(2026);
-
-    expect(mock.history.get[0].url).toBe(`${BASE}/leaderboard/outfield_directional_oaa`);
-  });
-
-  it("sends year and csv params", async () => {
-    mock.onGet(`${BASE}/leaderboard/outfield_directional_oaa`).reply(200, OUTFIELD_DIRECTIONAL_OAA_CSV);
-
-    await fetchOutfieldDirectionalOaaCsv(2026);
-
-    expect(mock.history.get[0].params).toMatchObject({ year: 2026, csv: "true" });
-  });
-
-  it("returns the raw CSV string", async () => {
-    mock.onGet(`${BASE}/leaderboard/outfield_directional_oaa`).reply(200, OUTFIELD_DIRECTIONAL_OAA_CSV);
-
-    const result = await fetchOutfieldDirectionalOaaCsv(2026);
-
-    expect(result).toBe(OUTFIELD_DIRECTIONAL_OAA_CSV);
   });
 });
 

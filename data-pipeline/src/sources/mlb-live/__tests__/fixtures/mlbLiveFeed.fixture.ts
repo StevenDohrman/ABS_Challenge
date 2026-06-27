@@ -100,7 +100,15 @@ export function buildLinescore(
       batter: { id: 682998, fullName: "Jacob Wilson" },
     },
     defense: {
-      pitcher: { id: 656731, fullName: "Gregory Soto" },
+      pitcher:   { id: 656731, fullName: "Gregory Soto" },
+      catcher:   { id: 663728, fullName: "Tyler Soderstrom" },
+      first:     { id: 669477, fullName: "Casey Schmitt" },
+      second:    { id: 683766, fullName: "Christian Koss" },
+      third:     { id: 656305, fullName: "Matt Chapman" },
+      shortstop: { id: 642715, fullName: "Willy Adames" },
+      left:      { id: 671218, fullName: "Heliot Ramos" },
+      center:    { id: 808982, fullName: "Jung Hoo Lee" },
+      right:     { id: 677800, fullName: "Austin Slater" },
     },
     ...overrides,
   };

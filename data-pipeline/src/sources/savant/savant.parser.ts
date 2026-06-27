@@ -2,7 +2,6 @@ import {
   SavantBatterStatline,
   SavantBatterSprayProfile,
   SavantFielderOaa,
-  SavantOutfieldDirectionalOaa,
   SavantSprintSpeed,
   SavantPlayerPitchHistory,
 } from "./savant.types";
@@ -210,29 +209,36 @@ export function parseSprayProfiles(
   fetchedAt: string
 ): SavantBatterSprayProfile[] {
   return parseCsvToRows(csv)
-    .filter((row) => col(row, "player_id") !== "")
+    // "id" is the column name used by the /leaderboard/batted-ball endpoint;
+    // older fixtures and any future API revision may use "player_id".
+    .filter((row) => col(row, "player_id", "id") !== "")
     .map((row): SavantBatterSprayProfile => ({
-      playerId: parseInt10(col(row, "player_id")),
+      playerId: parseInt10(col(row, "player_id", "id")),
       playerName: col(row, "player_name", "name"),
       season: parseInt10(col(row, "year")),
-      pa: parseInt10(col(row, "pa")),
+      // /leaderboard/batted-ball uses "bbe" (batted-ball events); older
+      // endpoint used "pa".
+      pa: parseInt10(col(row, "pa", "bbe")),
+      // The /leaderboard/batted-ball endpoint returns decimal rates (0–1)
+      // with the suffix "_rate"; older endpoint used "_percent" (0–100).
+      // parsePercent() normalises both by converting values ≤1 to percentages.
       pullPercent: parsePercent(
-        col(row, "pull_percent", "pull_pct", "pull")
+        col(row, "pull_percent", "pull_pct", "pull", "pull_rate")
       ),
       straightawayPercent: parsePercent(
-        col(row, "straightaway_percent", "straightaway_pct", "cent")
+        col(row, "straightaway_percent", "straightaway_pct", "cent", "straight_rate")
       ),
       oppoPercent: parsePercent(
-        col(row, "oppo_percent", "opposite_percent", "oppo_pct", "oppo")
+        col(row, "oppo_percent", "opposite_percent", "oppo_pct", "oppo", "oppo_rate")
       ),
       gbPercent: parsePercent(
-        col(row, "gb_percent", "ground_ball_percent", "gb")
+        col(row, "gb_percent", "ground_ball_percent", "gb", "gb_rate")
       ),
       fbPercent: parsePercent(
-        col(row, "fb_percent", "fly_ball_percent", "fb")
+        col(row, "fb_percent", "fly_ball_percent", "fb", "fb_rate")
       ),
       ldPercent: parsePercent(
-        col(row, "ld_percent", "line_drive_percent", "ld")
+        col(row, "ld_percent", "line_drive_percent", "ld", "ld_rate")
       ),
       raw: row,
       fetchedAt,
@@ -248,48 +254,21 @@ export function parseFielderOaa(
   fetchedAt: string
 ): SavantFielderOaa[] {
   return parseCsvToRows(csv)
-    .filter((row) => col(row, "player_id") !== "")
+    .filter((row) => col(row, "player_id", "id") !== "")
     .map((row): SavantFielderOaa => ({
-      playerId: parseInt10(col(row, "player_id")),
-      playerName: col(row, "name", "player_name"),
+      playerId: parseInt10(col(row, "player_id", "id")),
+      playerName: col(
+        row,
+        "name",
+        "player_name",
+        "last_name, first_name",
+        "last_name_first_name"
+      ),
       season: parseInt10(col(row, "year")),
-      position: col(row, "pos", "position"),
+      position: col(row, "pos", "position", "primary_pos_formatted"),
       oaa: parseNum(col(row, "outs_above_average", "oaa")),
       oaaVsRhh: parseNum(col(row, "outs_above_average_rhh", "oaa_rhh")),
       oaaVsLhh: parseNum(col(row, "outs_above_average_lhh", "oaa_lhh")),
-      raw: row,
-      fetchedAt,
-    }));
-}
-
-// ---------------------------------------------------------------------------
-// Outfield directional OAA parser
-// ---------------------------------------------------------------------------
-
-export function parseOutfieldDirectionalOaa(
-  csv: string,
-  fetchedAt: string
-): SavantOutfieldDirectionalOaa[] {
-  return parseCsvToRows(csv)
-    .filter((row) => col(row, "player_id") !== "")
-    .map((row): SavantOutfieldDirectionalOaa => ({
-      playerId: parseInt10(col(row, "player_id")),
-      playerName: col(row, "name", "player_name"),
-      season: parseInt10(col(row, "year")),
-      position: col(row, "pos", "position"),
-      oaa: parseNum(col(row, "outs_above_average", "oaa")),
-      oaaLeft: parseNum(
-        col(row, "outs_above_average_left", "oaa_left", "oaa_lft")
-      ),
-      oaaStraight: parseNum(
-        col(row, "outs_above_average_straight", "oaa_straight", "oaa_str")
-      ),
-      oaaRight: parseNum(
-        col(row, "outs_above_average_right", "oaa_right", "oaa_rgt")
-      ),
-      reaction: parseNum(col(row, "reaction", "reaction_time")),
-      burst: parseNum(col(row, "burst", "burst_score")),
-      route: parsePercent(col(row, "route", "route_efficiency", "route_eff")),
       raw: row,
       fetchedAt,
     }));

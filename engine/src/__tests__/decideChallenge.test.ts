@@ -45,6 +45,8 @@ const disciplinedPlayer: PlayerChallengeContext = {
   whiffPercent: 0.19,
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 const averagePlayer: PlayerChallengeContext = {
@@ -58,6 +60,8 @@ const averagePlayer: PlayerChallengeContext = {
   whiffPercent: 0.25,
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 const aggressivePlayer: PlayerChallengeContext = {
@@ -71,6 +75,8 @@ const aggressivePlayer: PlayerChallengeContext = {
   whiffPercent: 0.38,
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 const calledStrike: PitchCallContext = {

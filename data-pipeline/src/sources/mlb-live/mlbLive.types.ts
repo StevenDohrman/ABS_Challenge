@@ -1,4 +1,25 @@
 /**
+ * Fielder IDs for the current defensive alignment, extracted from
+ * linescore.defense in the MLB live feed. All slots are optional because
+ * the API may omit them in early-game states or for historical backfill plays.
+ *
+ * Position keys match the fielder_oaa table position abbreviations after
+ * conversion: first→1B, second→2B, third→3B, shortstop→SS, left→LF,
+ * center→CF, right→RF.
+ */
+export interface DefensiveLineup {
+  pitcher?: number;
+  catcher?: number;
+  first?: number;     // 1B
+  second?: number;    // 2B
+  third?: number;     // 3B
+  shortstop?: number; // SS
+  left?: number;      // LF
+  center?: number;    // CF
+  right?: number;     // RF
+}
+
+/**
  * balls/strikes/outs represent the count AFTER the pitch (from playEvent.count).
  * ballsBefore/strikesBefore represent the count BEFORE the pitch, computed during
  * parsing by walking the play's event sequence. These pre-pitch values are the
@@ -92,5 +113,24 @@ export interface MlbAtBatSnapshot {
   battingTeamId: number;
   fieldingTeamId: number;
 
+  /**
+   * Defensive fielder IDs for the current alignment, extracted from
+   * linescore.defense in the MLB live feed. Absent for historical backfill
+   * at-bats (live feed doesn't carry per-play defense history).
+   */
+  defense?: DefensiveLineup;
+
   fetchedAt: string;
+}
+
+/** MLB pitch call code for a called strike (no swing). */
+export const CALLED_STRIKE_CALL_CODE = "C";
+
+/**
+ * First-poll batch of completed at-bats plus which indices need pre-compute
+ * before historical pitch replay (only at-bats with called strikes).
+ */
+export interface GameBackfillPayload {
+  snapshots: MlbAtBatSnapshot[];
+  calledStrikeAtBatIndices: number[];
 }

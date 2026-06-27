@@ -4,7 +4,6 @@ import {
   fetchPlateDisciplineCsv,
   fetchSprayProfileCsv,
   fetchFielderOaaCsv,
-  fetchOutfieldDirectionalOaaCsv,
   fetchSprintSpeedCsv,
 } from "../sources/savant/savant.client";
 import {
@@ -12,14 +11,12 @@ import {
   mergePlateDiscipline,
   parseSprayProfiles,
   parseFielderOaa,
-  parseOutfieldDirectionalOaa,
   parseSprintSpeed,
 } from "../sources/savant/savant.parser";
 import {
   SavantBatterStatline,
   SavantBatterSprayProfile,
   SavantFielderOaa,
-  SavantOutfieldDirectionalOaa,
   SavantSprintSpeed,
 } from "../sources/savant/savant.types";
 
@@ -32,11 +29,10 @@ import {
  *
  * Example (backend):
  *   const job = new SavantDailyJob();
- *   job.on('batterStatlines',       (s) => cache.set('batters', s));
- *   job.on('sprayProfiles',         (s) => cache.set('spray', s));
- *   job.on('fielderOaa',            (s) => cache.set('oaa', s));
- *   job.on('outfieldDirectionalOaa',(s) => cache.set('dirOaa', s));
- *   job.on('sprintSpeed',           (s) => cache.set('speed', s));
+ *   job.on('batterStatlines', (s) => cache.set('batters', s));
+ *   job.on('sprayProfiles',   (s) => cache.set('spray', s));
+ *   job.on('fielderOaa',      (s) => cache.set('oaa', s));
+ *   job.on('sprintSpeed',     (s) => cache.set('speed', s));
  *   await job.run(2026);
  */
 export interface SavantDailyJob {
@@ -53,10 +49,6 @@ export interface SavantDailyJob {
     listener: (oaa: SavantFielderOaa[]) => void
   ): this;
   on(
-    event: "outfieldDirectionalOaa",
-    listener: (oaa: SavantOutfieldDirectionalOaa[]) => void
-  ): this;
-  on(
     event: "sprintSpeed",
     listener: (speeds: SavantSprintSpeed[]) => void
   ): this;
@@ -66,12 +58,11 @@ export interface SavantDailyJob {
 /**
  * Fetches all Savant pregame context data for a given season.
  *
- * Runs five independent pipelines in parallel:
+ * Runs four independent pipelines in parallel:
  *   1. Batter statlines   (expected-statistics + plate-discipline merge)
  *   2. Batter spray profiles
  *   3. Fielder OAA        (all positions)
- *   4. Outfield directional OAA + jump metrics
- *   5. Sprint speed       (all positions)
+ *   4. Sprint speed       (all positions)
  *
  * Errors from individual pipelines are emitted on `error` with a
  * descriptive message; remaining pipelines continue unaffected.
@@ -84,7 +75,6 @@ export class SavantDailyJob extends EventEmitter {
       this.runBatterStatlines(season, fetchedAt),
       this.runSprayProfiles(season, fetchedAt),
       this.runFielderOaa(season, fetchedAt),
-      this.runOutfieldDirectionalOaa(season, fetchedAt),
       this.runSprintSpeed(season, fetchedAt),
     ]);
   }
@@ -126,18 +116,6 @@ export class SavantDailyJob extends EventEmitter {
       this.emit("fielderOaa", parseFielderOaa(csv, fetchedAt));
     } catch (err) {
       this.emitError("fielder OAA", err);
-    }
-  }
-
-  private async runOutfieldDirectionalOaa(
-    season: number,
-    fetchedAt: string
-  ): Promise<void> {
-    try {
-      const csv = await fetchOutfieldDirectionalOaaCsv(season);
-      this.emit("outfieldDirectionalOaa", parseOutfieldDirectionalOaa(csv, fetchedAt));
-    } catch (err) {
-      this.emitError("outfield directional OAA", err);
     }
   }
 

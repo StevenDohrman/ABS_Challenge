@@ -290,6 +290,77 @@ export const SCORING = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Defensive context — spray-based RE-delta multiplier
+// ---------------------------------------------------------------------------
+
+/**
+ * Spray-based defensive multiplier parameters.
+ *
+ * V1 uses the batter's batted-ball type mix (GB/FB/LD) to scale the RE delta
+ * by a small factor reflecting how the defense is typically positioned against
+ * this batter.  The effect is intentionally small (max ±10%) so it does not
+ * dominate the situational and credibility signals.
+ *
+ * Rationale:
+ *  - GB-heavy batters tend to produce more infield outs (league-avg GB ≈ 44%).
+ *    A batter who is unusually GB-heavy has a lower "hit value" per BIP → the
+ *    RE delta of keeping them at bat is slightly lower than league average.
+ *  - LD-heavy batters have the highest BABIP (~.680 for line drives) → the
+ *    extra at-bat is unusually valuable → small positive multiplier.
+ *  - FB batters are intermediate but slightly positive (extra-base potential).
+ *
+ * When specific fielder OAA data is available (future enhancement), multiply
+ * the fielder's spray-zone OAA contribution on top of this spray factor.
+ */
+export const DEFENSIVE = {
+  /** League-average ground ball rate (0–1). Source: MLB 2024 average. */
+  LEAGUE_AVG_GB_RATE: 0.44,
+
+  /** League-average fly ball rate (0–1). */
+  LEAGUE_AVG_FB_RATE: 0.33,
+
+  /** League-average line drive rate (0–1). */
+  LEAGUE_AVG_LD_RATE: 0.23,
+
+  /**
+   * Multiplier scale per unit of GB-rate deviation from league average.
+   * Positive GB deviation (batter more GB-heavy than average) lowers the
+   * multiplier (ground balls produce more outs).  Each 0.10 deviation shifts
+   * the multiplier by 0.10 × GB_SCALE = 2.0%.
+   */
+  GB_SCALE: 0.20,
+
+  /**
+   * Multiplier scale per unit of FB-rate deviation.
+   * Positive FB deviation (more fly balls) slightly boosts the multiplier.
+   */
+  FB_SCALE: 0.15,
+
+  /**
+   * Multiplier scale per unit of LD-rate deviation.
+   * LD has the highest BABIP (~.680) of any batted-ball type, so deviations
+   * here have the largest per-unit impact on expected hit value.
+   */
+  LD_SCALE: 0.35,
+
+  /** Maximum defensive multiplier (spray-favourable hitter). */
+  MAX_MULTIPLIER: 1.10,
+
+  /** Minimum defensive multiplier (strongly GB-heavy hitter). */
+  MIN_MULTIPLIER: 0.90,
+
+  /**
+   * Multiplier scale per unit of fielder OAA.
+   * A fielder with +15 OAA converts ~6% more batted balls into outs than average.
+   * Each OAA unit shifts the multiplier by ±0.4%:
+   *   +15 OAA → -6% multiplier (elite defender → less value in extending at-bat)
+   *   -15 OAA → +6% multiplier (poor defender → more value in extending at-bat)
+   * The OAA component stacks with the spray component; both are clamped together.
+   */
+  OAA_SCALE: 0.004,
+} as const;
+
+// ---------------------------------------------------------------------------
 // Thresholds — score → recommendation label and minimum confidence
 // ---------------------------------------------------------------------------
 
