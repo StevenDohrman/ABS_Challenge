@@ -1,11 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import { acquireDbSlot, releaseDbSlot } from "./dbGate";
 
 /**
- * Singleton Prisma client.
+ * Singleton Prisma client with a central concurrency gate.
  *
- * Prisma opens a connection pool when the first query runs. Sharing a single
- * instance across the process avoids exhausting the database connection limit,
- * which is especially important with Supabase's pooler-based limits.
+ * All queries pass through dbGate (see dbGate.ts) before hitting the database.
+ * This prevents live-poll bulk writes, Savant ingest, and API reads from
+ * exhausting the connection pool and surfacing P2024 timeouts.
  *
  * The global check prevents hot-reload tools (ts-node-dev, nodemon) from
  * creating a new client on every file change during development.
@@ -14,9 +15,8 @@ import { PrismaClient } from "@prisma/client";
 /**
  * How long (seconds) a query will wait for a free connection before Prisma
  * throws P2024. Bulk writes are concurrency-capped (DB_LIMITS.WRITE_CONCURRENCY)
- * so the pool should not saturate, but a slightly larger timeout than Prisma's
- * 10s default rides out brief contention spikes — e.g. the daily Savant rerun
- * overlapping a burst of live-poll writes — instead of dropping queries.
+ * and all queries are gated (DB_LIMITS.MAX_CONCURRENT_QUERIES) so the pool
+ * should not saturate; a slightly larger timeout rides out brief spikes.
  */
 const POOL_TIMEOUT_SECONDS = 20;
 
@@ -45,15 +45,40 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-function createPrismaClient(): PrismaClient {
+function createBasePrismaClient(): PrismaClient {
   const url = buildDatasourceUrl();
   return new PrismaClient({
     ...(url ? { datasources: { db: { url } } } : {}),
     log:
       process.env.NODE_ENV === "development"
-        ? ["query", "warn", "error"]
+        ? ["warn", "error"]
         : ["warn", "error"],
   });
+}
+
+/**
+ * Wrap the client so every model operation acquires a dbGate slot first.
+ * Cast back to PrismaClient so repositories keep their existing types.
+ */
+function createGatedPrismaClient(base: PrismaClient): PrismaClient {
+  return base.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          await acquireDbSlot();
+          try {
+            return await query(args);
+          } finally {
+            releaseDbSlot();
+          }
+        },
+      },
+    },
+  }) as unknown as PrismaClient;
+}
+
+function createPrismaClient(): PrismaClient {
+  return createGatedPrismaClient(createBasePrismaClient());
 }
 
 export const prisma: PrismaClient = global.__prisma ?? createPrismaClient();

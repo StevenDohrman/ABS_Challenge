@@ -11,10 +11,10 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantOutfieldDirectionalOaa, ActiveGame } from "@abs/data-pipeline";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, ActiveGame } from "@abs/data-pipeline";
 import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
-import { upsertSprayProfiles, upsertFielderOaa, upsertOutfieldDirectionalOaa } from "../db/defensiveRepository";
+import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Game lifecycle
@@ -192,19 +192,5 @@ export async function handleFielderOaa(
     await upsertFielderOaa(oaaRows);
   } catch (err) {
     console.error("[ingestService] failed to upsert fielder OAA batch:", err);
-  }
-}
-
-/**
- * Persist a batch of outfield directional OAA rows from the SavantDailyJob.
- */
-export async function handleOutfieldDirectionalOaa(
-  oaaRows: SavantOutfieldDirectionalOaa[]
-): Promise<void> {
-  try {
-    console.log(`[ingestService] upserting ${oaaRows.length} outfield directional OAA rows`);
-    await upsertOutfieldDirectionalOaa(oaaRows);
-  } catch (err) {
-    console.error("[ingestService] failed to upsert outfield directional OAA batch:", err);
   }
 }

@@ -3,6 +3,8 @@ import cors from "cors";
 import { recommendationsRouter } from "./routes/recommendations";
 import { scheduleRouter } from "./routes/schedule";
 import { prisma } from "./db/prisma";
+import { getDbGateStats } from "./db/dbGate";
+import { DB_LIMITS } from "./db/constants";
 
 const app = express();
 
@@ -25,7 +27,15 @@ app.get("/health", async (_req, res) => {
   } catch {
     // DB unreachable — server is still up, just report the state.
   }
-  res.json({ status: "ok", db });
+  const pool = getDbGateStats();
+  res.json({
+    status: "ok",
+    db,
+    pool: {
+      ...pool,
+      maxConcurrent: DB_LIMITS.MAX_CONCURRENT_QUERIES,
+    },
+  });
 });
 
 /**

@@ -17,7 +17,9 @@
  *
  *   LivePollJob.gameOver    → ingestService.handleGameOver
  *
- *   SavantDailyJob.batterStatlines → ingestService.handleBatterStatlines
+ *   SavantDailyJob.batterStatlines       → ingestService.handleBatterStatlines
+ *   SavantDailyJob.sprayProfiles         → ingestService.handleSprayProfiles
+ *   SavantDailyJob.fielderOaa            → ingestService.handleFielderOaa
  *
  * SavantDailyJob is run once at startup (to load pregame data) and re-run
  * daily at a scheduled time. In production, replace the 24-hour interval with
@@ -31,13 +33,22 @@ import {
   handlePitchEvent,
   handleGameOver,
   handleBatterStatlines,
+  handleSprayProfiles,
+  handleFielderOaa,
   reconcileChallengeCounts,
 } from "./services/ingestService";
 import {
   precomputeAtBatRecommendations,
   triggerRecommendationIfCalledStrike,
 } from "./services/challengeService";
+import { processGameBackfill } from "./services/gameBackfillService";
 import { purgeOldGames } from "./db/cleanupRepository";
+import {
+  enqueuePipelineDbWork,
+  trackGameBackfill,
+  trackGameBackfillPitchReady,
+  waitForGameBackfillPitchReady,
+} from "./db/pipelineDbQueue";
 import { SEASONS } from "./db/constants";
 
 /** How often to re-run the Savant daily job in milliseconds (24 hours). */
@@ -81,27 +92,53 @@ function startLivePollJob(): void {
     await handleGameDiscovered(game);
   });
 
-  job.on("atBatStart", async (snapshot) => {
-    // Write the snapshot first so precompute can read game context from the DB.
-    await handleAtBatStart(snapshot);
-    await precomputeAtBatRecommendations(snapshot);
+  /**
+   * Mid-game first poll: batch of completed at-bats. Runs on the low-priority
+   * queue as a single job. Pitch replay waits only until called-strike at-bats
+   * are pre-computed; the rest of the history fills in in the background.
+   */
+  job.on("gameBackfill", (payload) => {
+    if (payload.snapshots.length === 0) return;
+    const gamePk = payload.snapshots[0].gamePk;
+
+    let resolvePitchReady!: () => void;
+    const pitchReady = new Promise<void>((resolve) => {
+      resolvePitchReady = resolve;
+    });
+    trackGameBackfillPitchReady(gamePk, pitchReady);
+
+    const work = enqueuePipelineDbWork(
+      `backfill-batch game=${gamePk} count=${payload.snapshots.length} cs=${payload.calledStrikeAtBatIndices.length}`,
+      () => processGameBackfill(payload, resolvePitchReady),
+      "low"
+    );
+    trackGameBackfill(gamePk, work);
   });
 
-  // All historical at-bats arrive as one batch on the first poll. Process
-  // them one at a time so DB connections never exceed 12 concurrently
-  // (the Promise.allSettled inside precomputeAtBatRecommendations).
-  job.on("gameBackfill", async (snapshots) => {
-    for (const snapshot of snapshots) {
-      await handleAtBatStart(snapshot);
-      await precomputeAtBatRecommendations(snapshot);
-    }
+  job.on("atBatStart", async (snapshot) => {
+    // Current at-bat is not blocked by historical backfill — process immediately.
+    await enqueuePipelineDbWork(
+      `atBatStart game=${snapshot.gamePk} atBat=${snapshot.atBatIndex}`,
+      async () => {
+        await handleAtBatStart(snapshot);
+        await precomputeAtBatRecommendations(snapshot);
+      },
+      "high"
+    );
   });
 
   job.on("pitchEvent", async (event) => {
-    const dbRowId = await handlePitchEvent(event);
-    if (dbRowId !== null) {
-      await triggerRecommendationIfCalledStrike(event, dbRowId);
-    }
+    await waitForGameBackfillPitchReady(event.gamePk);
+    await enqueuePipelineDbWork(
+      `pitch game=${event.gamePk} atBat=${event.atBatIndex} pitch=${event.pitchNumber}`,
+      async () => {
+        const dbRowId = await handlePitchEvent(event);
+        if (dbRowId !== null) {
+          await triggerRecommendationIfCalledStrike(event, dbRowId);
+        }
+      },
+      "high"
+    );
   });
 
   job.on("gameOver", async ({ gamePk }) => {
@@ -125,6 +162,14 @@ async function runSavantDailyJob(): Promise<void> {
 
   job.on("batterStatlines", async (statlines) => {
     await handleBatterStatlines(statlines);
+  });
+
+  job.on("sprayProfiles", async (profiles) => {
+    await handleSprayProfiles(profiles);
+  });
+
+  job.on("fielderOaa", async (oaaRows) => {
+    await handleFielderOaa(oaaRows);
   });
 
   job.on("error", (err) => {

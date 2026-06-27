@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { ChallengeDecision } from "@abs/engine";
 import type { ChallengeRecommendation } from "@prisma/client";
+import { ALL_COUNT_STATES } from "./constants";
 
 export type { ChallengeRecommendation };
 
@@ -161,4 +162,37 @@ export async function gameHasTriggeredRecommendation(
     select: { id: true },
   });
   return row !== null;
+}
+
+/** Number of count-state rows expected after a full at-bat precompute. */
+export const FULL_PRECOMPUTE_COUNT = ALL_COUNT_STATES.length;
+
+/**
+ * At-bat indices that already have all count-state recommendations stored.
+ * Used on restart to skip redundant engine work.
+ */
+export async function findAtBatIndicesWithCompletePrecompute(
+  gamePk: number
+): Promise<Set<number>> {
+  const groups = await prisma.challengeRecommendation.groupBy({
+    by: ["atBatIndex"],
+    where: { gamePk },
+    _count: { id: true },
+  });
+
+  return new Set(
+    groups
+      .filter((group) => group._count.id >= FULL_PRECOMPUTE_COUNT)
+      .map((group) => group.atBatIndex)
+  );
+}
+
+export async function atBatHasCompletePrecompute(
+  gamePk: number,
+  atBatIndex: number
+): Promise<boolean> {
+  const count = await prisma.challengeRecommendation.count({
+    where: { gamePk, atBatIndex },
+  });
+  return count >= FULL_PRECOMPUTE_COUNT;
 }
