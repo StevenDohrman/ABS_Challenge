@@ -111,15 +111,23 @@ export const SEASONS = {
 
 export const DB_LIMITS = {
   /**
+   * Maximum Prisma queries in flight process-wide. Every query acquires a slot
+   * in dbGate before running (see db/prisma.ts). Keep this well below the
+   * Prisma connection_limit (default num_cpus*2+1, often 17) so API reads and
+   * live-poll writes can share the pool without P2024 timeouts.
+   */
+  MAX_CONCURRENT_QUERIES: 10,
+
+  /** Log a warning when a query waits longer than this for a dbGate slot (ms). */
+  GATE_WARN_WAIT_MS: 2_000,
+
+  /**
    * Maximum number of write queries to keep in flight at once when persisting a
    * bulk batch — the daily Savant statline/spray/OAA upserts and the 12
    * per-at-bat recommendation rows pre-computed on every at-bat start.
    *
-   * This is deliberately kept well below the Prisma connection-pool limit
-   * (default num_cpus*2+1) so a bulk batch can never check out every connection
-   * and starve the live-poll loop and the API, which share the same pool.
-   * Raising this past the pool size reintroduces the `P2024` connection-pool
-   * timeout errors. The work itself is unchanged — only the fan-out is capped.
+   * Must stay at or below MAX_CONCURRENT_QUERIES so a single batch cannot
+   * monopolise every slot (reads and other handlers need headroom).
    */
-  WRITE_CONCURRENCY: 8,
+  WRITE_CONCURRENCY: 4,
 } as const;

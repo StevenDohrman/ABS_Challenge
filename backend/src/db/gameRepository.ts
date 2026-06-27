@@ -283,3 +283,16 @@ export async function findLatestAtBatSnapshot(
     orderBy: { atBatIndex: "desc" },
   });
 }
+
+/**
+ * Returns every atBatIndex that already has a stored snapshot for this game.
+ * Used on pipeline restart to skip re-ingesting historical at-bats.
+ */
+export async function findStoredAtBatIndices(gamePk: number): Promise<number[]> {
+  const rows = await prisma.liveGameSnapshot.findMany({
+    where: { gamePk },
+    select: { atBatIndex: true },
+    orderBy: { atBatIndex: "asc" },
+  });
+  return rows.map((row) => row.atBatIndex);
+}

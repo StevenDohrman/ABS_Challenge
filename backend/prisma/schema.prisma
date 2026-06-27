@@ -305,34 +305,3 @@ model FielderOaa {
   @@map("fielder_oaa")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// outfield_directional_oaa
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Outfielder directional OAA and jump metrics. Ingested by SavantDailyJob.
-// One row per (playerId, season); upserted on each daily run.
-model OutfieldDirectionalOaa {
-  id         Int    @id @default(autoincrement())
-  playerId   Int
-  playerName String
-  season     Int
-  position   String
-
-  oaa         Float?
-  oaaLeft     Float?
-  oaaStraight Float?
-  oaaRight    Float?
-
-  // Jump metrics.
-  reaction Float?
-  burst    Float?
-  route    Float?
-
-  fetchedAt DateTime
-  updatedAt DateTime @updatedAt
-
-  @@unique([playerId, season])
-  @@index([playerId])
-  @@map("outfield_directional_oaa")
-}
-

@@ -1,27 +1,34 @@
 import type { PlayerStatSnapshot } from "@prisma/client";
 import type { PlayerChallengeContext } from "@abs/engine";
+import type { PlayerSprayProfile } from "../db/defensiveRepository";
 import { STAT_CONVERSION } from "../db/constants";
 
 /**
- * Build a PlayerChallengeContext from a stored player stat snapshot.
+ * Build a PlayerChallengeContext from a stored player stat snapshot and an
+ * optional spray profile.
  *
  * Savant plate discipline metrics are stored as percentages (0–100).
  * The engine expects rates in the 0–1 range. This function performs the
  * conversion using STAT_CONVERSION.PERCENT_TO_RATE_DIVISOR so the constant
  * documents the reason for dividing rather than leaving a bare /100.
  *
- * Fields not yet populated (battingHand, obp, ops) are passed as null.
- * The engine handles nulls gracefully — they result in no adjustment for
- * that specific signal rather than throwing an error.
+ * Spray profile fields are also stored as percentages (0–100) and converted
+ * to 0–1 rates. When no spray profile is available, sprayProfile is null and
+ * the engine applies a 1.0× defensive multiplier (no adjustment).
+ *
+ * fielderOaa is the OAA of the fielder covering this batter's primary spray
+ * zone (already selected by batting-hand split in the challenge service).
+ * Null → 0× OAA adjustment from the engine.
  */
 export function buildPlayerChallengeContext(
-  snapshot: PlayerStatSnapshot
+  snapshot: PlayerStatSnapshot,
+  sprayProfile: PlayerSprayProfile | null = null,
+  fielderOaa: number | null = null
 ): PlayerChallengeContext {
   return {
     playerId: snapshot.playerId,
 
     // Batter stance — populated from the MLB Stats API when available.
-    // Null here until we wire the handedness enrichment step.
     battingHand: toHandedness(snapshot.battingHand),
 
     // Offensive value signals (used to scale the RE delta).
@@ -37,6 +44,22 @@ export function buildPlayerChallengeContext(
     // Historical challenge accuracy from our own DB.
     historicalChallengeAttempts: snapshot.historicalChallengeAttempts,
     historicalChallengeSuccessRate: snapshot.historicalChallengeSuccessRate,
+
+    // Spray profile — null when the player has not been ingested yet or has
+    // too few batted-ball events (sub-100 PA threshold on the Savant endpoint).
+    sprayProfile: sprayProfile
+      ? {
+          pullPercent: toRate(sprayProfile.pullPercent),
+          straightawayPercent: toRate(sprayProfile.straightawayPercent),
+          oppoPercent: toRate(sprayProfile.oppoPercent),
+          gbPercent: toRate(sprayProfile.gbPercent),
+          fbPercent: toRate(sprayProfile.fbPercent),
+          ldPercent: toRate(sprayProfile.ldPercent),
+        }
+      : null,
+
+    // OAA for the fielder covering this batter's primary spray zone.
+    fielderOaa,
   };
 }
 
@@ -58,6 +81,8 @@ export function buildDefaultPlayerChallengeContext(
     whiffPercent: null,
     historicalChallengeAttempts: 0,
     historicalChallengeSuccessRate: null,
+    sprayProfile: null,
+    fielderOaa: null,
   };
 }
 

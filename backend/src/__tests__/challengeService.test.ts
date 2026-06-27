@@ -14,6 +14,7 @@
 import * as gameRepo from "../db/gameRepository";
 import * as playerRepo from "../db/playerRepository";
 import * as recRepo from "../db/recommendationRepository";
+import * as defRepo from "../db/defensiveRepository";
 import * as contextBuilder from "../services/playerContextBuilder";
 import {
   precomputeAtBatRecommendations,
@@ -48,6 +49,7 @@ jest.mock("@abs/engine", () => ({
 jest.mock("../db/gameRepository");
 jest.mock("../db/playerRepository");
 jest.mock("../db/recommendationRepository");
+jest.mock("../db/defensiveRepository");
 jest.mock("../services/playerContextBuilder");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +71,12 @@ const mockComputeTeamChallengesRemaining =
 const mockFindPlayerStatSnapshot = playerRepo.findPlayerStatSnapshot as jest.MockedFunction<
   typeof playerRepo.findPlayerStatSnapshot
 >;
+const mockFindSprayProfile = defRepo.findSprayProfile as jest.MockedFunction<
+  typeof defRepo.findSprayProfile
+>;
+const mockFindFielderOaaBatch = defRepo.findFielderOaaBatch as jest.MockedFunction<
+  typeof defRepo.findFielderOaaBatch
+>;
 const mockUpsertRecommendation = recRepo.upsertRecommendation as jest.MockedFunction<
   typeof recRepo.upsertRecommendation
 >;
@@ -83,6 +91,10 @@ const mockFindLatestTriggeredRecommendation =
 const mockFindRecommendation = recRepo.findRecommendation as jest.MockedFunction<
   typeof recRepo.findRecommendation
 >;
+const mockAtBatHasCompletePrecompute =
+  recRepo.atBatHasCompletePrecompute as jest.MockedFunction<
+    typeof recRepo.atBatHasCompletePrecompute
+  >;
 const mockBuildPlayerChallengeContext =
   contextBuilder.buildPlayerChallengeContext as jest.MockedFunction<
     typeof contextBuilder.buildPlayerChallengeContext
@@ -115,6 +127,8 @@ const DEFAULT_PLAYER_CONTEXT = {
   whiffPercent: null,
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null as null,
+  fielderOaa: null as null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,6 +160,18 @@ describe("precomputeAtBatRecommendations", () => {
     beforeEach(() => {
       mockFindGame.mockResolvedValue(makeGame());
       mockFindPlayerStatSnapshot.mockResolvedValue(null); // no Savant data yet
+      mockFindSprayProfile.mockResolvedValue(null);       // no spray profile yet
+      mockFindFielderOaaBatch.mockResolvedValue([]);      // no fielder OAA yet
+      mockAtBatHasCompletePrecompute.mockResolvedValue(false);
+    });
+
+    it("skips precompute when all 12 count states are already stored", async () => {
+      mockAtBatHasCompletePrecompute.mockResolvedValue(true);
+
+      await precomputeAtBatRecommendations(makeMlbAtBatSnapshot());
+
+      expect(decideChallenge).not.toHaveBeenCalled();
+      expect(mockUpsertRecommendation).not.toHaveBeenCalled();
     });
 
     it("calls upsertRecommendation exactly 12 times — once per count state", async () => {
@@ -342,7 +368,9 @@ describe("triggerRecommendationIfCalledStrike", () => {
     });
 
     it("marks the recommendation as triggered when one is found", async () => {
-      mockFindRecommendation.mockResolvedValue(makeChallengeRecommendation());
+      mockFindRecommendation.mockResolvedValue(
+        makeChallengeRecommendation({ triggeredAt: null, pitchEventId: null })
+      );
 
       await triggerRecommendationIfCalledStrike(calledStrikeEvent, DB_ROW_ID);
 
@@ -353,6 +381,16 @@ describe("triggerRecommendationIfCalledStrike", () => {
 
     it("does not call markRecommendationTriggered when no pre-computed row is found", async () => {
       mockFindRecommendation.mockResolvedValue(null);
+
+      await triggerRecommendationIfCalledStrike(calledStrikeEvent, DB_ROW_ID);
+
+      expect(mockMarkRecommendationTriggered).not.toHaveBeenCalled();
+    });
+
+    it("does not re-trigger when the recommendation was already marked triggered", async () => {
+      mockFindRecommendation.mockResolvedValue(
+        makeChallengeRecommendation({ triggeredAt: new Date("2026-06-22T21:06:00Z") })
+      );
 
       await triggerRecommendationIfCalledStrike(calledStrikeEvent, DB_ROW_ID);
 

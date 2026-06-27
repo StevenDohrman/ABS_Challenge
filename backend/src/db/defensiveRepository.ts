@@ -1,9 +1,8 @@
 /**
  * Defensive Repository
  *
- * Handles DB persistence for spray profiles and OAA data ingested by
- * SavantDailyJob. All three tables use (playerId, season) or
- * (playerId, season, position) as their natural unique key.
+ * Handles DB persistence for spray profiles and fielder OAA data ingested by
+ * SavantDailyJob.
  */
 
 import { prisma } from "./prisma";
@@ -12,15 +11,13 @@ import { mapSettledWithConcurrency } from "../utils/concurrency";
 import type {
   SavantBatterSprayProfile,
   SavantFielderOaa,
-  SavantOutfieldDirectionalOaa,
 } from "@abs/data-pipeline";
 import type {
   PlayerSprayProfile,
   FielderOaa,
-  OutfieldDirectionalOaa,
 } from "@prisma/client";
 
-export type { PlayerSprayProfile, FielderOaa, OutfieldDirectionalOaa };
+export type { PlayerSprayProfile, FielderOaa };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // player_spray_profiles
@@ -136,54 +133,26 @@ export async function findFielderOaa(
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// outfield_directional_oaa
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function upsertOutfieldDirectionalOaaRow(
-  row: SavantOutfieldDirectionalOaa
-): Promise<OutfieldDirectionalOaa> {
-  const sharedFields = {
-    playerName: row.playerName,
-    position: row.position,
-    oaa: row.oaa,
-    oaaLeft: row.oaaLeft,
-    oaaStraight: row.oaaStraight,
-    oaaRight: row.oaaRight,
-    reaction: row.reaction,
-    burst: row.burst,
-    route: row.route,
-    fetchedAt: new Date(row.fetchedAt),
-  };
-
-  return prisma.outfieldDirectionalOaa.upsert({
-    where: { playerId_season: { playerId: row.playerId, season: row.season } },
-    update: sharedFields,
-    create: { playerId: row.playerId, season: row.season, ...sharedFields },
-  });
+export interface FielderOaaLookup {
+  playerId: number;
+  position: string;
 }
 
-export async function upsertOutfieldDirectionalOaa(
-  rows: SavantOutfieldDirectionalOaa[]
-): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    rows,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (r) => upsertOutfieldDirectionalOaaRow(r)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
-    console.error(
-      `[defensiveRepository] ${failures.length} of ${rows.length} outfield directional OAA upserts failed`
-    );
-  }
-}
-
-export async function findOutfieldDirectionalOaa(
-  playerId: number,
+/**
+ * Batch-fetch OAA rows for multiple fielder/position pairs in a single query.
+ * Used during at-bat precompute to avoid N sequential lookups exhausting the
+ * connection pool when resolving spray-zone coverage.
+ */
+export async function findFielderOaaBatch(
+  lookups: FielderOaaLookup[],
   season: number
-): Promise<OutfieldDirectionalOaa | null> {
-  return prisma.outfieldDirectionalOaa.findUnique({
-    where: { playerId_season: { playerId, season } },
+): Promise<FielderOaa[]> {
+  if (lookups.length === 0) return [];
+
+  return prisma.fielderOaa.findMany({
+    where: {
+      season,
+      OR: lookups.map(({ playerId, position }) => ({ playerId, position })),
+    },
   });
 }

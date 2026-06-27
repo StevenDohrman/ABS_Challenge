@@ -182,6 +182,82 @@ describe("buildPlayerChallengeContext", () => {
       expect(ctx.historicalChallengeSuccessRate).toBeNull();
     });
   });
+
+  describe("spray profile conversion", () => {
+    it("sets sprayProfile to null when no profile is passed", () => {
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}));
+      expect(ctx.sprayProfile).toBeNull();
+    });
+
+    it("converts spray percentages (0–100) to rates (0–1)", () => {
+      const profile = {
+        id: 1,
+        playerId: 682998,
+        playerName: "Wilson, Jacob",
+        season: 2026,
+        pa: 550,
+        pullPercent: 41.2,
+        straightawayPercent: 34.8,
+        oppoPercent: 24.0,
+        gbPercent: 45.1,
+        fbPercent: 31.2,
+        ldPercent: 23.7,
+        fetchedAt: new Date("2026-06-18"),
+        updatedAt: new Date("2026-06-18"),
+      };
+
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}), profile);
+      expect(ctx.sprayProfile).not.toBeNull();
+      expect(ctx.sprayProfile!.pullPercent).toBeCloseTo(41.2 / 100, 5);
+      expect(ctx.sprayProfile!.gbPercent).toBeCloseTo(45.1 / 100, 5);
+      expect(ctx.sprayProfile!.ldPercent).toBeCloseTo(23.7 / 100, 5);
+    });
+
+    it("sets individual spray fields to null when the profile has nulls", () => {
+      const profile = {
+        id: 2,
+        playerId: 999,
+        playerName: "Unknown",
+        season: 2026,
+        pa: 105,
+        pullPercent: null,
+        straightawayPercent: null,
+        oppoPercent: null,
+        gbPercent: null,
+        fbPercent: null,
+        ldPercent: null,
+        fetchedAt: new Date("2026-06-18"),
+        updatedAt: new Date("2026-06-18"),
+      };
+
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}), profile);
+      expect(ctx.sprayProfile).not.toBeNull();
+      expect(ctx.sprayProfile!.pullPercent).toBeNull();
+      expect(ctx.sprayProfile!.gbPercent).toBeNull();
+    });
+  });
+
+  describe("fielderOaa passthrough", () => {
+    it("sets fielderOaa to null by default", () => {
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}));
+      expect(ctx.fielderOaa).toBeNull();
+    });
+
+    it("passes a positive OAA value through unchanged", () => {
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}), null, 12);
+      expect(ctx.fielderOaa).toBe(12);
+    });
+
+    it("passes a negative OAA value through unchanged", () => {
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}), null, -8);
+      expect(ctx.fielderOaa).toBe(-8);
+    });
+
+    it("accepts null explicitly (no fielder data available)", () => {
+      const ctx = buildPlayerChallengeContext(makePlayerStatSnapshot({}), null, null);
+      expect(ctx.fielderOaa).toBeNull();
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,5 +291,13 @@ describe("buildDefaultPlayerChallengeContext", () => {
 
   it("sets historicalChallengeSuccessRate to null", () => {
     expect(ctx.historicalChallengeSuccessRate).toBeNull();
+  });
+
+  it("sets sprayProfile to null (no spray data for default context)", () => {
+    expect(ctx.sprayProfile).toBeNull();
+  });
+
+  it("sets fielderOaa to null (no fielder data for default context)", () => {
+    expect(ctx.fielderOaa).toBeNull();
   });
 });
