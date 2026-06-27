@@ -91,4 +91,41 @@ export interface PlayerChallengeContext {
    * demonstrably calibrated; weight this heavily.
    */
   historicalChallengeSuccessRate: number | null;
+
+  // ── Defensive context ──────────────────────────────────────────────────────
+
+  /**
+   * Batter's batted-ball spray tendencies for the current season (0–1 rates).
+   * Used by the defensive feature to compute a small RE-delta multiplier based
+   * on the batter's typical hit distribution.
+   *
+   * V1: populated from player_spray_profiles; no per-fielder OAA adjustment
+   * yet (live lineup fielder IDs are not wired). When null, the defensive
+   * multiplier defaults to 1.0× (no adjustment).
+   */
+  sprayProfile: {
+    /** Fraction of batted balls pulled (0–1). */
+    pullPercent: number | null;
+    /** Fraction of batted balls hit straightaway (0–1). */
+    straightawayPercent: number | null;
+    /** Fraction of batted balls hit opposite field (0–1). */
+    oppoPercent: number | null;
+    /** Fraction of batted balls that are ground balls (0–1). */
+    gbPercent: number | null;
+    /** Fraction of batted balls that are fly balls (0–1). */
+    fbPercent: number | null;
+    /** Fraction of batted balls that are line drives (0–1). */
+    ldPercent: number | null;
+  } | null;
+
+  /**
+   * Outs Above Average for the fielder covering the batter's primary spray
+   * zone this at-bat. Positive OAA = elite defender → slightly lower value of
+   * extending the at-bat.  Negative OAA = poor defender → slightly higher value.
+   *
+   * Split by batter handedness (oaaVsRhh / oaaVsLhh) when available.
+   * Null when the fielder is unknown (e.g. historical backfill at-bats where
+   * the live lineup is unavailable) → 0× adjustment, same as pre-defensive-feature.
+   */
+  fielderOaa: number | null;
 }

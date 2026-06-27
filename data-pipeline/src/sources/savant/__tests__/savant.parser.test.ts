@@ -4,7 +4,6 @@ import {
   mergePlateDiscipline,
   parseSprayProfiles,
   parseFielderOaa,
-  parseOutfieldDirectionalOaa,
   parseSprintSpeed,
   parsePlayerStatcastHistory,
 } from "../savant.parser";
@@ -13,7 +12,6 @@ import {
   PLATE_DISCIPLINE_CSV,
   SPRAY_PROFILE_CSV,
   FIELDER_OAA_CSV,
-  OUTFIELD_DIRECTIONAL_OAA_CSV,
   SPRINT_SPEED_CSV,
   PLAYER_STATCAST_HISTORY_CSV,
   EMPTY_PLAYER_HISTORY_CSV,
@@ -196,7 +194,8 @@ describe("parseSprayProfiles", () => {
   it("maps playerId and playerName", () => {
     const [wilson] = parseSprayProfiles(SPRAY_PROFILE_CSV, FETCHED_AT);
     expect(wilson.playerId).toBe(682998);
-    expect(wilson.playerName).toBe("Jacob Wilson");
+    // New /leaderboard/batted-ball endpoint formats names as "Last, First"
+    expect(wilson.playerName).toBe("Wilson, Jacob");
   });
 
   it("maps directional tendencies", () => {
@@ -261,46 +260,20 @@ describe("parseFielderOaa", () => {
   it("returns empty array for header-only CSV", () => {
     expect(parseFielderOaa(HEADER_ONLY_CSV, FETCHED_AT)).toHaveLength(0);
   });
-});
 
-// ---------------------------------------------------------------------------
-// parseOutfieldDirectionalOaa
-// ---------------------------------------------------------------------------
+  it("parses the current Savant CSV column names (primary_pos_formatted, last_name first_name)", () => {
+    const csv = [
+      '"last_name, first_name","player_id","display_team_name","year","primary_pos_formatted","fielding_runs_prevented","outs_above_average","outs_above_average_rhh","outs_above_average_lhh"',
+      '"Abrams, CJ","682928","Nationals","2026","SS","-7",-9,-7,-2',
+    ].join("\n");
 
-describe("parseOutfieldDirectionalOaa", () => {
-  it("parses all rows", () => {
-    expect(parseOutfieldDirectionalOaa(OUTFIELD_DIRECTIONAL_OAA_CSV, FETCHED_AT)).toHaveLength(3);
-  });
-
-  it("maps playerId, playerName, season, and position", () => {
-    const [wilson] = parseOutfieldDirectionalOaa(OUTFIELD_DIRECTIONAL_OAA_CSV, FETCHED_AT);
-    expect(wilson.playerId).toBe(682998);
-    expect(wilson.playerName).toBe("Jacob Wilson");
-    expect(wilson.season).toBe(2026);
-    expect(wilson.position).toBe("CF");
-  });
-
-  it("maps overall and directional OAA", () => {
-    const [wilson] = parseOutfieldDirectionalOaa(OUTFIELD_DIRECTIONAL_OAA_CSV, FETCHED_AT);
-    expect(wilson.oaa).toBe(8);
-    expect(wilson.oaaLeft).toBe(3);
-    expect(wilson.oaaStraight).toBe(2);
-    expect(wilson.oaaRight).toBe(3);
-  });
-
-  it("maps jump metrics", () => {
-    const [wilson] = parseOutfieldDirectionalOaa(OUTFIELD_DIRECTIONAL_OAA_CSV, FETCHED_AT);
-    expect(wilson.reaction).toBeCloseTo(0.32);
-    expect(wilson.burst).toBeCloseTo(1.8);
-    expect(wilson.route).toBeCloseTo(95.4);
-  });
-
-  it("sets jump metrics to null when absent", () => {
-    const oaaList = parseOutfieldDirectionalOaa(OUTFIELD_DIRECTIONAL_OAA_CSV, FETCHED_AT);
-    const trout = oaaList[2];
-    expect(trout.reaction).toBeNull();
-    expect(trout.burst).toBeNull();
-    expect(trout.route).toBeNull();
+    const [abrams] = parseFielderOaa(csv, FETCHED_AT);
+    expect(abrams.playerId).toBe(682928);
+    expect(abrams.playerName).toBe("Abrams, CJ");
+    expect(abrams.position).toBe("SS");
+    expect(abrams.oaa).toBe(-9);
+    expect(abrams.oaaVsRhh).toBe(-7);
+    expect(abrams.oaaVsLhh).toBe(-2);
   });
 });
 

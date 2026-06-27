@@ -1,7 +1,11 @@
 import { EventEmitter } from "events";
 import { fetchUpcomingAndLiveGames, ActiveGame } from "../sources/mlb-live/mlbLive.schedule";
 import { GamePoller } from "../sources/mlb-live/mlbLive.poller";
-import { MlbLivePitchEvent, MlbAtBatSnapshot } from "../sources/mlb-live/mlbLive.types";
+import {
+  MlbLivePitchEvent,
+  MlbAtBatSnapshot,
+  GameBackfillPayload,
+} from "../sources/mlb-live/mlbLive.types";
 
 const GAME_CHECK_INTERVAL_MS = 5 * 60_000;
 
@@ -23,7 +27,7 @@ export interface LivePollJob {
   on(event: "gameDiscovered", listener: (game: ActiveGame) => void): this;
   on(event: "atBatStart", listener: (snapshot: MlbAtBatSnapshot) => void): this;
   /** All historical at-bats from a mid-game first poll, delivered as one batch. */
-  on(event: "gameBackfill", listener: (snapshots: MlbAtBatSnapshot[]) => void): this;
+  on(event: "gameBackfill", listener: (payload: GameBackfillPayload) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
@@ -94,7 +98,7 @@ export class LivePollJob extends EventEmitter {
 
     poller.on("pitchEvent", (event) => this.emit("pitchEvent", event));
     poller.on("atBatStart", (snapshot) => this.emit("atBatStart", snapshot));
-    poller.on("gameBackfill", (snapshots) => this.emit("gameBackfill", snapshots));
+    poller.on("gameBackfill", (payload) => this.emit("gameBackfill", payload));
     poller.on("error", (err) => this.emit("error", err));
     poller.on("gameOver", ({ gamePk }) => {
       this.emit("gameOver", { gamePk });

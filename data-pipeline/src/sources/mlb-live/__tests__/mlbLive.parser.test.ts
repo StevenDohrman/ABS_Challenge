@@ -398,6 +398,33 @@ describe("parseAtBatSnapshot", () => {
 
     expect(parseAtBatSnapshot(feed, FETCHED_AT)?.outs).toBe(2);
   });
+
+  it("extracts fielder IDs from linescore.defense into snapshot.defense", () => {
+    const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
+
+    expect(snapshot?.defense).toBeDefined();
+    expect(snapshot?.defense?.pitcher).toBe(656731);
+    expect(snapshot?.defense?.center).toBe(808982);
+    expect(snapshot?.defense?.left).toBe(671218);
+    expect(snapshot?.defense?.shortstop).toBe(642715);
+    expect(snapshot?.defense?.third).toBe(656305);
+  });
+
+  it("sets defense to undefined when linescore.defense has no fielder slots", () => {
+    const linescore = buildLinescore({
+      defense: { pitcher: { id: 656731, fullName: "Gregory Soto" } },
+    });
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
+        linescore,
+      },
+    });
+    const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
+
+    // Only pitcher in the defense object — no outfield/infield slots → undefined
+    expect(snapshot?.defense).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

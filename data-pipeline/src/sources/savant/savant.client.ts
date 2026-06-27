@@ -78,18 +78,19 @@ export async function fetchPlateDisciplineCsv(season: number): Promise<string> {
 /**
  * Fetch the batted-ball spray profile leaderboard CSV for a given season.
  *
- * Provides per-batter: pull_percent, straightaway_percent, oppo_percent,
- * gb_percent, fb_percent, ld_percent.
+ * Provides per-batter: pull_rate, straight_rate, oppo_rate,
+ * gb_rate, fb_rate, ld_rate (decimal rates 0–1).
+ *
+ * NOTE: The endpoint was moved from /leaderboard/batted-ball-profile to
+ * /leaderboard/batted-ball and the column names changed accordingly.
+ * The parser handles both naming conventions via fallback key lists.
  */
 export async function fetchSprayProfileCsv(season: number): Promise<string> {
   const { data } = await savantHttp.get<string>(
-    `${SAVANT_BASE}/leaderboard/batted-ball-profile`,
+    `${SAVANT_BASE}/leaderboard/batted-ball`,
     {
       params: {
         year: season,
-        batSide: "",
-        position: "",
-        team: "",
         min: "100",
         csv: "true",
       },
@@ -106,36 +107,12 @@ export async function fetchSprayProfileCsv(season: number): Promise<string> {
  * outs_above_average_lhh, and position.
  */
 export async function fetchFielderOaaCsv(season: number): Promise<string> {
+  // Savant returns the full HTML leaderboard page (not CSV) when pos/range/shift
+  // params are included — only the minimal param set reliably returns CSV.
   const { data } = await savantHttp.get<string>(
     `${SAVANT_BASE}/leaderboard/outs_above_average`,
     {
       params: {
-        type: "Fielder",
-        year: season,
-        pos: "all",
-        roles: "",
-        range: "year",
-        shift: "all",
-        team: "",
-        csv: "true",
-      },
-      responseType: "text",
-    }
-  );
-  return data;
-}
-
-/**
- * Fetch the outfield directional OAA leaderboard CSV for a given season.
- *
- * Provides per-outfielder: directional OAA (left/straight/right) and
- * athleticism metrics (reaction, burst, route efficiency).
- */
-export async function fetchOutfieldDirectionalOaaCsv(season: number): Promise<string> {
-  const { data } = await savantHttp.get<string>(
-    `${SAVANT_BASE}/leaderboard/outfield_directional_oaa`,
-    {
-      params: {
         year: season,
         type: "Fielder",
         csv: "true",
@@ -143,6 +120,12 @@ export async function fetchOutfieldDirectionalOaaCsv(season: number): Promise<st
       responseType: "text",
     }
   );
+  if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+    throw new Error(
+      `[savant.client] fetchFielderOaaCsv(${season}) received HTML instead of CSV — ` +
+        "Savant may have changed the endpoint params again"
+    );
+  }
   return data;
 }
 

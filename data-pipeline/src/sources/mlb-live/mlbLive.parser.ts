@@ -3,6 +3,7 @@ import {
   MlbLivePitchEvent,
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
+  DefensiveLineup,
 } from "./mlbLive.types";
 
 /** Outs at the start of an at-bat are always 0, 1, or 2. The MLB feed sometimes reports 3 after the third out of a half-inning. */
@@ -114,6 +115,7 @@ export function parseAtBatSnapshot(
     awayScore: linescore?.teams?.away?.runs ?? 0,
     battingTeamId,
     fieldingTeamId,
+    defense: parseDefensiveLineup(linescore?.defense),
     fetchedAt,
   };
 }
@@ -225,6 +227,34 @@ export function pitchKey(event: MlbLivePitchEvent): string {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Extract fielder IDs from the linescore defense object.
+ * Returns undefined when the defense object is absent or empty (pregame,
+ * historical backfill plays where per-play defense is unavailable).
+ */
+function parseDefensiveLineup(
+  defense: MlbLiveFeedResponse["liveData"]["linescore"]["defense"] | undefined
+): DefensiveLineup | undefined {
+  if (!defense) return undefined;
+  const result: DefensiveLineup = {};
+  if (defense.pitcher?.id)   result.pitcher   = defense.pitcher.id;
+  if (defense.catcher?.id)   result.catcher   = defense.catcher.id;
+  if (defense.first?.id)     result.first     = defense.first.id;
+  if (defense.second?.id)    result.second    = defense.second.id;
+  if (defense.third?.id)     result.third     = defense.third.id;
+  if (defense.shortstop?.id) result.shortstop = defense.shortstop.id;
+  if (defense.left?.id)      result.left      = defense.left.id;
+  if (defense.center?.id)    result.center    = defense.center.id;
+  if (defense.right?.id)     result.right     = defense.right.id;
+  // Only return a lineup when at least one positional fielder is present.
+  // A defense object with only pitcher/catcher (or only battingTeam/fieldingTeam)
+  // is not useful for fielder OAA lookup and should be treated as absent.
+  const hasPositionalFielder =
+    !!result.first || !!result.second || !!result.third ||
+    !!result.shortstop || !!result.left || !!result.center || !!result.right;
+  return hasPositionalFielder ? result : undefined;
+}
 
 function parsePitchEventsFromPlay(
   gamePk: number,

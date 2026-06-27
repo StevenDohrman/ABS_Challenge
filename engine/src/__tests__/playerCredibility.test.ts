@@ -55,6 +55,8 @@ const disciplinedBatter: PlayerChallengeContext = {
   whiffPercent: 0.18,    // elite — well below league average (0.25)
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 const aggressiveBatter: PlayerChallengeContext = {
@@ -68,6 +70,8 @@ const aggressiveBatter: PlayerChallengeContext = {
   whiffPercent: 0.35,    // well above league average (0.25)
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 const noDataBatter: PlayerChallengeContext = {
@@ -81,6 +85,8 @@ const noDataBatter: PlayerChallengeContext = {
   whiffPercent: null,
   historicalChallengeAttempts: 0,
   historicalChallengeSuccessRate: null,
+  sprayProfile: null,
+  fielderOaa: null,
 };
 
 // ---------------------------------------------------------------------------

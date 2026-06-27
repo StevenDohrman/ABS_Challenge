@@ -146,44 +146,6 @@ export interface SavantFielderOaa {
 }
 
 /**
- * Outfielder directional OAA and jump metrics for a season.
- * Extends the aggregate OAA picture with directional breakdowns and
- * athleticism components (reaction, burst, route efficiency).
- *
- * When combined with SavantBatterSprayProfile, directional OAA lets the
- * engine ask: "does this outfielder convert balls to his right — which is
- * where this pull-heavy batter typically hits?"
- */
-export interface SavantOutfieldDirectionalOaa {
-  playerId: number;
-  playerName: string;
-  season: number;
-  position: string;
-
-  oaa: number | null;
-
-  /** OAA on balls requiring movement to the fielder's left. */
-  oaaLeft: number | null;
-  /** OAA on balls requiring straight-back tracking. */
-  oaaStraight: number | null;
-  /** OAA on balls requiring movement to the fielder's right. */
-  oaaRight: number | null;
-
-  /**
-   * Jump metrics — how the fielder gets to the ball.
-   * reaction: initial read time in seconds (lower is better).
-   * burst:    first-step acceleration (higher is better).
-   * route:    path efficiency as a percentage (100 = perfect route).
-   */
-  reaction: number | null;
-  burst: number | null;
-  route: number | null;
-
-  raw: Record<string, string>;
-  fetchedAt: string;
-}
-
-/**
  * Per-player sprint speed (feet per second) from Statcast.
  * Applies to both offensive and defensive players.
  *

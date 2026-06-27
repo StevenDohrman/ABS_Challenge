@@ -34,8 +34,15 @@
  *     a .600 OPS hitter doing the same. Null OPS → 1.0× (no adjustment).
  *     See features/offensiveValue.ts.
  *
+ *  4b. Defensive context multiplier
+ *     Applies a small ±10% correction to the RE delta based on the batter's
+ *     spray profile (GB/FB/LD rate deviations from league average).  GB-heavy
+ *     batters generate more infield outs, reducing the value of extending their
+ *     at-bat.  LD/FB-heavy batters have higher BABIP expectations.  Null spray
+ *     profile → 1.0× (no adjustment).  See features/defensiveContext.ts.
+ *
  *  5. Raw expected value
- *     rawEV = P(call was wrong) × reDelta × offensiveValueMultiplier
+ *     rawEV = P(call was wrong) × reDelta × offensiveMultiplier × defensiveMultiplier
  *
  *  6. Situation weight  →  leverage multiplier
  *     adjustedEV = rawEV × situationWeight
@@ -67,6 +74,7 @@ import {
 import { LeagueAverages } from "../domain/leagueContext.types";
 import { computePlayerCredibility } from "../features/playerCredibility";
 import { computeOffensiveValue } from "../features/offensiveValue";
+import { computeDefensiveContext } from "../features/defensiveContext";
 import { computeSituationWeight } from "../features/situationWeight";
 import { computeChallengeScarcity } from "../features/challengeScarcity";
 import { normalizeScore } from "./scoring";
@@ -121,9 +129,20 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
 
   const offensiveValue = computeOffensiveValue(input.playerContext, league);
 
+  // ── Step 4b: Defensive context multiplier ───────────────────────────────────
+  // Small ±10% spray-based correction. GB-heavy batters generate more infield
+  // outs (slight penalty); LD/FB-heavy batters have higher BABIP (slight bonus).
+  // Null spray profile → 1.0× (no adjustment — same behaviour as pre-v1).
+
+  const defensiveContext = computeDefensiveContext(input.playerContext);
+
   // ── Step 5: Raw expected value ──────────────────────────────────────────────
 
-  const rawEV = credibility.pCallWasWrong * reDelta * offensiveValue.multiplier;
+  const rawEV =
+    credibility.pCallWasWrong *
+    reDelta *
+    offensiveValue.multiplier *
+    defensiveContext.multiplier;
 
   // ── Step 6: Situation weight ────────────────────────────────────────────────
 

@@ -14,7 +14,10 @@ export type {
   MlbLivePitchEvent,
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
+  DefensiveLineup,
+  GameBackfillPayload,
 } from "./sources/mlb-live/mlbLive.types";
+export { CALLED_STRIKE_CALL_CODE } from "./sources/mlb-live/mlbLive.types";
 
 // Schedule types — used when discovering active games.
 export type { ActiveGame } from "./sources/mlb-live/mlbLive.schedule";
@@ -24,6 +27,5 @@ export type {
   SavantBatterStatline,
   SavantBatterSprayProfile,
   SavantFielderOaa,
-  SavantOutfieldDirectionalOaa,
   SavantSprintSpeed,
 } from "./sources/savant/savant.types";
