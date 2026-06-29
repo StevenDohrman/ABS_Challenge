@@ -3,6 +3,7 @@ import type {
   ChallengeRecommendationResponse,
   AtBatRecommendationGridResponse,
   GameAtBatHistoryResponse,
+  PostgameAuditResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -99,6 +100,23 @@ export async function fetchGameAtBatHistory(
     if (res.status === 404) return { status: "not_found" };
     if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
     return { status: "ok", data: (await res.json()) as GameAtBatHistoryResponse };
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Postgame audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchPostgameAudit(
+  gamePk: number
+): Promise<ApiResult<PostgameAuditResponse>> {
+  try {
+    const res = await fetch(`${BASE}/games/${gamePk}/postgame-audit`);
+    if (res.status === 404) return { status: "not_found" };
+    if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
+    return { status: "ok", data: (await res.json()) as PostgameAuditResponse };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Network error" };
   }

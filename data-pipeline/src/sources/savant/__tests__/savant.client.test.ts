@@ -7,6 +7,7 @@ import {
   fetchFielderOaaCsv,
   fetchSprintSpeedCsv,
   fetchPlayerStatcastHistoryCsv,
+  fetchGameStatcastCsv,
 } from "../savant.client";
 import {
   EXPECTED_STATS_CSV,
@@ -259,5 +260,26 @@ describe("fetchPlayerStatcastHistoryCsv", () => {
     mock.onGet(`${BASE}/statcast_search/csv`).networkError();
 
     await expect(fetchPlayerStatcastHistoryCsv(682998, 2026)).rejects.toThrow();
+  });
+});
+
+describe("fetchGameStatcastCsv", () => {
+  it("requests statcast_search with game_pk param", async () => {
+    mock.onGet(`${BASE}/statcast_search/csv`).reply(200, PLAYER_STATCAST_HISTORY_CSV);
+
+    await fetchGameStatcastCsv(824991);
+
+    expect(mock.history.get[0].params).toMatchObject({
+      all: "true",
+      type: "details",
+      game_pk: 824991,
+      csv: "true",
+    });
+  });
+
+  it("throws when HTML is returned instead of CSV", async () => {
+    mock.onGet(`${BASE}/statcast_search/csv`).reply(200, "<!DOCTYPE html><html></html>");
+
+    await expect(fetchGameStatcastCsv(824991)).rejects.toThrow(/HTML instead of CSV/);
   });
 });

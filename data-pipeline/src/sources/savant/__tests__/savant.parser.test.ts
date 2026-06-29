@@ -6,6 +6,7 @@ import {
   parseFielderOaa,
   parseSprintSpeed,
   parsePlayerStatcastHistory,
+  parseGameStatcastCsv,
 } from "../savant.parser";
 import {
   EXPECTED_STATS_CSV,
@@ -390,5 +391,19 @@ describe("parsePlayerStatcastHistory", () => {
   it("sets fetchedAt on every pitch", () => {
     const pitches = parsePlayerStatcastHistory(PLAYER_STATCAST_HISTORY_CSV, FETCHED_AT);
     expect(pitches.every((p) => p.fetchedAt === FETCHED_AT)).toBe(true);
+  });
+});
+
+describe("parseGameStatcastCsv", () => {
+  it("parses game-scoped Statcast CSV into SavantPitchRow objects", () => {
+    const rows = parseGameStatcastCsv(PLAYER_STATCAST_HISTORY_CSV, FETCHED_AT);
+    expect(rows).toHaveLength(4);
+    expect(rows[0].gamePk).toBe(824991);
+    expect(rows[0].atBatNumber).toBe(1);
+    expect(rows[0].zone).toBe(2);
+  });
+
+  it("returns empty array for header-only CSV", () => {
+    expect(parseGameStatcastCsv(EMPTY_PLAYER_HISTORY_CSV, FETCHED_AT)).toHaveLength(0);
   });
 });

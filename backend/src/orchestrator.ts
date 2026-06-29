@@ -42,6 +42,11 @@ import {
   triggerRecommendationIfCalledStrike,
 } from "./services/challengeService";
 import { processGameBackfill } from "./services/gameBackfillService";
+import {
+  scheduleSavantPostgameEnrichment,
+  resumePendingSavantEnrichments,
+} from "./services/postgameScheduler";
+import { scanAndBackfillFinalGames } from "./services/finalGameBackfillService";
 import { purgeOldGames } from "./db/cleanupRepository";
 import {
   enqueuePipelineDbWork,
@@ -53,6 +58,9 @@ import { SEASONS } from "./db/constants";
 
 /** How often to re-run the Savant daily job in milliseconds (24 hours). */
 const SAVANT_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1_000;
+
+/** How often to scan for untracked Final games to backfill (6 hours). */
+const FINAL_BACKFILL_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 
 /** Retain this many days of game data. Override with DATA_RETENTION_DAYS env var. */
 const DATA_RETENTION_DAYS = parseInt(process.env["DATA_RETENTION_DAYS"] ?? "7", 10);
@@ -77,6 +85,9 @@ export async function startOrchestrator(): Promise<void> {
   await reconcileChallengeCounts();
   startLivePollJob();
   scheduleSavantDailyJob();  // Then schedule daily reruns.
+  await resumePendingSavantEnrichments();
+  await runFinalGameBackfill();
+  scheduleFinalGameBackfill();
   await runCleanupJob();     // Purge old data at startup and schedule daily reruns.
   scheduleCleanupJob();
 }
@@ -143,6 +154,7 @@ function startLivePollJob(): void {
 
   job.on("gameOver", async ({ gamePk }) => {
     await handleGameOver(gamePk);
+    scheduleSavantPostgameEnrichment(gamePk);
   });
 
   job.on("error", (err) => {
@@ -190,6 +202,24 @@ function scheduleSavantDailyJob(): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Final game backfill (untracked Final games in retention window)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function runFinalGameBackfill(): Promise<void> {
+  try {
+    await scanAndBackfillFinalGames(DATA_RETENTION_DAYS);
+  } catch (err) {
+    console.error("[orchestrator] final game backfill error:", err);
+  }
+}
+
+function scheduleFinalGameBackfill(): void {
+  setInterval(() => {
+    void runFinalGameBackfill();
+  }, FINAL_BACKFILL_INTERVAL_MS);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Data retention cleanup
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -201,7 +231,8 @@ async function runCleanupJob(): Promise<void> {
       console.log(
         `[orchestrator] cleanup removed ${result.games} games, ` +
         `${result.snapshots} snapshots, ${result.pitchEvents} pitch events, ` +
-        `${result.recommendations} recommendations`
+        `${result.recommendations} recommendations, ` +
+        `${result.savantPitches} savant pitches, ${result.postgameAudits} audits`
       );
     } else {
       console.log("[orchestrator] cleanup: nothing to purge");

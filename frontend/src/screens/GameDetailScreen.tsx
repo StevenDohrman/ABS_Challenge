@@ -1,34 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ScheduleGame } from "../api/types";
 import type {
   ChallengeRecommendationResponse,
   AtBatRecommendationGridResponse,
   GameAtBatHistoryResponse,
+  PostgameAuditResponse,
 } from "../api/types";
 import {
   fetchLatestRecommendation,
   fetchCurrentAtBatGrid,
   fetchGameAtBatHistory,
   fetchTodaySchedule,
+  fetchPostgameAudit,
 } from "../api/client";
 import { LivePitchCard } from "../components/LivePitchCard";
 import { PreAtBatBanner } from "../components/PreAtBatBanner";
 import { AtBatHistory } from "../components/AtBatHistory";
+import { PostgameAuditSummary } from "../components/PostgameAuditSummary";
 import { StatusDot } from "../components/StatusDot";
+import { mlbToday } from "../utils/scheduleDates";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props + helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface Props {
-  game: ScheduleGame;
-  onBack: () => void;
-}
-
 const LIVE_PITCH_POLL_MS  = 5_000;
 const PRE_BAT_POLL_MS     = 8_000;
 const HISTORY_POLL_MS     = 15_000;
 const SCHEDULE_REFRESH_MS = 30_000;
+const AUDIT_POLL_MS       = 30_000;
 
 function PulsingDot() {
   return (
@@ -87,23 +88,68 @@ function ScorePill({ abbrev, score, isWinner }: { abbrev: string; score: number 
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function GameDetailScreen({ game: initialGame, onBack }: Props) {
-  // Keep a locally-refreshed copy so score/inning/count update without a page reload
-  const [game, setGame] = useState<ScheduleGame>(initialGame);
+export function GameDetailScreen() {
+  const { gamePk: gamePkParam } = useParams<{ gamePk: string }>();
+  const [searchParams] = useSearchParams();
+  const scheduleDate = searchParams.get("date") ?? undefined;
+  const gamePk = parseInt(gamePkParam ?? "", 10);
+
+  const [game, setGame] = useState<ScheduleGame | null>(null);
+  const [gameLoading, setGameLoading] = useState(true);
 
   useEffect(() => {
+    if (isNaN(gamePk)) return;
     async function refreshGame() {
-      const r = await fetchTodaySchedule();
+      setGameLoading(true);
+      const r = await fetchTodaySchedule(scheduleDate);
       if (r.status === "ok") {
-        const updated = r.data.games.find((g) => g.gamePk === initialGame.gamePk);
-        if (updated) setGame(updated);
+        const found = r.data.games.find((g) => g.gamePk === gamePk);
+        setGame(found ?? null);
       }
+      setGameLoading(false);
     }
     void refreshGame();
+    const isHistoricalDate = scheduleDate != null && scheduleDate !== mlbToday();
+    if (isHistoricalDate) return;
     const id = setInterval(() => void refreshGame(), SCHEDULE_REFRESH_MS);
     return () => clearInterval(id);
-  }, [initialGame.gamePk]);
+  }, [gamePk, scheduleDate]);
 
+  if (isNaN(gamePk) || (!gameLoading && !game)) {
+    return (
+      <div className="space-y-4">
+        <Link
+          to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
+          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
+        >
+          <span>←</span> All games
+        </Link>
+        <div className="rounded-xl border border-white/10 px-5 py-8 text-center">
+          <p className="text-sm text-white/40">Game not found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!game) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-24 bg-white/5 rounded animate-pulse" />
+        <div className="h-40 rounded-2xl bg-white/5 border border-white/10 animate-pulse" />
+      </div>
+    );
+  }
+
+  return <GameDetailContent game={game} scheduleDate={scheduleDate} />;
+}
+
+function GameDetailContent({
+  game,
+  scheduleDate,
+}: {
+  game: ScheduleGame;
+  scheduleDate?: string;
+}) {
   const isLive   = game.abstractState === "Live";
   const isFinal  = game.abstractState === "Final";
   const isPre    = game.abstractState === "Preview";
@@ -122,6 +168,10 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
   // ── History state ─────────────────────────────────────────────────────────
   const [history, setHistory] = useState<GameAtBatHistoryResponse | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ── Postgame audit state ──────────────────────────────────────────────────
+  const [postgameAudit, setPostgameAudit] = useState<PostgameAuditResponse | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   // ── Live polling ──────────────────────────────────────────────────────────
   const pollLive = useCallback(async () => {
@@ -148,12 +198,12 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
 
   // ── History polling / loading ─────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
-    if (!game.isTracked) return;
+    if (!game.isTracked && !isFinal) return;
     setHistoryLoading(true);
     const result = await fetchGameAtBatHistory(game.gamePk);
     if (result.status === "ok") setHistory(result.data);
     setHistoryLoading(false);
-  }, [game.gamePk, game.isTracked]);
+  }, [game.gamePk, game.isTracked, isFinal]);
 
   useEffect(() => {
     void loadHistory();
@@ -161,6 +211,24 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
     const id = setInterval(() => void loadHistory(), HISTORY_POLL_MS);
     return () => clearInterval(id);
   }, [isLive, loadHistory]);
+
+  const loadPostgameAudit = useCallback(async () => {
+    if (!isFinal) return;
+    setAuditLoading(true);
+    const result = await fetchPostgameAudit(game.gamePk);
+    if (result.status === "ok") setPostgameAudit(result.data);
+    setAuditLoading(false);
+  }, [game.gamePk, isFinal]);
+
+  useEffect(() => {
+    void loadPostgameAudit();
+    if (!isFinal) return;
+    const id = setInterval(() => {
+      if (postgameAudit?.status === "ready") return;
+      void loadPostgameAudit();
+    }, AUDIT_POLL_MS);
+    return () => clearInterval(id);
+  }, [isFinal, loadPostgameAudit, postgameAudit?.status]);
 
   // ── Pre-bat polling (separate for banner update rate) ─────────────────────
   useEffect(() => {
@@ -184,12 +252,12 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
     <div className="space-y-6">
 
       {/* Back button */}
-      <button
-        onClick={onBack}
+      <Link
+        to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
         className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
       >
         <span>←</span> All games
-      </button>
+      </Link>
 
       {/* Game header */}
       <div className="rounded-2xl border border-white/10 bg-white/4 px-5 py-4">
@@ -255,7 +323,12 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
         )}
 
         {/* Tracking badge */}
-        {!game.isTracked && (
+        {!game.isTracked && isFinal && (
+          <p className="text-center text-xs text-amber-400/70 font-mono mt-4">
+            Backfill pending — postgame analysis will appear once the pipeline ingests this game.
+          </p>
+        )}
+        {!game.isTracked && !isFinal && (
           <p className="text-center text-xs text-white/30 font-mono mt-4">
             This game is not yet tracked by the recommendation pipeline.
           </p>
@@ -321,8 +394,16 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
 
       {/* ── POST-GAME MODE ────────────────────────────────────────────────── */}
       {isFinal && (
-        <section className="space-y-3">
-          <p className="text-xs text-white/40 font-mono uppercase tracking-widest">At-bat review</p>
+        <>
+          <PostgameAuditSummary
+            audit={postgameAudit}
+            loading={auditLoading}
+            awayAbbrev={awayAbbrev}
+            homeAbbrev={homeAbbrev}
+          />
+
+          <section className="space-y-3">
+            <p className="text-xs text-white/40 font-mono uppercase tracking-widest">At-bat review</p>
 
           {historyLoading && !history && (
             <div className="space-y-2">
@@ -338,20 +419,21 @@ export function GameDetailScreen({ game: initialGame, onBack }: Props) {
             </div>
           )}
 
-          {!game.isTracked && (
+          {!historyLoading && !history && !game.isTracked && (
             <div className="rounded-xl border border-white/10 px-5 py-8 text-center space-y-2">
-              <p className="text-2xl">📭</p>
+              <p className="text-2xl">⏳</p>
               <p className="text-sm text-white/50">
-                This game was not tracked by the recommendation pipeline.
+                Ingesting game data from the MLB archive…
               </p>
               <p className="text-xs text-white/30">
-                Only games the backend ingested during the live period have recommendation history.
+                Final games are backfilled automatically; refresh in a few minutes.
               </p>
             </div>
           )}
 
           {history && <AtBatHistory atBats={history.atBats} />}
-        </section>
+          </section>
+        </>
       )}
     </div>
   );

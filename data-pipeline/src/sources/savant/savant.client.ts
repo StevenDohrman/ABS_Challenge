@@ -184,3 +184,30 @@ export async function fetchPlayerStatcastHistoryCsv(
   );
   return data;
 }
+
+/**
+ * Fetch all Statcast pitch rows for a single completed game.
+ *
+ * Savant typically lags 30–60+ minutes after game end; callers should retry
+ * until rows appear.
+ */
+export async function fetchGameStatcastCsv(gamePk: number): Promise<string> {
+  const { data } = await savantHttp.get<string>(
+    `${SAVANT_BASE}/statcast_search/csv`,
+    {
+      params: {
+        all: "true",
+        type: "details",
+        game_pk: gamePk,
+        csv: "true",
+      },
+      responseType: "text",
+    }
+  );
+  if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+    throw new Error(
+      `[savant.client] fetchGameStatcastCsv(${gamePk}) received HTML instead of CSV`
+    );
+  }
+  return data;
+}

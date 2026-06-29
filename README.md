@@ -927,14 +927,16 @@ See **Future Engine Calculation Features (Phase 7+)** below for planned engine i
 
 ## Current Status (as of June 2026)
 
-Phase 4 is complete. The full stack is running end-to-end:
+Phase 5 is complete. The full stack runs end-to-end including postgame Savant audits:
 
-- **Data pipeline**: `LivePollJob` polls active games every 15 s, detects new at-bats (including gap-fill for multiple at-bats completing between polls), backfills historical at-bats on startup (resume-from-DB skips work already stored), and emits pitch events with deduplication.
-- **Backend**: pre-computes 12-count recommendation grids per at-bat, triggers called-strike recommendations, serves schedule/live/history APIs, runs daily data-retention cleanup (configurable via `DATA_RETENTION_DAYS`, default 7 days).
-- **Engine**: run expectancy, player credibility (plate discipline + fixed count modifier), offensive value (current batter OPS), defensive context (spray profile + per-fielder OAA), situation weight, challenge scarcity.
-- **Frontend**: React + Tailwind SPA at `frontend/`. Shows today's games dashboard, live game detail (score, inning, count auto-refreshes every 30 s), pre-at-bat banner with count grid, called-strike card, and at-bat history with expandable recommendation grids.
+- **Data pipeline**: `LivePollJob` polls active games; `SavantPostgameJob` waits **14 hours after Final**, then polls every 10 min for up to 8 hours.
+- **Backend**: pre-computes 12-count grids, triggers called-strike recommendations, persists `savant_pitch_events` and `postgame_challenge_audits`, serves `GET /api/games/:gamePk/postgame-audit`.
+- **Engine**: unchanged — audit logic lives in `postgameAuditService` (not the engine).
+- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with Savant missed badges.
 
-**Next up:** Phase 5 (postgame Savant audits), then Phase 6 (7-day game history, rankings, About / How it works), then Phase 7 (engine tuning).
+**Missed value definition:** sum of `runExpectancySwing` for all `missedChallenge` rows — includes cases where the team was out of challenges (strategic miss from earlier bad challenges).
+
+**Next up:** Phase 6 (7-day game history, player/team challenge rankings leaderboard, product polish), then Phase 7 (engine tuning).
 
 ---
 

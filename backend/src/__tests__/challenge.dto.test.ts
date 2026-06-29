@@ -1,4 +1,5 @@
-import { toRecommendationDto } from "../challenge.dto";
+import type { PostgameChallengeAudit } from "@prisma/client";
+import { toRecommendationDto, toPostgameAuditResponseDto } from "../challenge.dto";
 import { makeChallengeRecommendation, makeLiveGameSnapshot } from "./fixtures";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,5 +254,81 @@ describe("toRecommendationDto — edge cases", () => {
     const rec = makeChallengeRecommendation({ balls: 3, strikes: 2 });
     const dto = toRecommendationDto(rec, makeLiveGameSnapshot());
     expect(dto.count).toBe("3-2");
+  });
+});
+
+describe("toPostgameAuditResponseDto", () => {
+  it("sums total missed value across all missed challenges including out-of-challenges", () => {
+    const audits = [
+      {
+        atBatIndex: 0,
+        pitchNumber: 1,
+        inning: 7,
+        halfInning: "top",
+        balls: 1,
+        strikes: 2,
+        batterId: 1,
+        pitcherId: 2,
+        originalCall: "strike",
+        plateX: 1,
+        plateZ: 2,
+        szTop: 3.5,
+        szBot: 1.6,
+        savantZoneResult: "ball",
+        callWasProbablyWrong: true,
+        liveRecommendation: "ALLOW",
+        playerConfidence: 60,
+        challengeAvailable: true,
+        shouldHaveChallenged: true,
+        missedChallenge: true,
+        badChallengeAllowed: false,
+        runExpectancySwing: 0.18,
+        notesJson: [],
+      },
+      {
+        atBatIndex: 5,
+        pitchNumber: 2,
+        inning: 3,
+        halfInning: "bottom",
+        balls: 0,
+        strikes: 2,
+        batterId: 3,
+        pitcherId: 4,
+        originalCall: "strike",
+        plateX: 1,
+        plateZ: 2,
+        szTop: 3.5,
+        szBot: 1.6,
+        savantZoneResult: "ball",
+        callWasProbablyWrong: true,
+        liveRecommendation: "AUTO_ALLOW",
+        playerConfidence: 50,
+        challengeAvailable: false,
+        shouldHaveChallenged: true,
+        missedChallenge: true,
+        badChallengeAllowed: false,
+        runExpectancySwing: 0.12,
+        notesJson: [],
+      },
+    ];
+
+    const dto = toPostgameAuditResponseDto(
+      824991,
+      "ready",
+      new Date(),
+      audits as unknown as PostgameChallengeAudit[],
+      null,
+      { homeTeamId: 133, awayTeamId: 134 }
+    );
+    expect(dto.summary.totalMissedValue).toBeCloseTo(0.3);
+    expect(dto.summary.missedChallengeCount).toBe(2);
+    expect(dto.summary.byTeam.away.totalMissedValue).toBeCloseTo(0.18);
+    expect(dto.summary.byTeam.away.missedChallengeCount).toBe(1);
+    expect(dto.summary.byTeam.home.totalMissedValue).toBeCloseTo(0.12);
+    expect(dto.summary.byTeam.home.missedChallengeCount).toBe(1);
+    expect(dto.summary.topMissed).toHaveLength(2);
+    expect(dto.summary.topMissed[0].expectedValue).toBeCloseTo(0.18);
+    expect(dto.summary.topMissed[0].battingSide).toBe("away");
+    expect(dto.missedChallenges).toHaveLength(2);
   });
 });

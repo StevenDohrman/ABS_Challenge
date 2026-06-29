@@ -3,6 +3,7 @@ import {
   parseGameSnapshot,
   parseAtBatSnapshot,
   parseHistoricalAtBatSnapshots,
+  parseAllAtBatSnapshots,
   pitchKey,
 } from "../mlbLive.parser";
 import {
@@ -471,6 +472,34 @@ describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
 
     const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
     expect(historical.map((s) => s.outs)).toEqual([0, 1, 2]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseAllAtBatSnapshots — includes the last at-bat (unlike historical)
+// ---------------------------------------------------------------------------
+
+describe("parseAllAtBatSnapshots", () => {
+  it("includes the current (last) at-bat for a Final game feed", () => {
+    const play0 = buildPlay({
+      about: { ...buildPlay().about, atBatIndex: 0, isComplete: true },
+    });
+    const play1 = buildPlay({
+      about: { ...buildPlay().about, atBatIndex: 1, isComplete: true },
+    });
+
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [play0, play1], currentPlay: play1 },
+        linescore: buildLinescore(),
+      },
+    });
+
+    const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
+    const all = parseAllAtBatSnapshots(feed, FETCHED_AT);
+
+    expect(historical.map((s) => s.atBatIndex)).toEqual([0]);
+    expect(all.map((s) => s.atBatIndex)).toEqual([0, 1]);
   });
 });
 

@@ -17,6 +17,8 @@ export async function purgeOldGames(retentionDays: number): Promise<{
   snapshots: number;
   pitchEvents: number;
   recommendations: number;
+  savantPitches: number;
+  postgameAudits: number;
 }> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
@@ -28,22 +30,25 @@ export async function purgeOldGames(retentionDays: number): Promise<{
   });
 
   if (oldGames.length === 0) {
-    return { games: 0, snapshots: 0, pitchEvents: 0, recommendations: 0 };
+    return { games: 0, snapshots: 0, pitchEvents: 0, recommendations: 0, savantPitches: 0, postgameAudits: 0 };
   }
 
   const gamePks = oldGames.map((g) => g.gamePk);
 
-  // Sequential: challenge_recommendations references live_pitch_events via
-  // pitchEventId, so recommendations must go first. Snapshots and games follow.
-  const recResult   = await prisma.challengeRecommendation.deleteMany({ where: { gamePk: { in: gamePks } } });
-  const snapResult  = await prisma.liveGameSnapshot.deleteMany({ where: { gamePk: { in: gamePks } } });
-  const pitchResult = await prisma.livePitchEvent.deleteMany({ where: { gamePk: { in: gamePks } } });
-  const gameResult  = await prisma.game.deleteMany({ where: { gamePk: { in: gamePks } } });
+  // Sequential: child tables before games.
+  const auditResult   = await prisma.postgameChallengeAudit.deleteMany({ where: { gamePk: { in: gamePks } } });
+  const savantResult  = await prisma.savantPitchEvent.deleteMany({ where: { gamePk: { in: gamePks } } });
+  const recResult     = await prisma.challengeRecommendation.deleteMany({ where: { gamePk: { in: gamePks } } });
+  const snapResult    = await prisma.liveGameSnapshot.deleteMany({ where: { gamePk: { in: gamePks } } });
+  const pitchResult   = await prisma.livePitchEvent.deleteMany({ where: { gamePk: { in: gamePks } } });
+  const gameResult    = await prisma.game.deleteMany({ where: { gamePk: { in: gamePks } } });
 
   return {
     games: gameResult.count,
     snapshots: snapResult.count,
     pitchEvents: pitchResult.count,
     recommendations: recResult.count,
+    savantPitches: savantResult.count,
+    postgameAudits: auditResult.count,
   };
 }

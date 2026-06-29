@@ -203,6 +203,23 @@ export function parseHistoricalAtBatSnapshots(
 }
 
 /**
+ * Snapshots for every at-bat in the feed — used when backfilling a Final game
+ * from the archived live feed (includes the last at-bat, unlike historical).
+ */
+export function parseAllAtBatSnapshots(
+  feed: MlbLiveFeedResponse,
+  fetchedAt: string
+): MlbAtBatSnapshot[] {
+  const allPlays = feed.liveData?.plays?.allPlays ?? [];
+  if (allPlays.length === 0) return [];
+  const maxIndex = allPlays.reduce(
+    (max, play) => Math.max(max, play.about.atBatIndex),
+    -1
+  );
+  return parsePlaysInIndexRange(feed, fetchedAt, -1, maxIndex + 1);
+}
+
+/**
  * Snapshots for completed plays whose index falls strictly between
  * afterIndex and beforeIndex (both exclusive). Used to catch at-bats that
  * completed between two consecutive polls when the index jumped by > 1.
