@@ -4,6 +4,10 @@ import { startOrchestrator } from "./orchestrator";
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 
 async function main(): Promise<void> {
+  process.on("unhandledRejection", (reason) => {
+    console.error("[server] unhandled promise rejection:", reason);
+  });
+
   // Start the live polling pipeline and daily Savant job.
   await startOrchestrator();
 

@@ -47,6 +47,7 @@ import {
   resumePendingSavantEnrichments,
 } from "./services/postgameScheduler";
 import { scanAndBackfillFinalGames } from "./services/finalGameBackfillService";
+import { backfillMissingRankingsContributions } from "./services/rankingsBackfillService";
 import { purgeOldGames } from "./db/cleanupRepository";
 import {
   enqueuePipelineDbWork,
@@ -88,6 +89,7 @@ export async function startOrchestrator(): Promise<void> {
   await resumePendingSavantEnrichments();
   await runFinalGameBackfill();
   scheduleFinalGameBackfill();
+  await runRankingsBackfill();
   await runCleanupJob();     // Purge old data at startup and schedule daily reruns.
   scheduleCleanupJob();
 }
@@ -219,6 +221,18 @@ function scheduleFinalGameBackfill(): void {
   }, FINAL_BACKFILL_INTERVAL_MS);
 }
 
+async function runRankingsBackfill(): Promise<void> {
+  try {
+    await enqueuePipelineDbWork(
+      "rankings-backfill",
+      () => backfillMissingRankingsContributions(),
+      "low"
+    );
+  } catch (err) {
+    console.error("[orchestrator] rankings backfill error:", err);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Data retention cleanup
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +246,8 @@ async function runCleanupJob(): Promise<void> {
         `[orchestrator] cleanup removed ${result.games} games, ` +
         `${result.snapshots} snapshots, ${result.pitchEvents} pitch events, ` +
         `${result.recommendations} recommendations, ` +
-        `${result.savantPitches} savant pitches, ${result.postgameAudits} audits`
+        `${result.savantPitches} savant pitches, ${result.postgameAudits} audits, ` +
+        `${result.rankingsContributions} rankings contributions`
       );
     } else {
       console.log("[orchestrator] cleanup: nothing to purge");

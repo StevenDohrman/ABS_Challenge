@@ -4,6 +4,9 @@ import type {
   AtBatRecommendationGridResponse,
   GameAtBatHistoryResponse,
   PostgameAuditResponse,
+  PlayerRankingsResponse,
+  TeamRankingsResponse,
+  RankingsBundleResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -117,6 +120,63 @@ export async function fetchPostgameAudit(
     if (res.status === 404) return { status: "not_found" };
     if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
     return { status: "ok", data: (await res.json()) as PostgameAuditResponse };
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rankings
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RankingsFetchOptions {
+  period?: "week" | "season";
+}
+
+function rankingsQuery(opts: RankingsFetchOptions): string {
+  const params = new URLSearchParams();
+  if (opts.period) params.set("period", opts.period);
+  const q = params.toString();
+  return q ? `?${q}` : "";
+}
+
+export async function fetchRankingsBundle(
+  opts: RankingsFetchOptions = {}
+): Promise<ApiResult<RankingsBundleResponse>> {
+  try {
+    const res = await fetch(`${BASE}/rankings${rankingsQuery(opts)}`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      return {
+        status: "error",
+        message: body?.error ?? `HTTP ${res.status}`,
+      };
+    }
+    return { status: "ok", data: (await res.json()) as RankingsBundleResponse };
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+export async function fetchPlayerRankings(
+  opts: RankingsFetchOptions = {}
+): Promise<ApiResult<PlayerRankingsResponse>> {
+  try {
+    const res = await fetch(`${BASE}/rankings/players${rankingsQuery(opts)}`);
+    if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
+    return { status: "ok", data: (await res.json()) as PlayerRankingsResponse };
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+export async function fetchTeamRankings(
+  opts: RankingsFetchOptions = {}
+): Promise<ApiResult<TeamRankingsResponse>> {
+  try {
+    const res = await fetch(`${BASE}/rankings/teams${rankingsQuery(opts)}`);
+    if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
+    return { status: "ok", data: (await res.json()) as TeamRankingsResponse };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Network error" };
   }

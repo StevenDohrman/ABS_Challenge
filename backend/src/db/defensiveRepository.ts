@@ -8,6 +8,7 @@
 import { prisma } from "./prisma";
 import { DB_LIMITS } from "./constants";
 import { mapSettledWithConcurrency } from "../utils/concurrency";
+import { recordPlayerName } from "./playerNameRepository";
 import type {
   SavantBatterSprayProfile,
   SavantFielderOaa,
@@ -42,6 +43,9 @@ export async function upsertSprayProfile(
     where: { playerId_season: { playerId: profile.playerId, season: profile.season } },
     update: sharedFields,
     create: { playerId: profile.playerId, season: profile.season, ...sharedFields },
+  }).then(async (row) => {
+    await recordPlayerName(row.playerId, row.playerName);
+    return row;
   });
 }
 
@@ -100,6 +104,9 @@ export async function upsertFielderOaaRow(
       position: row.position,
       ...sharedFields,
     },
+  }).then(async (saved) => {
+    await recordPlayerName(saved.playerId, saved.playerName);
+    return saved;
   });
 }
 

@@ -2,9 +2,11 @@ import express from "express";
 import cors from "cors";
 import { recommendationsRouter } from "./routes/recommendations";
 import { scheduleRouter } from "./routes/schedule";
+import { rankingsRouter } from "./routes/rankings";
 import { prisma } from "./db/prisma";
 import { getDbGateStats } from "./db/dbGate";
 import { DB_LIMITS } from "./db/constants";
+import { httpStatusForError, publicErrorMessage } from "./utils/httpErrors";
 
 const app = express();
 
@@ -47,6 +49,7 @@ app.get("/health", async (_req, res) => {
  */
 app.use("/api/games", recommendationsRouter);
 app.use("/api/schedule", scheduleRouter);
+app.use("/api/rankings", rankingsRouter);
 
 // ── Catch-all error handler ─────────────────────────────────────────────────
 
@@ -57,8 +60,11 @@ app.use(
     res: express.Response,
     _next: express.NextFunction
   ) => {
+    const status = httpStatusForError(err);
     console.error("[app] unhandled error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    if (!res.headersSent) {
+      res.status(status).json({ error: publicErrorMessage(err, status) });
+    }
   }
 );
 

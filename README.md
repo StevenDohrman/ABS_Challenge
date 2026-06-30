@@ -896,6 +896,8 @@ Focus on:
 - Detecting bad allowed challenges
 - Building audit reports
 
+**Phase 6 status (complete):** 7-day schedule slider, About, How it works, postgame per-team splits, and **rolling 7-day + season challenge rankings** at `/rankings` (Players | Teams, Last 7 days | Season).
+
 ### Phase 6: Product Quality of Life
 
 Frontend and API polish after the live + postgame core is working. Build these **before** engine tuning so the product is usable and explorable while audit data accumulates.
@@ -903,12 +905,13 @@ Frontend and API polish after the live + postgame core is working. Build these *
 Focus on:
 
 - **Recent games (7-day window)** — Dashboard or schedule view showing tracked games from the last 7 days when they exist in the DB (aligned with `DATA_RETENTION_DAYS` default). Today’s live games remain primary; past days are browsable without re-polling MLB.
-- **Challenge rankings — players** — Leaderboard of batters (and/or challengers) ranked by challenge activity and outcomes: attempts, overturn rate, missed high-value opportunities (once Phase 5 audits exist), etc.
-- **Challenge rankings — teams** — Same rankings page with a selector to switch between **Players** and **Teams**; team aggregates roll up batter-side and fielding-side challenge usage.
+- **Challenge rankings — players & teams** — `/rankings` with **Players | Teams** and **Last 7 days | Season** toggles. The 7-day view is a **rolling window** (today plus the prior 6 days), aligned with `DATA_RETENTION_DAYS` and the schedule slider — not calendar weeks. Season totals accumulate from `TRACKING_START_DATE` with **running rates** (overturn % = total overturned ÷ total used).
 - **About page** — Static page: what the project is, data sources (MLB live feed, Savant), disclaimer that recommendations are strategic guidance not real-time zone calls.
 - **How it works page** — Static page walking through the pipeline (ingest → precompute → called-strike trigger → recommendation labels) and how to read the UI (count grid, live card, history, postgame audit when available).
 
-Backend work for Phase 6 is mostly read APIs aggregating existing `games`, `live_pitch_events`, `challenge_recommendations`, and (after Phase 5) `postgame_challenge_audits` — no new ingestion sources required for the static pages.
+Backend: `GET /api/rankings` (bundle) or `/players` / `/teams` with `?period=week|season`. Week mode sums **day buckets** over the rolling `DATA_RETENTION_DAYS` window (default 7). Season mode reads **running season totals** incremented on each challenge/audit. Rankings update incrementally when a review resolves live or when postgame audit completes (including backfill); startup backfill catches any missed rows idempotently.
+
+**Production note (All-Star deploy):** Set `DATA_RETENTION_DAYS` high enough to retain all tracked games for season rankings (e.g. `120`). Set `TRACKING_START_DATE` to the first date the system tracked games.
 
 ### Phase 7: Model Improvement
 
@@ -923,20 +926,62 @@ Focus on:
 
 See **Future Engine Calculation Features (Phase 7+)** below for planned engine inputs (lineup window, count splits, sprint speed) that belong in this phase.
 
+### Phase 8: Forked Game Branches (Client-Only)
+
+Let users **fork** a live or final game into a personal **branch** they can edit locally — alternate challenge counts, at-bat outcomes, or “what if” recommendation paths — without writing to the server DB or re-running the engine on the backend.
+
+**Design constraints:**
+
+- **Local storage only** — forked games live in the browser (`localStorage` and/or `IndexedDB` for larger payloads). No new Prisma tables, no fork persistence on Supabase.
+- **Fork from canonical game** — snapshot the current API payload for a `gamePk` (schedule header, at-bat snapshots, pitch events, 12-count recommendation grids, optional postgame audit rows) into a versioned JSON document with a new `forkId` and `parentGamePk`.
+- **Editable branch state** — user adjusts challenge counts remaining, marks pitches as challenged/overturned, or toggles which count was “triggered” on an at-bat; UI recomputes display-only summaries (e.g. hypothetical missed value) in the client without calling `decideChallenge` on the server.
+- **Import / export** — download fork as `.json`; import restores into local storage (validate schema version, merge or replace by `forkId`).
+- **Clear separation in UI** — forked games show a “LOCAL FORK” badge; canonical DB games remain read-only except for live polling.
+
+**Suggested scope:**
+
+1. **Export API (read-only)** — optional `GET /api/games/:gamePk/export` returning a single bundle for forking (or reuse existing history + audit endpoints from the client).
+2. **Frontend fork store** — `forkStorage.ts` with CRUD, quota handling, and schema version.
+3. **Fork detail view** — reuse `GameDetailScreen` / `AtBatHistory` / `CountGrid` with a `mode: "canonical" | "fork"` prop; edits write to local fork only.
+4. **Fork list** — `/forks` route showing saved local branches with link back to parent `gamePk`.
+
+Defer heavy client-side engine recompute until Phase 7; Phase 8 can start with manual edits + static grids from the fork snapshot.
+
 ---
 
 ## Current Status (as of June 2026)
 
-Phase 5 is complete. The full stack runs end-to-end including postgame Savant audits:
+Phase 6 is complete. The full stack runs end-to-end including postgame Savant audits and challenge rankings:
 
 - **Data pipeline**: `LivePollJob` polls active games; `SavantPostgameJob` waits **14 hours after Final**, then polls every 10 min for up to 8 hours.
 - **Backend**: pre-computes 12-count grids, triggers called-strike recommendations, persists `savant_pitch_events` and `postgame_challenge_audits`, serves `GET /api/games/:gamePk/postgame-audit`.
 - **Engine**: unchanged — audit logic lives in `postgameAuditService` (not the engine).
-- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with Savant missed badges.
+- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`, `/rankings`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with Savant missed badges. Rankings page: weekly + season, players + teams.
 
 **Missed value definition:** sum of `runExpectancySwing` for all `missedChallenge` rows — includes cases where the team was out of challenges (strategic miss from earlier bad challenges).
 
-**Next up:** Phase 6 (7-day game history, player/team challenge rankings leaderboard, product polish), then Phase 7 (engine tuning).
+**Next up:** Phase 7 (engine tuning), then Phase 8 (client-only forked game branches). Phase 6 rankings ship at `/rankings` (weekly + season, players + teams).
+
+---
+
+## Challenge Rankings (Phase 6)
+
+**Routes:** `GET /api/rankings/players`, `GET /api/rankings/teams`
+
+| Param | Values | Default |
+|-------|--------|---------|
+| `period` | `week` (rolling last N days), `season` | `week` |
+
+Optional `sort` / `order` query params still work on the API for external clients. The web UI fetches unsorted rows once per period and sorts in the browser.
+
+| Param | Values | Default |
+|-------|--------|---------|
+| `sort` | `missedRe`, `challengeSuccess` | `missedRe` |
+| `order` | `desc`, `asc` | `desc` |
+
+- **Missed RE:** batting-side run expectancy left on the table (postgame audit).
+- **Challenge success %:** overturned ÷ challenges used; no challenges = — (sorted last).
+- **Deploy:** set `DATA_RETENTION_DAYS` high enough to keep all season games (e.g. `120` through All-Star break); set `TRACKING_START_DATE` to your program start.
 
 ---
 
@@ -999,9 +1044,13 @@ Spray profiles, fielder OAA, and per-fielder defensive context are wired end-to-
 
 Pull Savant pitch-location data after game completion, join to `live_pitch_events`, and populate `postgame_challenge_audits` to audit missed challenges and bad allowed challenges.
 
-### 4. Phase 6: Product quality of life
+### 4. ~~Phase 6: Product quality of life~~ (done)
 
-See **Phase 6** under Development Phases: 7-day game browser, player/team challenge rankings (shared page with selector), About page, How it works page.
+7-day game browser, About, How it works, postgame per-team splits, and `/rankings` (weekly + season, players + teams).
+
+### 5. Phase 8: Forked game branches (client-only)
+
+See **Phase 8** under Development Phases. Local-storage forks with import/export; no DB persistence.
 
 ---
 

@@ -15,7 +15,12 @@ import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantB
 import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
+import { recordNamesFromPitchRow } from "../db/playerNameRepository";
 import { persistSavantPitchesAndAudit, recordSavantEnrichmentAttempt } from "./postgameAuditService";
+import {
+  applyPitchReviewContribution,
+  trackTeamGameAppearances,
+} from "./rankingsIncrementalService";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Game lifecycle
@@ -28,6 +33,7 @@ import { persistSavantPitchesAndAudit, recordSavantEnrichmentAttempt } from "./p
 export async function handleGameDiscovered(game: ActiveGame): Promise<void> {
   try {
     await upsertGame(game);
+    await trackTeamGameAppearances(game.gamePk);
   } catch (err) {
     console.error(
       `[ingestService] failed to upsert game ${game.gamePk}:`,
@@ -138,6 +144,21 @@ export async function handlePitchEvent(
     if (event.hasReview && event.challengerTeamId) {
       await recomputeChallengesRemaining(event.gamePk);
     }
+
+    if (
+      event.hasReview &&
+      event.challengerTeamId &&
+      event.isOverturned !== null &&
+      event.isOverturned !== undefined
+    ) {
+      await applyPitchReviewContribution(row.id);
+    }
+
+    await recordNamesFromPitchRow({
+      batterId: row.batterId,
+      challengerName: row.challengerName,
+      rawPayload: row.rawPayload,
+    });
 
     return row.id;
   } catch (err) {

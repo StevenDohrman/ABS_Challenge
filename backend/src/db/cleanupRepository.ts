@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "./prisma";
+import { purgeRankingsForGames } from "./rankingsBucketRepository";
 
 export async function purgeOldGames(retentionDays: number): Promise<{
   games: number;
@@ -19,6 +20,7 @@ export async function purgeOldGames(retentionDays: number): Promise<{
   recommendations: number;
   savantPitches: number;
   postgameAudits: number;
+  rankingsContributions: number;
 }> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
@@ -30,10 +32,20 @@ export async function purgeOldGames(retentionDays: number): Promise<{
   });
 
   if (oldGames.length === 0) {
-    return { games: 0, snapshots: 0, pitchEvents: 0, recommendations: 0, savantPitches: 0, postgameAudits: 0 };
+    return {
+      games: 0,
+      snapshots: 0,
+      pitchEvents: 0,
+      recommendations: 0,
+      savantPitches: 0,
+      postgameAudits: 0,
+      rankingsContributions: 0,
+    };
   }
 
   const gamePks = oldGames.map((g) => g.gamePk);
+
+  const rankingsContributions = await purgeRankingsForGames(gamePks);
 
   // Sequential: child tables before games.
   const auditResult   = await prisma.postgameChallengeAudit.deleteMany({ where: { gamePk: { in: gamePks } } });
@@ -50,5 +62,6 @@ export async function purgeOldGames(retentionDays: number): Promise<{
     recommendations: recResult.count,
     savantPitches: savantResult.count,
     postgameAudits: auditResult.count,
+    rankingsContributions,
   };
 }
