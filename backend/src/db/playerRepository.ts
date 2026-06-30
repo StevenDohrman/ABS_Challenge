@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { DB_LIMITS } from "./constants";
 import { mapSettledWithConcurrency } from "../utils/concurrency";
+import { recordPlayerName } from "./playerNameRepository";
 import type { SavantBatterStatline } from "@abs/data-pipeline";
 import type { PlayerStatSnapshot } from "@prisma/client";
 
@@ -54,6 +55,9 @@ export async function upsertBatterStatline(
       season: statline.season,
       ...sharedFields,
     },
+  }).then(async (row) => {
+    await recordPlayerName(row.playerId, row.playerName);
+    return row;
   });
 }
 

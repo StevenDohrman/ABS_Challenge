@@ -24,6 +24,7 @@ import {
   type OriginalCall,
 } from "../db/postgameAuditRepository";
 import { markSavantEnriched, incrementSavantEnrichmentAttempt } from "../db/gameRepository";
+import { applyPostgameAuditContributionsForGame } from "./rankingsIncrementalService";
 
 export type { SavantZoneResult, OriginalCall, PostgameAuditInput };
 
@@ -196,6 +197,7 @@ export async function auditGame(gamePk: number): Promise<number> {
   }
 
   await upsertPostgameAudits(audits);
+  await applyPostgameAuditContributionsForGame(gamePk);
   return audits.length;
 }
 

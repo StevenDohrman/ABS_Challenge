@@ -1,0 +1,27 @@
+import { Prisma } from "@prisma/client";
+
+export function httpStatusForError(err: unknown): number {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    // P1001: can't reach server, P1002: server timeout, P1017: connection closed
+    if (err.code === "P1001" || err.code === "P1002" || err.code === "P1017") {
+      return 503;
+    }
+    // P2024: pool timeout waiting for connection
+    if (err.code === "P2024") {
+      return 503;
+    }
+  }
+
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    return 503;
+  }
+
+  return 500;
+}
+
+export function publicErrorMessage(err: unknown, status: number): string {
+  if (status === 503) {
+    return "Database temporarily unavailable";
+  }
+  return "Internal server error";
+}

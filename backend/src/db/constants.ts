@@ -120,6 +120,31 @@ export const SAVANT_POSTGAME = {
   MAX_DURATION_MS: 8 * 60 * 60_000,
 } as const;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Data retention
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DATA_RETENTION = {
+  /** Default days of game rows kept; override with DATA_RETENTION_DAYS env var. */
+  DEFAULT_DAYS: 7,
+} as const;
+
+/** Game rows with gameDate before (today − N) are purged; N defaults to 7. */
+export function getDataRetentionDays(): number {
+  const parsed = parseInt(
+    process.env["DATA_RETENTION_DAYS"] ?? String(DATA_RETENTION.DEFAULT_DAYS),
+    10
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DATA_RETENTION.DEFAULT_DAYS;
+}
+
+/** Earliest MLB gameDate still in DB for the configured retention window (inclusive). */
+export function retentionWindowStart(today: string, retentionDays: number): string {
+  const d = new Date(`${today}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - (retentionDays - 1));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Earliest time we should attempt the first Savant fetch for a Final game. */
 export function savantPollEarliestAt(finalizedAt: Date): Date {
   return new Date(finalizedAt.getTime() + SAVANT_POSTGAME.INITIAL_DELAY_MS);

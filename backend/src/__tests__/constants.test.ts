@@ -5,6 +5,9 @@ import {
   STAT_CONVERSION,
   SEASONS,
   SAVANT_POSTGAME,
+  DATA_RETENTION,
+  getDataRetentionDays,
+  retentionWindowStart,
   isSavantEnrichmentExpired,
   isSavantEnrichmentAbandoned,
   isSavantPollingDue,
@@ -192,5 +195,16 @@ describe("isSavantEnrichmentAbandoned", () => {
     const finalizedAt = new Date("2026-06-22T20:00:00Z");
     const nowMs = finalizedAt.getTime() + 22 * 60 * 60_000;
     expect(isSavantEnrichmentAbandoned(finalizedAt, null, null, nowMs)).toBe(true);
+  });
+});
+
+describe("data retention helpers", () => {
+  it("defaults to 7 days", () => {
+    expect(getDataRetentionDays()).toBe(DATA_RETENTION.DEFAULT_DAYS);
+  });
+
+  it("retentionWindowStart spans N days including today", () => {
+    expect(retentionWindowStart("2026-06-29", 7)).toBe("2026-06-23");
+    expect(retentionWindowStart("2026-06-29", 1)).toBe("2026-06-29");
   });
 });

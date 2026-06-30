@@ -407,3 +407,128 @@ model FielderOaa {
   @@map("fielder_oaa")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// player_names
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Canonical MLB player ID → display name, enriched over time from live feed,
+// Savant daily jobs, and challenge review payloads.
+model PlayerName {
+  playerId  Int      @id
+  fullName  String
+  updatedAt DateTime @updatedAt
+
+  @@map("player_names")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rankings (precomputed incremental totals)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Idempotent queue entry — one row per pitch review or postgame audit applied.
+model RankingsContribution {
+  id          Int      @id @default(autoincrement())
+  sourceType  String   // "pitch_review" | "postgame_audit"
+  sourceId    Int
+  gamePk      Int
+  gameDate    String
+  season      Int
+  payloadJson Json
+  createdAt   DateTime @default(now())
+
+  @@unique([sourceType, sourceId])
+  @@index([gamePk])
+  @@index([gameDate])
+  @@map("rankings_contributions")
+}
+
+model PlayerRankingDayBucket {
+  id                   Int    @id @default(autoincrement())
+  playerId             Int
+  gameDate             String
+  season               Int
+  challengesUsed       Int    @default(0)
+  challengesOverturned Int    @default(0)
+  missedOpportunities  Int    @default(0)
+  totalMissedValue     Float  @default(0)
+  battingGainedRe      Float  @default(0)
+  fieldingGainedRe     Float  @default(0)
+  badChallenges        Int    @default(0)
+
+  @@unique([playerId, gameDate, season])
+  @@index([gameDate, season])
+  @@map("player_ranking_day_buckets")
+}
+
+model TeamRankingDayBucket {
+  id                   Int    @id @default(autoincrement())
+  teamId               Int
+  gameDate             String
+  season               Int
+  challengesUsed       Int    @default(0)
+  challengesOverturned Int    @default(0)
+  battingMissedCount   Int    @default(0)
+  battingMissedValue   Float  @default(0)
+  battingGainedRe      Float  @default(0)
+  fieldingGainedRe     Float  @default(0)
+  badChallenges        Int    @default(0)
+
+  @@unique([teamId, gameDate, season])
+  @@index([gameDate, season])
+  @@map("team_ranking_day_buckets")
+}
+
+model PlayerRankingSeasonTotal {
+  id                   Int    @id @default(autoincrement())
+  playerId             Int
+  season               Int
+  challengesUsed       Int    @default(0)
+  challengesOverturned Int    @default(0)
+  missedOpportunities  Int    @default(0)
+  totalMissedValue     Float  @default(0)
+  battingGainedRe      Float  @default(0)
+  fieldingGainedRe     Float  @default(0)
+  badChallenges        Int    @default(0)
+
+  @@unique([playerId, season])
+  @@map("player_ranking_season_totals")
+}
+
+model TeamRankingSeasonTotal {
+  id                   Int    @id @default(autoincrement())
+  teamId               Int
+  season               Int
+  challengesUsed       Int    @default(0)
+  challengesOverturned Int    @default(0)
+  battingMissedCount   Int    @default(0)
+  battingMissedValue   Float  @default(0)
+  battingGainedRe      Float  @default(0)
+  fieldingGainedRe     Float  @default(0)
+  badChallenges        Int    @default(0)
+
+  @@unique([teamId, season])
+  @@map("team_ranking_season_totals")
+}
+
+model RankingPlayerGameAppearance {
+  playerId Int
+  gamePk   Int
+  gameDate String
+  season   Int
+
+  @@id([playerId, gamePk])
+  @@index([playerId, gameDate, season])
+  @@map("ranking_player_game_appearances")
+}
+
+model RankingTeamGameAppearance {
+  teamId   Int
+  gamePk   Int
+  gameDate String
+  season   Int
+
+  @@id([teamId, gamePk])
+  @@index([teamId, gameDate, season])
+  @@map("ranking_team_game_appearances")
+}
+

@@ -9,6 +9,9 @@ export function AppLayout() {
             ⚾ ABS Challenge
           </Link>
           <nav className="flex items-center gap-4 text-sm">
+            <Link to="/rankings" className="text-white/40 hover:text-white/80 transition-colors">
+              Rankings
+            </Link>
             <Link to="/about" className="text-white/40 hover:text-white/80 transition-colors">
               About
             </Link>

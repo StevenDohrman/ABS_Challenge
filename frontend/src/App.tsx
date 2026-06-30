@@ -4,6 +4,7 @@ import { GamesDashboard } from "./screens/GamesDashboard";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { AboutPage } from "./screens/AboutPage";
 import { HowItWorksPage } from "./screens/HowItWorksPage";
+import { RankingsScreen } from "./screens/RankingsScreen";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="games/:gamePk" element={<GameDetailScreen />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="how-it-works" element={<HowItWorksPage />} />
+          <Route path="rankings" element={<RankingsScreen />} />
         </Route>
       </Routes>
     </BrowserRouter>
