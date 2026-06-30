@@ -60,6 +60,7 @@ model Game {
   recommendations ChallengeRecommendation[]
   savantPitches   SavantPitchEvent[]
   postgameAudits  PostgameChallengeAudit[]
+  lineups         GameLineup[]
 
   @@map("games")
 }
@@ -81,6 +82,9 @@ model LiveGameSnapshot {
   runnerOnFirst  Boolean
   runnerOnSecond Boolean
   runnerOnThird  Boolean
+  runnerFirstId  Int?
+  runnerSecondId Int?
+  runnerThirdId  Int?
   homeScore     Int
   awayScore     Int
   batterId      Int
@@ -405,6 +409,50 @@ model FielderOaa {
   @@unique([playerId, season, position])
   @@index([playerId])
   @@map("fielder_oaa")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// player_sprint_speed
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Statcast sprint speed leaderboard. Ingested by SavantDailyJob.
+// One row per (playerId, season); upserted on each daily run.
+model PlayerSprintSpeed {
+  id              Int    @id @default(autoincrement())
+  playerId        Int
+  playerName      String
+  season          Int
+  position        String
+  sprintSpeed     Float?
+  homeTo1b        Float?
+  competitiveRuns Int    @default(0)
+  fetchedAt       DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@unique([playerId, season])
+  @@index([playerId])
+  @@map("player_sprint_speed")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// game_lineups
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Batting order from MLB live feed boxscore. Updated when the feed changes.
+model GameLineup {
+  id           Int      @id @default(autoincrement())
+  gamePk       Int
+  teamId       Int
+  playerId     Int
+  battingOrder Int
+  fetchedAt    DateTime
+  updatedAt    DateTime @updatedAt
+
+  game Game @relation(fields: [gamePk], references: [gamePk])
+
+  @@unique([gamePk, teamId, playerId])
+  @@index([gamePk, teamId])
+  @@map("game_lineups")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

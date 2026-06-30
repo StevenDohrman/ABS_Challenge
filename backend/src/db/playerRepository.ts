@@ -100,3 +100,14 @@ export async function findPlayerStatSnapshot(
     },
   });
 }
+
+export async function findPlayerStatSnapshotBatch(
+  playerIds: number[],
+  season: number
+): Promise<PlayerStatSnapshot[]> {
+  if (playerIds.length === 0) return [];
+
+  return prisma.playerStatSnapshot.findMany({
+    where: { season, playerId: { in: playerIds } },
+  });
+}

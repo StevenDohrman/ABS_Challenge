@@ -4,7 +4,71 @@ import {
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
   DefensiveLineup,
+  BaseRunners,
+  GameLineupEntry,
 } from "./mlbLive.types";
+
+/** Extract runner IDs from linescore offense slots. */
+function parseRunnerIds(
+  offense: MlbLiveFeedResponse["liveData"]["linescore"]["offense"] | undefined
+): BaseRunners {
+  const result: BaseRunners = {};
+  if (offense?.first?.id) result.first = offense.first.id;
+  if (offense?.second?.id) result.second = offense.second.id;
+  if (offense?.third?.id) result.third = offense.third.id;
+  return result;
+}
+
+/**
+ * Parse batting order entries from the live feed boxscore for both teams.
+ */
+export function parseGameLineups(
+  feed: MlbLiveFeedResponse,
+  fetchedAt: string
+): GameLineupEntry[] {
+  const boxscore = feed.liveData?.boxscore;
+  if (!boxscore?.teams) return [];
+
+  const entries: GameLineupEntry[] = [];
+  for (const side of ["home", "away"] as const) {
+    const teamSide = boxscore.teams[side];
+    const teamId = teamSide?.team?.id;
+    const order = teamSide?.battingOrder;
+    if (!teamId || !order?.length) continue;
+
+    order.forEach((playerId, index) => {
+      if (playerId) {
+        entries.push({
+          gamePk: feed.gamePk,
+          teamId,
+          playerId,
+          battingOrder: index + 1,
+          fetchedAt,
+        });
+      }
+    });
+  }
+  return entries;
+}
+
+/**
+ * Batting order (player IDs) for the team currently batting.
+ */
+function parseBattingOrderForTeam(
+  feed: MlbLiveFeedResponse,
+  battingTeamId: number
+): number[] | undefined {
+  const boxscore = feed.liveData?.boxscore;
+  if (!boxscore?.teams) return undefined;
+
+  for (const side of ["home", "away"] as const) {
+    const teamSide = boxscore.teams[side];
+    if (teamSide?.team?.id === battingTeamId && teamSide.battingOrder?.length) {
+      return teamSide.battingOrder;
+    }
+  }
+  return undefined;
+}
 
 /** Outs at the start of an at-bat are always 0, 1, or 2. The MLB feed sometimes reports 3 after the third out of a half-inning. */
 function normalizeOutsAtAtBatStart(outs: number): number {
@@ -100,6 +164,9 @@ export function parseAtBatSnapshot(
     linescore?.defense?.fieldingTeam?.id ??
     (halfInning === "top" ? homeTeamId : awayTeamId);
 
+  const runnerIds = parseRunnerIds(linescore?.offense);
+  const hasRunner = (base: keyof BaseRunners) => runnerIds[base] !== undefined;
+
   return {
     gamePk: feed.gamePk,
     atBatIndex: currentPlay.about.atBatIndex,
@@ -108,14 +175,16 @@ export function parseAtBatSnapshot(
     inning: currentPlay.about.inning,
     halfInning,
     outs: outsAtPlayStart(currentPlay, linescore?.outs ?? 0),
-    runnerOnFirst: !!linescore?.offense?.first,
-    runnerOnSecond: !!linescore?.offense?.second,
-    runnerOnThird: !!linescore?.offense?.third,
+    runnerOnFirst: hasRunner("first"),
+    runnerOnSecond: hasRunner("second"),
+    runnerOnThird: hasRunner("third"),
+    runnerIds,
     homeScore: linescore?.teams?.home?.runs ?? 0,
     awayScore: linescore?.teams?.away?.runs ?? 0,
     battingTeamId,
     fieldingTeamId,
     defense: parseDefensiveLineup(linescore?.defense),
+    battingOrder: parseBattingOrderForTeam(feed, battingTeamId),
     fetchedAt,
   };
 }

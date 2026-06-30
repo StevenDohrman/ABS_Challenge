@@ -5,6 +5,7 @@ import {
   MlbLivePitchEvent,
   MlbAtBatSnapshot,
   GameBackfillPayload,
+  GameLineupEntry,
 } from "../sources/mlb-live/mlbLive.types";
 
 const GAME_CHECK_INTERVAL_MS = 5 * 60_000;
@@ -30,6 +31,7 @@ export interface LivePollJob {
   on(event: "gameBackfill", listener: (payload: GameBackfillPayload) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
+  on(event: "lineupUpdate", listener: (entries: GameLineupEntry[]) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
 }
 
@@ -99,6 +101,7 @@ export class LivePollJob extends EventEmitter {
     poller.on("pitchEvent", (event) => this.emit("pitchEvent", event));
     poller.on("atBatStart", (snapshot) => this.emit("atBatStart", snapshot));
     poller.on("gameBackfill", (payload) => this.emit("gameBackfill", payload));
+    poller.on("lineupUpdate", (entries) => this.emit("lineupUpdate", entries));
     poller.on("error", (err) => this.emit("error", err));
     poller.on("gameOver", ({ gamePk }) => {
       this.emit("gameOver", { gamePk });

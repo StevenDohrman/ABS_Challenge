@@ -19,50 +19,54 @@
  *     Whether the team can physically challenge is tracked separately by the
  *     backend (challengeAvailable on the persisted recommendation).
  *
- *  2. Run expectancy delta
+ *  2. Run expectancy (pre-computed by caller)
+ *     The backend calls computeChallengeOutcomeExpectancies() before decideChallenge:
+ *       current, ifSucceeds, ifFails  — expected runs for rest of inning
  *     reDelta = runExpectancyIfSuccessful - runExpectancyIfFailed
- *     This quantifies how much the challenge is worth IF the call was wrong.
- *     Pre-computed by the caller using computeChallengeOutcomeExpectancies().
+ *     See data/runExpectancy.ts.
  *
- *  3. Player credibility  →  P(call was wrong)
+ *  3. Baserunning multiplier (walk paths only)
+ *     Scales reDelta on 3-ball counts using sprint speed and lead-runner bottleneck
+ *     logic on forced advances. Non-walk success paths → 1.0×.
+ *     See features/baserunningContext.ts.
+ *
+ *  4. Player credibility  →  P(call was wrong)
  *     Estimated from plate discipline, matchup handedness, count context, and
  *     historical challenge accuracy. See features/playerCredibility.ts.
  *
- *  4. Offensive value multiplier
+ *  5. Offensive value multiplier
  *     Scales the RE delta by how valuable this batter is relative to league
- *     average. A .900 OPS hitter keeping their at-bat alive is worth more than
- *     a .600 OPS hitter doing the same. Null OPS → 1.0× (no adjustment).
- *     See features/offensiveValue.ts.
+ *     average (OPS). Null OPS → 1.0×. See features/offensiveValue.ts.
  *
- *  4b. Defensive context multiplier
- *     Applies a small ±10% correction to the RE delta based on the batter's
- *     spray profile (GB/FB/LD rate deviations from league average).  GB-heavy
- *     batters generate more infield outs, reducing the value of extending their
- *     at-bat.  LD/FB-heavy batters have higher BABIP expectations.  Null spray
- *     profile → 1.0× (no adjustment).  See features/defensiveContext.ts.
+ *  6. Lineup context multiplier
+ *     Scales reDelta by decay-weighted quality of upcoming batters in the due-up
+ *     window (5 - outs, excluding current batter). See features/lineupContext.ts.
  *
- *  5. Raw expected value
- *     rawEV = P(call was wrong) × reDelta × offensiveMultiplier × defensiveMultiplier
+ *  7. Defensive context multiplier
+ *     Small ±10% correction from batter spray profile and fielder OAA.
+ *     See features/defensiveContext.ts.
  *
- *  6. Situation weight  →  leverage multiplier
+ *  8. Raw expected value
+ *     rawEV = P(call was wrong) × reDelta
+ *           × baserunningMultiplier × offensiveMultiplier
+ *           × lineupMultiplier × defensiveMultiplier
+ *
+ *  9. Situation weight  →  leverage multiplier
  *     adjustedEV = rawEV × situationWeight
- *     Late innings, close games, and extra innings amplify the raw EV.
- *     Blowouts dampen it. See features/situationWeight.ts.
+ *     Late innings, close games, and extra innings amplify raw EV; blowouts dampen.
+ *     See features/situationWeight.ts.
  *
- *  6. Score normalization  (0–100)
+ * 10. Score normalization  (0–100)
  *     score = normalize(adjustedEV)
- *     Converts runs into a dimensionless score centered at 50 (break-even).
+ *     See decision/scoring.ts.
  *
- *  7. Threshold application + scarcity
- *     Recommendation label and minimum confidence are derived from the score.
- *     When challenges are scarce (1 remaining), thresholds are raised to
- *     encourage conserving challenges. A team with 0 challenges receives no
- *     penalty — the recommendation reflects the call's raw value so a missed
- *     opportunity is visible. See decision/thresholds.ts.
+ * 11. Scarcity + thresholds
+ *     Recommendation label and minimum confidence from score, with threshold
+ *     shifts when challenges are scarce. See features/challengeScarcity.ts,
+ *     decision/thresholds.ts.
  *
- *  8. Explanation
- *     A short ordered list of human-readable sentences describing the key
- *     factors that drove the recommendation. See decision/explanation.ts.
+ * 12. Explanation
+ *     Human-readable sentences for the key factors. See decision/explanation.ts.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -75,6 +79,8 @@ import { LeagueAverages } from "../domain/leagueContext.types";
 import { computePlayerCredibility } from "../features/playerCredibility";
 import { computeOffensiveValue } from "../features/offensiveValue";
 import { computeDefensiveContext } from "../features/defensiveContext";
+import { computeBaserunningContext } from "../features/baserunningContext";
+import { computeLineupContext } from "../features/lineupContext";
 import { computeSituationWeight } from "../features/situationWeight";
 import { computeChallengeScarcity } from "../features/challengeScarcity";
 import { normalizeScore } from "./scoring";
@@ -114,6 +120,13 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
   const reDelta =
     input.runExpectancyIfSuccessful - input.runExpectancyIfFailed;
 
+  // ── Step 2b: Baserunning multiplier (walk paths only) ─────────────────────
+
+  const baserunning = computeBaserunningContext(
+    input.gameState,
+    input.baserunningContext
+  );
+
   // ── Step 3: Player credibility  →  P(call was wrong) ───────────────────────
 
   const credibility = computePlayerCredibility(
@@ -129,6 +142,11 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
 
   const offensiveValue = computeOffensiveValue(input.playerContext, league);
 
+  // ── Step 4c: Lineup context multiplier ──────────────────────────────────────
+  // Value of extending the inning for upcoming hitters in the due-up window.
+
+  const lineupContext = computeLineupContext(input.lineupContext, league);
+
   // ── Step 4b: Defensive context multiplier ───────────────────────────────────
   // Small ±10% spray-based correction. GB-heavy batters generate more infield
   // outs (slight penalty); LD/FB-heavy batters have higher BABIP (slight bonus).
@@ -141,7 +159,9 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
   const rawEV =
     credibility.pCallWasWrong *
     reDelta *
+    baserunning.multiplier *
     offensiveValue.multiplier *
+    lineupContext.multiplier *
     defensiveContext.multiplier;
 
   // ── Step 6: Situation weight ────────────────────────────────────────────────
@@ -166,6 +186,8 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
     reDelta,
     adjustedEV,
     credibility,
+    baserunning,
+    lineupContext,
     situation,
     scarcity,
     thresholdResult,
@@ -201,6 +223,7 @@ function resolveLeagueAverages(override?: Partial<LeagueAverages>): LeagueAverag
     strikeoutRate:  override?.strikeoutRate  ?? LEAGUE_AVERAGES.STRIKEOUT_RATE,
     whiffRate:      override?.whiffRate      ?? LEAGUE_AVERAGES.WHIFF_RATE,
     ops:            override?.ops            ?? LEAGUE_AVERAGES.OPS,
+    woba:           override?.woba,
   };
 }
 

@@ -15,6 +15,8 @@ import * as gameRepo from "../db/gameRepository";
 import * as playerRepo from "../db/playerRepository";
 import * as recRepo from "../db/recommendationRepository";
 import * as defRepo from "../db/defensiveRepository";
+import * as sprintRepo from "../db/sprintSpeedRepository";
+import * as lineupRepo from "../db/lineupRepository";
 import * as contextBuilder from "../services/playerContextBuilder";
 import {
   precomputeAtBatRecommendations,
@@ -50,6 +52,8 @@ jest.mock("../db/gameRepository");
 jest.mock("../db/playerRepository");
 jest.mock("../db/recommendationRepository");
 jest.mock("../db/defensiveRepository");
+jest.mock("../db/sprintSpeedRepository");
+jest.mock("../db/lineupRepository");
 jest.mock("../services/playerContextBuilder");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +81,16 @@ const mockFindSprayProfile = defRepo.findSprayProfile as jest.MockedFunction<
 const mockFindFielderOaaBatch = defRepo.findFielderOaaBatch as jest.MockedFunction<
   typeof defRepo.findFielderOaaBatch
 >;
+const mockFindSprintSpeedBatch = sprintRepo.findSprintSpeedBatch as jest.MockedFunction<
+  typeof sprintRepo.findSprintSpeedBatch
+>;
+const mockFindBattingOrder = lineupRepo.findBattingOrder as jest.MockedFunction<
+  typeof lineupRepo.findBattingOrder
+>;
+const mockFindPlayerStatSnapshotBatch =
+  playerRepo.findPlayerStatSnapshotBatch as jest.MockedFunction<
+    typeof playerRepo.findPlayerStatSnapshotBatch
+  >;
 const mockUpsertRecommendation = recRepo.upsertRecommendation as jest.MockedFunction<
   typeof recRepo.upsertRecommendation
 >;
@@ -162,6 +176,9 @@ describe("precomputeAtBatRecommendations", () => {
       mockFindPlayerStatSnapshot.mockResolvedValue(null); // no Savant data yet
       mockFindSprayProfile.mockResolvedValue(null);       // no spray profile yet
       mockFindFielderOaaBatch.mockResolvedValue([]);      // no fielder OAA yet
+      mockFindSprintSpeedBatch.mockResolvedValue([]);
+      mockFindBattingOrder.mockResolvedValue([]);
+      mockFindPlayerStatSnapshotBatch.mockResolvedValue([]);
       mockAtBatHasCompletePrecompute.mockResolvedValue(false);
     });
 

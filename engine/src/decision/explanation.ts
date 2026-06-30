@@ -17,6 +17,8 @@
 
 import { ChallengeDecision, ChallengeRecommendation } from "../domain/challengeDecision.types";
 import { PlayerCredibilityResult } from "../features/playerCredibility";
+import { BaserunningContextResult } from "../features/baserunningContext";
+import { LineupContextResult } from "../features/lineupContext";
 import { SituationWeightResult } from "../features/situationWeight";
 import { ChallengeScarcityResult } from "../features/challengeScarcity";
 import { ThresholdResult } from "./thresholds";
@@ -31,6 +33,8 @@ export interface ExplanationInput {
   reDelta: number;
   adjustedEV: number;
   credibility: PlayerCredibilityResult;
+  baserunning: BaserunningContextResult;
+  lineupContext: LineupContextResult;
   situation: SituationWeightResult;
   scarcity: ChallengeScarcityResult;
   thresholdResult: ThresholdResult;
@@ -57,6 +61,12 @@ export function buildExplanation(input: ExplanationInput): string[] {
 
   const credibilitySentence = buildCredibilitySentence(input.credibility);
   if (credibilitySentence) sentences.push(credibilitySentence);
+
+  const baserunningSentence = buildBaserunningSentence(input.baserunning);
+  if (baserunningSentence) sentences.push(baserunningSentence);
+
+  const lineupSentence = buildLineupSentence(input.lineupContext);
+  if (lineupSentence) sentences.push(lineupSentence);
 
   const situationSentence = buildSituationSentence(input.situation, input.inning, input.halfInning);
   if (situationSentence) sentences.push(situationSentence);
@@ -122,6 +132,43 @@ function buildCredibilitySentence(
   }
 
   return null; // Neutral discipline — not worth mentioning
+}
+
+function buildBaserunningSentence(
+  baserunning: BaserunningContextResult
+): string | null {
+  if (!baserunning.dataAvailable || Math.abs(baserunning.multiplier - 1) < 0.02) {
+    return null;
+  }
+
+  switch (baserunning.note) {
+    case "fast_lead":
+      return `Fast lead runner on base increases the value of reaching base safely on this walk count.`;
+    case "slow_lead":
+      return `Slow runner on base limits advancement upside if this challenge produces a walk.`;
+    case "fast_batter":
+      return `This batter's above-average sprint speed adds value on a walk-producing count.`;
+    case "slow_batter":
+      return `This batter's below-average sprint speed slightly reduces walk-path value.`;
+    default:
+      return baserunning.multiplier > 1
+        ? `Base-running speed on the paths favors the offense on a walk count.`
+        : `Base-running speed on the paths slightly reduces walk-path value.`;
+  }
+}
+
+function buildLineupSentence(lineup: LineupContextResult): string | null {
+  if (!lineup.dataAvailable || Math.abs(lineup.multiplier - 1) < 0.02) {
+    return null;
+  }
+
+  if (lineup.strongUpcoming) {
+    return `Strong hitters due up later this inning increases the value of extending this at-bat.`;
+  }
+
+  return lineup.multiplier < 1
+    ? `Weaker hitters due up later this inning slightly reduces the value of extending this at-bat.`
+    : null;
 }
 
 function buildSituationSentence(

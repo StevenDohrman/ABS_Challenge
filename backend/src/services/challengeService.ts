@@ -24,9 +24,13 @@
 import {
   decideChallenge,
   computeChallengeOutcomeExpectancies,
+  buildDueUpWindow,
   type GameStateContext,
   type PitchCallContext,
   type ChallengeDecisionInput,
+  type BaserunningContextInput,
+  type LineupContextInput,
+  type DueUpBatter,
 } from "@abs/engine";
 import type { MlbAtBatSnapshot, MlbLivePitchEvent, DefensiveLineup } from "@abs/data-pipeline";
 import { ALL_COUNT_STATES, SEASONS, CALL_CODES, DB_LIMITS } from "../db/constants";
@@ -36,8 +40,10 @@ import {
   findLatestAtBatSnapshot,
   computeTeamChallengesRemaining,
 } from "../db/gameRepository";
-import { findPlayerStatSnapshot } from "../db/playerRepository";
+import { findPlayerStatSnapshot, findPlayerStatSnapshotBatch } from "../db/playerRepository";
 import { findSprayProfile, findFielderOaaBatch } from "../db/defensiveRepository";
+import { findSprintSpeedBatch } from "../db/sprintSpeedRepository";
+import { findBattingOrder } from "../db/lineupRepository";
 import {
   upsertRecommendation,
   markRecommendationTriggered,
@@ -131,6 +137,38 @@ export async function precomputeAtBatRecommendations(
     ? buildPlayerChallengeContext(statSnapshot, sprayProfile, fielderOaa)
     : buildDefaultPlayerChallengeContext(snapshot.batterId);
 
+  const batterSprintSpeed = await resolveBaserunningContext(snapshot);
+
+  const battingOrder =
+    snapshot.battingOrder ??
+    (await findBattingOrder(snapshot.gamePk, snapshot.battingTeamId));
+
+  const lineupPlayerIds = buildDueUpWindow(
+    battingOrder,
+    snapshot.batterId,
+    snapshot.outs
+  );
+
+  const lineupStatRows = await findPlayerStatSnapshotBatch(
+    lineupPlayerIds,
+    SEASONS.CURRENT
+  );
+  const lineupStatById = new Map(
+    lineupStatRows.map((row) => [row.playerId, row])
+  );
+
+  const dueUpBatters: DueUpBatter[] = lineupPlayerIds.map((playerId) => {
+    const row = lineupStatById.get(playerId);
+    return {
+      playerId,
+      ops: row?.ops ?? null,
+      woba: row?.woba ?? null,
+    };
+  });
+
+  const lineupContext: LineupContextInput | undefined =
+    dueUpBatters.length > 0 ? { dueUpBatters } : undefined;
+
   const runners = {
     first: snapshot.runnerOnFirst,
     second: snapshot.runnerOnSecond,
@@ -186,6 +224,8 @@ export async function precomputeAtBatRecommendations(
         currentRunExpectancy: reValues.current,
         runExpectancyIfSuccessful: reValues.ifSucceeds,
         runExpectancyIfFailed: reValues.ifFails,
+        baserunningContext: batterSprintSpeed,
+        lineupContext,
       };
 
       const decision = decideChallenge(input);
@@ -294,6 +334,35 @@ export async function getLatestRecommendationForGame(
   if (!snapshot) return null;
 
   return { recommendation, snapshot };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Baserunning / lineup resolution helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function resolveBaserunningContext(
+  snapshot: MlbAtBatSnapshot
+): Promise<BaserunningContextInput> {
+  const runnerIds = snapshot.runnerIds ?? {};
+  const speedPlayerIds = [
+    snapshot.batterId,
+    runnerIds.first,
+    runnerIds.second,
+    runnerIds.third,
+  ].filter((id): id is number => id !== undefined);
+
+  const speedRows = await findSprintSpeedBatch(speedPlayerIds, SEASONS.CURRENT);
+  const speedById = new Map(speedRows.map((row) => [row.playerId, row.sprintSpeed]));
+
+  return {
+    runnerIds,
+    batterSprintSpeed: speedById.get(snapshot.batterId) ?? null,
+    runnerSprintSpeeds: {
+      first: runnerIds.first !== undefined ? speedById.get(runnerIds.first) ?? undefined : undefined,
+      second: runnerIds.second !== undefined ? speedById.get(runnerIds.second) ?? undefined : undefined,
+      third: runnerIds.third !== undefined ? speedById.get(runnerIds.third) ?? undefined : undefined,
+    },
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

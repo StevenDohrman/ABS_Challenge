@@ -361,6 +361,47 @@ export const DEFENSIVE = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Baserunning — sprint speed RE-delta multiplier (walk paths only)
+// ---------------------------------------------------------------------------
+
+export const BASERUNNING = {
+  /** MLB average top sprint speed in ft/s (Statcast). */
+  LEAGUE_AVG_SPRINT_SPEED: 27,
+
+  /** Multiplier shift per ft/s above/below league average. */
+  SPEED_SCALE: 0.007,
+
+  MIN_MULTIPLIER: 0.90,
+  MAX_MULTIPLIER: 1.10,
+
+  /** Relative weights for forced advances on a walk. */
+  WEIGHT_BATTER_TO_FIRST: 1.0,
+  WEIGHT_R1_TO_SECOND: 1.5,
+  WEIGHT_R2_TO_THIRD: 2.0,
+  WEIGHT_R3_SCORES: 4.0,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Lineup — upcoming batters window multiplier
+// ---------------------------------------------------------------------------
+
+export const LINEUP = {
+  /** windowSize = WINDOW_BASE - outs */
+  WINDOW_BASE: 5,
+
+  /** Decay weights for on-deck, next, etc. */
+  SLOT_DECAY: [1.0, 0.85, 0.70, 0.55, 0.45] as const,
+
+  LEAGUE_AVG_WOBA: 0.320,
+
+  /** Each 0.050 wOBA above/below average shifts multiplier by ~0.05. */
+  WOBA_SCALE: 1.0,
+
+  MIN_MULTIPLIER: 0.90,
+  MAX_MULTIPLIER: 1.10,
+} as const;
+
+// ---------------------------------------------------------------------------
 // Thresholds — score → recommendation label and minimum confidence
 // ---------------------------------------------------------------------------
 

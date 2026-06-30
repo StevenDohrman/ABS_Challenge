@@ -4,6 +4,7 @@ import {
   parseAtBatSnapshot,
   parseHistoricalAtBatSnapshots,
   parseAllAtBatSnapshots,
+  parseGameLineups,
   pitchKey,
 } from "../mlbLive.parser";
 import {
@@ -425,6 +426,85 @@ describe("parseAtBatSnapshot", () => {
 
     // Only pitcher in the defense object — no outfield/infield slots → undefined
     expect(snapshot?.defense).toBeUndefined();
+  });
+
+  it("extracts runner IDs from linescore.offense", () => {
+    const linescore = buildLinescore({
+      offense: {
+        batter: { id: 682998, fullName: "Jacob Wilson" },
+        first: { id: 111111 },
+        third: { id: 333333 },
+      },
+    });
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
+        linescore,
+      },
+    });
+    const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
+
+    expect(snapshot?.runnerIds).toEqual({ first: 111111, third: 333333 });
+    expect(snapshot?.runnerOnFirst).toBe(true);
+    expect(snapshot?.runnerOnSecond).toBe(false);
+    expect(snapshot?.runnerOnThird).toBe(true);
+  });
+
+  it("parses batting order from boxscore for the batting team", () => {
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
+        linescore: buildLinescore(),
+        boxscore: {
+          teams: {
+            home: {
+              team: { id: 133 },
+              battingOrder: [682998, 669477, 656305],
+            },
+            away: {
+              team: { id: 134 },
+              battingOrder: [676059, 668939],
+            },
+          },
+        },
+      },
+    });
+    const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
+
+    // Default fixture is bottom of 9th — home team (133) is batting
+    expect(snapshot?.battingOrder).toEqual([682998, 669477, 656305]);
+  });
+});
+
+describe("parseGameLineups", () => {
+  it("returns lineup entries for both teams from boxscore", () => {
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
+        linescore: buildLinescore(),
+        boxscore: {
+          teams: {
+            home: {
+              team: { id: 133 },
+              battingOrder: [682998, 669477],
+            },
+            away: {
+              team: { id: 134 },
+              battingOrder: [676059, 668939, 663624],
+            },
+          },
+        },
+      },
+    });
+
+    const entries = parseGameLineups(feed, FETCHED_AT);
+    expect(entries).toHaveLength(5);
+    expect(entries.find((e) => e.playerId === 682998)).toMatchObject({
+      gamePk: 824991,
+      teamId: 133,
+      battingOrder: 1,
+    });
+    expect(entries.find((e) => e.playerId === 663624)?.battingOrder).toBe(3);
   });
 });
 

@@ -35,6 +35,8 @@ import {
   handleBatterStatlines,
   handleSprayProfiles,
   handleFielderOaa,
+  handleSprintSpeed,
+  handleLineupUpdate,
   reconcileChallengeCounts,
 } from "./services/ingestService";
 import {
@@ -159,6 +161,10 @@ function startLivePollJob(): void {
     scheduleSavantPostgameEnrichment(gamePk);
   });
 
+  job.on("lineupUpdate", async (entries) => {
+    await handleLineupUpdate(entries);
+  });
+
   job.on("error", (err) => {
     console.error("[orchestrator] LivePollJob error:", err);
   });
@@ -184,6 +190,10 @@ async function runSavantDailyJob(): Promise<void> {
 
   job.on("fielderOaa", async (oaaRows) => {
     await handleFielderOaa(oaaRows);
+  });
+
+  job.on("sprintSpeed", async (speeds) => {
+    await handleSprintSpeed(speeds);
   });
 
   job.on("error", (err) => {

@@ -2,6 +2,10 @@ import { GameStateContext } from "./gameContext.types";
 import { PlayerChallengeContext } from "./playerContext.types";
 import { PitchCallContext } from "./pitchContext.types";
 import { LeagueAverages } from "./leagueContext.types";
+import {
+  BaserunningContextInput,
+  LineupContextInput,
+} from "./lineupContext.types";
 
 export type ChallengeRecommendation = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 
@@ -49,6 +53,18 @@ export interface ChallengeDecisionInput {
    * or the batter strikes out if strikes was 2.
    */
   runExpectancyIfFailed: number;
+
+  /**
+   * Sprint speed context for base-path adjustment on walk-producing counts.
+   * Omit when unavailable — engine defaults to 1.0×.
+   */
+  baserunningContext?: BaserunningContextInput;
+
+  /**
+   * Upcoming batters in the due-up window (excludes current batter).
+   * Omit when lineup unavailable — engine defaults to 1.0×.
+   */
+  lineupContext?: LineupContextInput;
 }
 
 /**
