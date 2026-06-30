@@ -36,10 +36,63 @@ export async function upsertGame(game: ActiveGame): Promise<Game> {
  * Mark a game as Final.
  */
 export async function markGameFinal(gamePk: number): Promise<void> {
+  await ensureGameFinalized(gamePk, new Date());
+}
+
+/**
+ * Mark a game Final and record when it ended. finalizedAt is only set once so
+ * Savant scheduling and backfill do not reset the 14-hour window.
+ */
+export async function ensureGameFinalized(
+  gamePk: number,
+  finalizedAt: Date
+): Promise<void> {
   await prisma.game.updateMany({
     where: { gamePk },
     data: { status: "Final", updatedAt: new Date() },
   });
+  await prisma.game.updateMany({
+    where: { gamePk, finalizedAt: null },
+    data: { finalizedAt, updatedAt: new Date() },
+  });
+}
+
+export async function countGameAtBats(gamePk: number): Promise<number> {
+  return prisma.liveGameSnapshot.count({ where: { gamePk } });
+}
+
+export async function countGamePitches(gamePk: number): Promise<number> {
+  return prisma.livePitchEvent.count({ where: { gamePk } });
+}
+
+export async function markSavantEnriched(gamePk: number): Promise<void> {
+  await prisma.game.updateMany({
+    where: { gamePk },
+    data: { savantEnrichedAt: new Date(), updatedAt: new Date() },
+  });
+}
+
+/** Record when postgame Savant polling began (idempotent — only sets once). */
+export async function markSavantEnrichmentStarted(gamePk: number): Promise<void> {
+  await prisma.game.updateMany({
+    where: { gamePk, savantEnrichmentStartedAt: null },
+    data: { savantEnrichmentStartedAt: new Date(), updatedAt: new Date() },
+  });
+}
+
+export async function incrementSavantEnrichmentAttempt(gamePk: number): Promise<void> {
+  await prisma.game.update({
+    where: { gamePk },
+    data: { savantEnrichmentAttempts: { increment: 1 } },
+  });
+}
+
+export async function isSavantEnriched(gamePk: number): Promise<boolean> {
+  const game = await prisma.game.findUnique({
+    where: { gamePk },
+    select: { savantEnrichedAt: true },
+  });
+  return game?.savantEnrichedAt != null;
 }
 
 /**

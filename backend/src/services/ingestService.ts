@@ -11,10 +11,11 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, ActiveGame } from "@abs/data-pipeline";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantPitchRow, ActiveGame } from "@abs/data-pipeline";
 import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
+import { persistSavantPitchesAndAudit, recordSavantEnrichmentAttempt } from "./postgameAuditService";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Game lifecycle
@@ -192,5 +193,44 @@ export async function handleFielderOaa(
     await upsertFielderOaa(oaaRows);
   } catch (err) {
     console.error("[ingestService] failed to upsert fielder OAA batch:", err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Savant postgame events
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Persist Savant pitch rows and run postgame challenge audits for a Final game.
+ */
+export async function handleSavantPostgamePitches(
+  gamePk: number,
+  pitches: SavantPitchRow[]
+): Promise<void> {
+  try {
+    console.log(
+      `[ingestService] upserting ${pitches.length} Savant pitches for game ${gamePk}`
+    );
+    await persistSavantPitchesAndAudit(gamePk, pitches);
+    console.log(`[ingestService] postgame audit complete for game ${gamePk}`);
+  } catch (err) {
+    console.error(
+      `[ingestService] failed postgame Savant ingest for game ${gamePk}:`,
+      err
+    );
+  }
+}
+
+/**
+ * Record a failed/not-ready Savant fetch attempt (orchestrator uses for retries).
+ */
+export async function handleSavantPostgameNotReady(gamePk: number): Promise<void> {
+  try {
+    await recordSavantEnrichmentAttempt(gamePk);
+  } catch (err) {
+    console.error(
+      `[ingestService] failed to record Savant attempt for game ${gamePk}:`,
+      err
+    );
   }
 }

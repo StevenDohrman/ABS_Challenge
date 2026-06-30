@@ -1,8 +1,9 @@
+import { Link } from "react-router-dom";
 import type { ScheduleGame } from "../api/types";
 
 interface Props {
   game: ScheduleGame;
-  onClick: () => void;
+  scheduleDate: string;
 }
 
 // ── Status helpers ─────────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ function ChallengeCounts({ game }: { game: ScheduleGame }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────
 
-export function GameCard({ game, onClick }: Props) {
+export function GameCard({ game, scheduleDate }: Props) {
   const cfg = statusCfg(game.detailedState);
   const isLive = game.abstractState === "Live";
   const isFinal = game.abstractState === "Final";
@@ -128,9 +129,9 @@ export function GameCard({ game, onClick }: Props) {
   const awayWins = hasScore && (game.awayScore ?? 0) > (game.homeScore ?? 0);
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all duration-150
+    <Link
+      to={`/games/${game.gamePk}?date=${scheduleDate}`}
+      className={`block w-full text-left rounded-2xl border p-4 transition-all duration-150
         hover:scale-[1.01] hover:brightness-110 active:scale-[0.99]
         ${cfg.bgCls} ${cfg.border}`}
     >
@@ -177,6 +178,6 @@ export function GameCard({ game, onClick }: Props) {
 
       <LiveSituation game={game} />
       <ChallengeCounts game={game} />
-    </button>
+    </Link>
   );
 }

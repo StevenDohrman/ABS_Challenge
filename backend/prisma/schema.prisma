@@ -45,12 +45,21 @@ model Game {
   homeChallengesRemaining Int @default(2)
   awayChallengesRemaining Int @default(2)
 
+  // Postgame Savant enrichment (Phase 5).
+  savantEnrichedAt          DateTime?
+  /** When the game was marked Final — used to delay Savant polling. */
+  finalizedAt               DateTime?
+  savantEnrichmentStartedAt DateTime?
+  savantEnrichmentAttempts  Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   snapshots       LiveGameSnapshot[]
   pitchEvents     LivePitchEvent[]
   recommendations ChallengeRecommendation[]
+  savantPitches   SavantPitchEvent[]
+  postgameAudits  PostgameChallengeAudit[]
 
   @@map("games")
 }
@@ -133,6 +142,7 @@ model LivePitchEvent {
 
   game            Game                      @relation(fields: [gamePk], references: [gamePk])
   recommendations ChallengeRecommendation[]
+  postgameAudit   PostgameChallengeAudit?
 
   @@unique([gamePk, atBatIndex, pitchNumber])
   @@index([gamePk])
@@ -238,12 +248,104 @@ model ChallengeRecommendation {
   triggeredAt  DateTime?
   pitchEventId Int?
 
-  game       Game            @relation(fields: [gamePk], references: [gamePk])
-  pitchEvent LivePitchEvent? @relation(fields: [pitchEventId], references: [id])
+  game          Game                     @relation(fields: [gamePk], references: [gamePk])
+  pitchEvent    LivePitchEvent?          @relation(fields: [pitchEventId], references: [id])
+  postgameAudit PostgameChallengeAudit?
 
   @@unique([gamePk, atBatIndex, balls, strikes])
   @@index([gamePk, triggeredAt])
   @@map("challenge_recommendations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// savant_pitch_events
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Postgame Statcast pitch rows keyed by Savant's at_bat_number (1-based).
+model SavantPitchEvent {
+  id          Int @id @default(autoincrement())
+  gamePk      Int
+  atBatNumber Int
+  atBatIndex  Int
+  pitchNumber Int
+
+  batterId  Int
+  pitcherId Int
+
+  plateX  Float?
+  plateZ  Float?
+  szTop   Float?
+  szBot   Float?
+  zone    Int?
+  description String?
+
+  fetchedAt DateTime
+
+  rawPayload Json
+
+  game         Game                    @relation(fields: [gamePk], references: [gamePk])
+  postgameAudit PostgameChallengeAudit?
+
+  @@unique([gamePk, atBatNumber, pitchNumber])
+  @@index([gamePk, atBatIndex, pitchNumber])
+  @@map("savant_pitch_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// postgame_challenge_audits
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One row per auditable called-strike pitch with a triggered recommendation.
+model PostgameChallengeAudit {
+  id         Int @id @default(autoincrement())
+  gamePk     Int
+  atBatIndex Int
+  pitchNumber Int
+
+  pitchEventId      Int @unique
+  recommendationId  Int @unique
+  savantPitchEventId Int? @unique
+
+  inning     Int
+  halfInning String
+  balls      Int
+  strikes    Int
+  outs       Int
+
+  batterId  Int
+  pitcherId Int
+
+  originalCall String // "ball" | "strike" | "unknown"
+
+  plateX Float?
+  plateZ Float?
+  szTop  Float?
+  szBot  Float?
+
+  savantZoneResult String // "ball" | "strike" | "unknown"
+  callWasProbablyWrong Boolean
+
+  liveRecommendation String // AUTO_ALLOW | ALLOW | WARN | DENY
+  playerConfidence   Int?
+  challengeAvailable Boolean
+
+  shouldHaveChallenged Boolean
+  missedChallenge      Boolean
+  badChallengeAllowed  Boolean
+
+  runExpectancySwing Float
+  notesJson          Json // string[]
+
+  createdAt DateTime @default(now())
+
+  game             Game                   @relation(fields: [gamePk], references: [gamePk])
+  pitchEvent       LivePitchEvent         @relation(fields: [pitchEventId], references: [id])
+  recommendation   ChallengeRecommendation @relation(fields: [recommendationId], references: [id])
+  savantPitchEvent SavantPitchEvent?      @relation(fields: [savantPitchEventId], references: [id])
+
+  @@index([gamePk, missedChallenge])
+  @@index([gamePk, runExpectancySwing])
+  @@map("postgame_challenge_audits")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

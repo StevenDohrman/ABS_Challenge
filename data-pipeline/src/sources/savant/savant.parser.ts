@@ -4,6 +4,7 @@ import {
   SavantFielderOaa,
   SavantSprintSpeed,
   SavantPlayerPitchHistory,
+  SavantPitchRow,
 } from "./savant.types";
 
 // ---------------------------------------------------------------------------
@@ -302,6 +303,42 @@ export function parseSprintSpeed(
 // ---------------------------------------------------------------------------
 // Per-player Statcast pitch history parser
 // ---------------------------------------------------------------------------
+
+function mapStatcastRowToSavantPitchRow(
+  row: Record<string, string>,
+  fetchedAt: string
+): SavantPitchRow {
+  const atBatNumber = parseInt10(col(row, "at_bat_number"));
+  return {
+    gamePk: parseInt10(col(row, "game_pk")),
+    gameDate: col(row, "game_date"),
+    atBatNumber,
+    pitchNumber: parseInt10(col(row, "pitch_number")),
+    batterId: parseInt10(col(row, "batter")),
+    pitcherId: parseInt10(col(row, "pitcher")),
+    plateX: parseNum(col(row, "plate_x")),
+    plateZ: parseNum(col(row, "plate_z")),
+    szTop: parseNum(col(row, "sz_top")),
+    szBot: parseNum(col(row, "sz_bot")),
+    description: col(row, "description"),
+    zone: parseNum(col(row, "zone")),
+    raw: row,
+    fetchedAt,
+  };
+}
+
+/**
+ * Parse the statcast_search CSV for a single game into SavantPitchRow objects.
+ * Used by SavantPostgameJob after a game goes Final.
+ */
+export function parseGameStatcastCsv(
+  csv: string,
+  fetchedAt: string
+): SavantPitchRow[] {
+  return parseCsvToRows(csv)
+    .filter((row) => col(row, "game_pk") !== "")
+    .map((row) => mapStatcastRowToSavantPitchRow(row, fetchedAt));
+}
 
 /**
  * Parse the statcast_search CSV for a single player into individual pitches.

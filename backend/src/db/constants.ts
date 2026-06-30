@@ -106,6 +106,62 @@ export const SEASONS = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Postgame Savant enrichment
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SAVANT_POSTGAME = {
+  /** Wait this long after Final before the first Savant fetch (Statcast lags ~12–24h). */
+  INITIAL_DELAY_MS: 14 * 60 * 60_000,
+
+  /** How often to poll Savant once the initial delay has elapsed (ms). */
+  POLL_INTERVAL_MS: 10 * 60_000,
+
+  /** Stop retrying if Statcast data never appears within this window after polling begins (ms). */
+  MAX_DURATION_MS: 8 * 60 * 60_000,
+} as const;
+
+/** Earliest time we should attempt the first Savant fetch for a Final game. */
+export function savantPollEarliestAt(finalizedAt: Date): Date {
+  return new Date(finalizedAt.getTime() + SAVANT_POSTGAME.INITIAL_DELAY_MS);
+}
+
+/** True when the initial post-Final delay has elapsed. */
+export function isSavantPollingDue(
+  finalizedAt: Date | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (!finalizedAt) return false;
+  return nowMs >= savantPollEarliestAt(finalizedAt).getTime();
+}
+
+/** True when the active polling window has elapsed without success. */
+export function isSavantEnrichmentExpired(
+  startedAt: Date | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (!startedAt) return false;
+  return nowMs - startedAt.getTime() >= SAVANT_POSTGAME.MAX_DURATION_MS;
+}
+
+/**
+ * Absolute give-up time: initial delay + poll window from Final.
+ * Used when polling never started (e.g. server was down through the poll window).
+ */
+export function isSavantEnrichmentAbandoned(
+  finalizedAt: Date | null,
+  enrichedAt: Date | null,
+  startedAt: Date | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (enrichedAt) return false;
+  if (startedAt && isSavantEnrichmentExpired(startedAt, nowMs)) return true;
+  if (!finalizedAt) return false;
+  const absoluteCapMs =
+    SAVANT_POSTGAME.INITIAL_DELAY_MS + SAVANT_POSTGAME.MAX_DURATION_MS;
+  return nowMs - finalizedAt.getTime() >= absoluteCapMs;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Database concurrency guardrails
 // ─────────────────────────────────────────────────────────────────────────────
 

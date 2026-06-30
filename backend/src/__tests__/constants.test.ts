@@ -4,6 +4,10 @@ import {
   CALL_CODES,
   STAT_CONVERSION,
   SEASONS,
+  SAVANT_POSTGAME,
+  isSavantEnrichmentExpired,
+  isSavantEnrichmentAbandoned,
+  isSavantPollingDue,
 } from "../db/constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,5 +134,63 @@ describe("SEASONS", () => {
     expect(SEASONS.CURRENT).toBeGreaterThanOrEqual(2020);
     expect(SEASONS.CURRENT).toBeLessThanOrEqual(2100);
     expect(Number.isInteger(SEASONS.CURRENT)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVANT_POSTGAME
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("SAVANT_POSTGAME", () => {
+  it("waits 14 hours after Final before the first fetch", () => {
+    expect(SAVANT_POSTGAME.INITIAL_DELAY_MS).toBe(14 * 60 * 60_000);
+  });
+
+  it("polls every 10 minutes once eligible", () => {
+    expect(SAVANT_POSTGAME.POLL_INTERVAL_MS).toBe(10 * 60_000);
+  });
+
+  it("stops polling 8 hours after the first fetch attempt", () => {
+    expect(SAVANT_POSTGAME.MAX_DURATION_MS).toBe(8 * 60 * 60_000);
+  });
+});
+
+describe("isSavantPollingDue", () => {
+  it("returns false before the 14-hour delay", () => {
+    const finalizedAt = new Date("2026-06-22T20:00:00Z");
+    const nowMs = finalizedAt.getTime() + 13 * 60 * 60_000;
+    expect(isSavantPollingDue(finalizedAt, nowMs)).toBe(false);
+  });
+
+  it("returns true after the 14-hour delay", () => {
+    const finalizedAt = new Date("2026-06-22T20:00:00Z");
+    const nowMs = finalizedAt.getTime() + 14 * 60 * 60_000;
+    expect(isSavantPollingDue(finalizedAt, nowMs)).toBe(true);
+  });
+});
+
+describe("isSavantEnrichmentExpired", () => {
+  it("returns false when enrichment has not started", () => {
+    expect(isSavantEnrichmentExpired(null)).toBe(false);
+  });
+
+  it("returns false within the 8-hour polling window", () => {
+    const startedAt = new Date("2026-06-22T20:00:00Z");
+    const nowMs = startedAt.getTime() + 7 * 60 * 60_000;
+    expect(isSavantEnrichmentExpired(startedAt, nowMs)).toBe(false);
+  });
+
+  it("returns true after 8 hours of polling", () => {
+    const startedAt = new Date("2026-06-22T20:00:00Z");
+    const nowMs = startedAt.getTime() + 8 * 60 * 60_000;
+    expect(isSavantEnrichmentExpired(startedAt, nowMs)).toBe(true);
+  });
+});
+
+describe("isSavantEnrichmentAbandoned", () => {
+  it("returns true after initial delay plus poll window from Final", () => {
+    const finalizedAt = new Date("2026-06-22T20:00:00Z");
+    const nowMs = finalizedAt.getTime() + 22 * 60 * 60_000;
+    expect(isSavantEnrichmentAbandoned(finalizedAt, null, null, nowMs)).toBe(true);
   });
 });

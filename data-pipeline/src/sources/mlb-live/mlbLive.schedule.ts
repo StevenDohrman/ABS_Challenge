@@ -72,6 +72,34 @@ export async function fetchUpcomingAndLiveGames(
   });
 }
 
+/**
+ * Return only Final games for a given official date.
+ */
+export async function fetchFinalGames(date?: string): Promise<ActiveGame[]> {
+  const games = await fetchGamesForDate(date);
+  return games.filter((g) => g.status === "Final");
+}
+
+/**
+ * Return Final games across a date range (inclusive), one day at a time.
+ */
+export async function fetchFinalGamesInRange(
+  startDate: string,
+  endDate: string
+): Promise<ActiveGame[]> {
+  const results: ActiveGame[] = [];
+  const start = new Date(`${startDate}T12:00:00Z`);
+  const end = new Date(`${endDate}T12:00:00Z`);
+
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    const dayGames = await fetchFinalGames(dateStr);
+    results.push(...dayGames);
+  }
+
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

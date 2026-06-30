@@ -124,7 +124,7 @@ export async function getGameAtBatHistory(
     return;
   }
 
-  const [snapshots, allRecs, reviewPitchEvents] = await Promise.all([
+  const [snapshots, allRecs, reviewPitchEvents, postgameAudits] = await Promise.all([
     prisma.liveGameSnapshot.findMany({
       where: { gamePk },
       orderBy: { atBatIndex: "asc" },
@@ -139,6 +139,7 @@ export async function getGameAtBatHistory(
         challengerTeamId: true,
       },
     }),
+    prisma.postgameChallengeAudit.findMany({ where: { gamePk } }),
   ]);
 
   if (snapshots.length === 0) {
@@ -146,6 +147,16 @@ export async function getGameAtBatHistory(
     return;
   }
 
-  const dto = toGameAtBatHistoryDto(gamePk, snapshots, allRecs, reviewPitchEvents);
+  const auditsByAtBat = new Map(
+    postgameAudits.map((a) => [a.atBatIndex, a])
+  );
+
+  const dto = toGameAtBatHistoryDto(
+    gamePk,
+    snapshots,
+    allRecs,
+    reviewPitchEvents,
+    auditsByAtBat
+  );
   res.json(dto);
 }

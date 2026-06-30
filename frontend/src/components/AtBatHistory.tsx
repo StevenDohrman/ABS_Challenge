@@ -101,6 +101,14 @@ function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
               <ChallengeBadge outcome={ab.challengeOutcome} />
             </div>
           )}
+          {ab.postgameAudit?.missedChallenge && (
+            <div className="mt-0.5">
+              <span className="inline-flex items-center text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border bg-orange-500/15 border-orange-500/30 text-orange-300">
+                Missed · Savant {ab.postgameAudit.savantZoneResult}
+                {!ab.postgameAudit.challengeAvailable && " · out of challenges"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Triggered recommendation (if any) */}

@@ -4,6 +4,7 @@ import {
   getCurrentAtBatRecommendations,
   getGameAtBatHistory,
 } from "../controllers/recommendationController";
+import { getPostgameAudit } from "../controllers/postgameAuditController";
 
 const router = Router();
 
@@ -18,6 +19,12 @@ router.get("/:gamePk/recommendation", getLatestRecommendation);
  * Returns all 12 pre-computed recommendations for the current at-bat.
  */
 router.get("/:gamePk/at-bats/current/recommendations", getCurrentAtBatRecommendations);
+
+/**
+ * GET /api/games/:gamePk/postgame-audit
+ * Returns Savant-backed postgame challenge audit summary and missed opportunities.
+ */
+router.get("/:gamePk/postgame-audit", getPostgameAudit);
 
 /**
  * GET /api/games/:gamePk/at-bats
