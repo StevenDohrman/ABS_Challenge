@@ -20,7 +20,7 @@ export {
   buildFinalGameBackfillPayload,
   inferFinalizedAtFromFeed,
 } from "./sources/mlb-live/mlbLive.backfill";
-export { parsePitchEvents } from "./sources/mlb-live/mlbLive.parser";
+export { parsePitchEvents, parseGameLineups } from "./sources/mlb-live/mlbLive.parser";
 
 // MLB live types — emitted by LivePollJob events.
 export type {
@@ -28,6 +28,8 @@ export type {
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
   DefensiveLineup,
+  BaseRunners,
+  GameLineupEntry,
   GameBackfillPayload,
 } from "./sources/mlb-live/mlbLive.types";
 export { CALLED_STRIKE_CALL_CODE } from "./sources/mlb-live/mlbLive.types";

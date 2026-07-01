@@ -232,6 +232,21 @@ export interface MlbLiveData {
     currentPlay?: MlbPlay;
   };
   linescore: MlbLinescore;
+  boxscore?: MlbBoxscore;
+}
+
+export interface MlbBoxscoreTeam {
+  team?: { id: number };
+  /** Player IDs in current batting order (1–9). */
+  battingOrder?: number[];
+  batters?: number[];
+}
+
+export interface MlbBoxscore {
+  teams: {
+    home: MlbBoxscoreTeam;
+    away: MlbBoxscoreTeam;
+  };
 }
 
 export interface MlbLiveFeedResponse {

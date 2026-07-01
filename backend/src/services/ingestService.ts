@@ -11,10 +11,12 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantPitchRow, ActiveGame } from "@abs/data-pipeline";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, SavantPitchRow, ActiveGame, GameLineupEntry } from "@abs/data-pipeline";
 import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
+import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
+import { upsertGameLineup } from "../db/lineupRepository";
 import { recordNamesFromPitchRow } from "../db/playerNameRepository";
 import { persistSavantPitchesAndAudit, recordSavantEnrichmentAttempt } from "./postgameAuditService";
 import {
@@ -214,6 +216,33 @@ export async function handleFielderOaa(
     await upsertFielderOaa(oaaRows);
   } catch (err) {
     console.error("[ingestService] failed to upsert fielder OAA batch:", err);
+  }
+}
+
+/**
+ * Persist a batch of sprint speed rows from the SavantDailyJob.
+ */
+export async function handleSprintSpeed(
+  rows: SavantSprintSpeed[]
+): Promise<void> {
+  try {
+    console.log(`[ingestService] upserting ${rows.length} sprint speed rows`);
+    await upsertSprintSpeed(rows);
+  } catch (err) {
+    console.error("[ingestService] failed to upsert sprint speed batch:", err);
+  }
+}
+
+/**
+ * Persist batting order from the MLB live feed boxscore.
+ */
+export async function handleLineupUpdate(
+  entries: GameLineupEntry[]
+): Promise<void> {
+  try {
+    await upsertGameLineup(entries);
+  } catch (err) {
+    console.error("[ingestService] failed to upsert game lineup:", err);
   }
 }
 

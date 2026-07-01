@@ -6,6 +6,7 @@ import {
   parseAtBatSnapshot,
   parseHistoricalAtBatSnapshots,
   parseMissedAtBatSnapshots,
+  parseGameLineups,
   pitchKey,
 } from "./mlbLive.parser";
 import {
@@ -13,6 +14,7 @@ import {
   MlbLiveGameSnapshot,
   MlbAtBatSnapshot,
   GameBackfillPayload,
+  GameLineupEntry,
   CALLED_STRIKE_CALL_CODE,
 } from "./mlbLive.types";
 
@@ -35,11 +37,13 @@ export interface GamePoller {
   on(event: "gameBackfill", listener: (payload: GameBackfillPayload) => void): this;
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
+  on(event: "lineupUpdate", listener: (entries: GameLineupEntry[]) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
   emit(event: "atBatStart", snapshot: MlbAtBatSnapshot): boolean;
   emit(event: "gameBackfill", payload: GameBackfillPayload): boolean;
   emit(event: "pitchEvent", pitchEvent: MlbLivePitchEvent): boolean;
   emit(event: "gameOver", payload: { gamePk: number }): boolean;
+  emit(event: "lineupUpdate", entries: GameLineupEntry[]): boolean;
   emit(event: "error", err: Error): boolean;
 }
 
@@ -114,6 +118,11 @@ export class GamePoller extends EventEmitter {
       }
 
       const snapshot = parseGameSnapshot(feed, fetchedAt);
+
+      const lineups = parseGameLineups(feed, fetchedAt);
+      if (lineups.length > 0) {
+        this.emit("lineupUpdate", lineups);
+      }
 
       const currentAtBatIndex = feed.liveData.plays.currentPlay?.about.atBatIndex ?? -1;
 

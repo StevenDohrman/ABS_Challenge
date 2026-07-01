@@ -19,6 +19,23 @@ export interface DefensiveLineup {
   right?: number;     // RF
 }
 
+/** Runner IDs occupying each base at at-bat start. */
+export interface BaseRunners {
+  first?: number;
+  second?: number;
+  third?: number;
+}
+
+/** One row in game_lineups — batting order slot for a player. */
+export interface GameLineupEntry {
+  gamePk: number;
+  teamId: number;
+  playerId: number;
+  /** 1-based spot in the order. */
+  battingOrder: number;
+  fetchedAt: string;
+}
+
 /**
  * balls/strikes/outs represent the count AFTER the pitch (from playEvent.count).
  * ballsBefore/strikesBefore represent the count BEFORE the pitch, computed during
@@ -107,6 +124,9 @@ export interface MlbAtBatSnapshot {
   runnerOnSecond: boolean;
   runnerOnThird: boolean;
 
+  /** MLB player IDs on each occupied base. Live at-bats only. */
+  runnerIds?: BaseRunners;
+
   homeScore: number;
   awayScore: number;
 
@@ -119,6 +139,12 @@ export interface MlbAtBatSnapshot {
    * at-bats (live feed doesn't carry per-play defense history).
    */
   defense?: DefensiveLineup;
+
+  /**
+   * Batting order for the batting team (player IDs, 1st through 9th).
+   * Parsed from liveData.boxscore.teams.{home|away}.battingOrder.
+   */
+  battingOrder?: number[];
 
   fetchedAt: string;
 }

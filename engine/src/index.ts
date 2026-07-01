@@ -18,6 +18,9 @@ export type {
   ChallengeRecommendation,
   ChallengeDecisionInput,
   ChallengeDecision,
+  BaserunningContextInput,
+  LineupContextInput,
+  DueUpBatter,
 } from "./domain/index";
 
 // Run expectancy utilities — used by backend to pre-compute RE values before
@@ -26,6 +29,8 @@ export {
   lookupBaseRE,
   computeChallengeOutcomeExpectancies,
 } from "./data/runExpectancy";
+
+export { buildDueUpWindow } from "./features/lineupContext";
 
 export type {
   Runners,
@@ -39,6 +44,8 @@ export {
   LEAGUE_AVERAGES,
   CREDIBILITY,
   DEFENSIVE,
+  BASERUNNING,
+  LINEUP,
   SITUATION,
   SCARCITY,
   SCORING,

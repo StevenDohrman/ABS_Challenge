@@ -7,3 +7,8 @@ export type {
   ChallengeDecisionInput,
   ChallengeDecision,
 } from "./challengeDecision.types";
+export type {
+  BaserunningContextInput,
+  LineupContextInput,
+  DueUpBatter,
+} from "./lineupContext.types";

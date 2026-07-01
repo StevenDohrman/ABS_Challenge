@@ -56,4 +56,10 @@ export interface LeagueAverages {
    * Typical value: 0.710–0.750.
    */
   ops: number;
+
+  /**
+   * League wOBA for the average MLB batter. Used for lineup context multiplier.
+   * Falls back to LINEUP.LEAGUE_AVG_WOBA in constants when omitted.
+   */
+  woba?: number;
 }
