@@ -69,7 +69,7 @@ function MissedRow({ item, rank }: { item: PostgameAuditItem; rank?: number }) {
           )}
         </div>
         <p className="text-[11px] text-white/30 mt-0.5">
-          Savant: {item.savantZoneResult} · Live: called strike
+          Zone: {item.zoneResult} · Live: called strike
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -108,18 +108,16 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
           </p>
           {status === "pending" && (
             <p className="text-xs text-amber-400/80 mt-1">
-              {audit.pollEarliestAt && new Date(audit.pollEarliestAt) > new Date()
-                ? `Postgame audit starts ${new Date(audit.pollEarliestAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} (14h after final)`
-                : "Checking Savant for pitch data every 10 min…"}
+              Running postgame audit from MLB pitch data…
             </p>
           )}
           {status === "ready" && enrichedAt && (
             <p className="text-[11px] text-white/25 font-mono mt-1">
-              Enriched {new Date(enrichedAt).toLocaleTimeString()}
+              Audited {new Date(enrichedAt).toLocaleTimeString()}
             </p>
           )}
           {status === "unavailable" && (
-            <p className="text-xs text-white/30 mt-1">Savant data unavailable</p>
+            <p className="text-xs text-white/30 mt-1">Postgame audit unavailable</p>
           )}
         </div>
         {status === "pending" && (
@@ -197,9 +195,7 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
           {status === "pending" && (
             <div className="px-5 py-6 text-center space-y-2">
               <p className="text-sm text-white/40">
-                {audit.pollEarliestAt && new Date(audit.pollEarliestAt) > new Date()
-                  ? "Statcast pitch data is typically available ~14 hours after the final out."
-                  : "Statcast pitch data typically appears 12–24 hours after the final out."}
+                Postgame analysis runs shortly after the game goes final using MLB live feed pitch location data.
               </p>
           <Link to="/how-it-works" className="text-xs text-white/30 hover:text-white/60 underline">
             Learn how postgame audit works

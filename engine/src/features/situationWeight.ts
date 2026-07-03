@@ -36,6 +36,8 @@ export interface SituationWeightResult {
   components: {
     inningLeverage: number;
     runDiffLeverage: number;
+    /** Use-it-or-lose-it boost when challenges remain in the 9th or later. */
+    challengeUrgency: number;
     isLateAndClose: boolean; // inning ≥ LATE_GAME_INNING and |runDiff| ≤ CLOSE_GAME_MAX_RUN_DIFF
     isBlowout: boolean;      // |runDiff| ≥ BLOWOUT_MIN_RUN_DIFF
     isExtraInnings: boolean; // inning > LAST_REGULAR_INNING
@@ -59,8 +61,13 @@ export function computeSituationWeight(
     gameState.runDifferentialForBattingTeam
   );
 
+  const challengeUrgency = computeChallengeUrgency(
+    gameState.inning,
+    gameState.challengesRemaining
+  );
+
   const weight = clamp(
-    inningLeverage * runDiffLeverage,
+    inningLeverage * runDiffLeverage * challengeUrgency,
     SITUATION.WEIGHT_MIN,
     SITUATION.WEIGHT_MAX
   );
@@ -72,6 +79,7 @@ export function computeSituationWeight(
     components: {
       inningLeverage,
       runDiffLeverage,
+      challengeUrgency,
       isLateAndClose:
         gameState.inning >= SITUATION.LATE_GAME_INNING &&
         absRunDiff <= SITUATION.CLOSE_GAME_MAX_RUN_DIFF,
@@ -136,6 +144,28 @@ function computeRunDiffLeverage(runDifferentialForBattingTeam: number): number {
     SITUATION.RUN_DIFF_LEVERAGE_BY_GAP[absGap] ??
     SITUATION.RUN_DIFF_LEVERAGE_BLOWOUT
   );
+}
+
+/**
+ * Boosts urgency in the final inning(s) when the batting team still has
+ * challenges to spend — wrong calls are costlier when there are few at-bats left.
+ */
+function computeChallengeUrgency(
+  inning: number,
+  challengesRemaining: number
+): number {
+  if (
+    inning < SITUATION.LATE_INNING_CHALLENGE_URGENCY ||
+    challengesRemaining <= 0
+  ) {
+    return 1;
+  }
+
+  if (challengesRemaining >= 2) {
+    return 1 + SITUATION.CHALLENGE_URGENCY_BONUS_WITH_TWO;
+  }
+
+  return 1 + SITUATION.CHALLENGE_URGENCY_BONUS_WITH_ONE;
 }
 
 // ---------------------------------------------------------------------------

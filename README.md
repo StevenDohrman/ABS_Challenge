@@ -579,7 +579,7 @@ export interface PostgameChallengeAudit {
   szTop: number | null;
   szBot: number | null;
 
-  savantZoneResult: "ball" | "strike" | "unknown";
+  zoneResult: "ball" | "strike" | "unknown";
   callWasProbablyWrong: boolean;
 
   liveRecommendation?: "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
@@ -951,12 +951,12 @@ Defer heavy client-side engine recompute until Phase 7; Phase 8 can start with m
 
 ## Current Status (as of June 2026)
 
-Phase 6 is complete. The full stack runs end-to-end including postgame Savant audits and challenge rankings:
+Phase 6 is complete. The full stack runs end-to-end including postgame challenge audits and challenge rankings:
 
-- **Data pipeline**: `LivePollJob` polls active games; `SavantPostgameJob` waits **14 hours after Final**, then polls every 10 min for up to 8 hours.
-- **Backend**: pre-computes 12-count grids, triggers called-strike recommendations, persists `savant_pitch_events` and `postgame_challenge_audits`, serves `GET /api/games/:gamePk/postgame-audit`.
+- **Data pipeline**: `LivePollJob` polls active games and ingests `pitchData` (plate location + strike zone height) into `live_pitch_events`. Postgame audit runs shortly after Final — no Savant CSV wait. `SavantDailyJob` still supplies pregame batter stats only.
+- **Backend**: pre-computes 12-count grids, triggers called-strike recommendations, runs `postgameAuditService` on Final/backfill, serves `GET /api/games/:gamePk/postgame-audit`.
 - **Engine**: unchanged — audit logic lives in `postgameAuditService` (not the engine).
-- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`, `/rankings`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with Savant missed badges. Rankings page: weekly + season, players + teams.
+- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`, `/rankings`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with zone missed badges. Rankings page: weekly + season, players + teams.
 
 **Missed value definition:** sum of `runExpectancySwing` for all `missedChallenge` rows — includes cases where the team was out of challenges (strategic miss from earlier bad challenges).
 

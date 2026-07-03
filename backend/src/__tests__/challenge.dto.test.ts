@@ -274,7 +274,7 @@ describe("toPostgameAuditResponseDto", () => {
         plateZ: 2,
         szTop: 3.5,
         szBot: 1.6,
-        savantZoneResult: "ball",
+        zoneResult: "ball",
         callWasProbablyWrong: true,
         liveRecommendation: "ALLOW",
         playerConfidence: 60,
@@ -299,7 +299,7 @@ describe("toPostgameAuditResponseDto", () => {
         plateZ: 2,
         szTop: 3.5,
         szBot: 1.6,
-        savantZoneResult: "ball",
+        zoneResult: "ball",
         callWasProbablyWrong: true,
         liveRecommendation: "AUTO_ALLOW",
         playerConfidence: 50,
@@ -317,7 +317,6 @@ describe("toPostgameAuditResponseDto", () => {
       "ready",
       new Date(),
       audits as unknown as PostgameChallengeAudit[],
-      null,
       { homeTeamId: 133, awayTeamId: 134 }
     );
     expect(dto.summary.totalMissedValue).toBeCloseTo(0.3);

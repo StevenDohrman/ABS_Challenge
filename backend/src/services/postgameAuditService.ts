@@ -1,64 +1,66 @@
 /**
  * Postgame challenge audit logic.
  *
- * Joins live pitch events + triggered recommendations with Savant location
- * data to evaluate missed challenges and bad allowed challenges.
+ * Joins live pitch events + triggered recommendations with MLB live feed
+ * pitch location data to evaluate missed challenges and bad allowed challenges.
  *
  * All zone/call logic lives here — the engine stays pure.
  */
 
-import type {
-  ChallengeRecommendation,
-  LivePitchEvent,
-  SavantPitchEvent,
-} from "@prisma/client";
-import type { SavantPitchRow } from "@abs/data-pipeline";
-import { CALLED_STRIKE_CALL_CODE } from "@abs/data-pipeline";
+import type { ChallengeRecommendation, LivePitchEvent } from "@prisma/client";
+import { CALLED_STRIKE_CALL_CODE, extractPitchLocationFromPlayEvent } from "@abs/data-pipeline";
 import {
-  upsertSavantPitchEvents,
-  findSavantPitchesForGame,
   upsertPostgameAudits,
   findAuditsForGame,
   type PostgameAuditInput,
-  type SavantZoneResult,
+  type ZoneResult,
   type OriginalCall,
 } from "../db/postgameAuditRepository";
-import { markSavantEnriched, incrementSavantEnrichmentAttempt } from "../db/gameRepository";
+import { markPostgameAudited } from "../db/gameRepository";
 import { applyPostgameAuditContributionsForGame } from "./rankingsIncrementalService";
 
-export type { SavantZoneResult, OriginalCall, PostgameAuditInput };
+export type { ZoneResult, OriginalCall, PostgameAuditInput };
 
+const PLATE_HALF_WIDTH_FT = 0.83;
 const POSITIVE_RECS = new Set(["AUTO_ALLOW", "ALLOW"]);
 const NEGATIVE_RECS = new Set(["DENY", "WARN"]);
 
-/** Savant zones 1–9 are in the strike zone; 11–14 are shadow/out-of-zone. */
-export function deriveSavantZoneResult(
-  zone: number | null,
+/** MLB zones 1–9 are in the strike zone; 11–14 are shadow/out-of-zone. */
+export function deriveMlbZoneResult(
+  mlbZone: number | null,
   plateX: number | null,
   plateZ: number | null,
-  szTop: number | null,
-  szBot: number | null
-): SavantZoneResult {
-  if (zone !== null) {
-    if (zone >= 1 && zone <= 9) return "strike";
-    if (zone >= 11 && zone <= 14) return "ball";
+  strikeZoneTop: number | null,
+  strikeZoneBottom: number | null
+): ZoneResult {
+  if (mlbZone !== null) {
+    if (mlbZone >= 1 && mlbZone <= 9) return "strike";
+    if (mlbZone >= 11 && mlbZone <= 14) return "ball";
   }
 
   if (
     plateX !== null &&
     plateZ !== null &&
-    szTop !== null &&
-    szBot !== null
+    strikeZoneTop !== null &&
+    strikeZoneBottom !== null
   ) {
-    const halfWidth = 0.83; // standard plate half-width in feet
     const inZone =
-      Math.abs(plateX) <= halfWidth &&
-      plateZ >= szBot &&
-      plateZ <= szTop;
+      Math.abs(plateX) <= PLATE_HALF_WIDTH_FT &&
+      plateZ >= strikeZoneBottom &&
+      plateZ <= strikeZoneTop;
     return inZone ? "strike" : "ball";
   }
 
   return "unknown";
+}
+
+function pitchHasLocation(pitch: LivePitchEvent): boolean {
+  return (
+    pitch.plateX !== null &&
+    pitch.plateZ !== null &&
+    pitch.strikeZoneTop !== null &&
+    pitch.strikeZoneBottom !== null
+  );
 }
 
 function mapLiveCall(callCode: string | null): OriginalCall {
@@ -73,34 +75,26 @@ function teamOverturnedChallenge(pitch: LivePitchEvent): boolean {
 
 export function buildAuditInput(
   pitch: LivePitchEvent,
-  recommendation: ChallengeRecommendation,
-  savant: SavantPitchEvent | null
+  recommendation: ChallengeRecommendation
 ): PostgameAuditInput | null {
   if (pitch.callCode !== CALLED_STRIKE_CALL_CODE) return null;
   if (recommendation.triggeredAt === null) return null;
 
   const notes: string[] = [];
-  if (!savant) {
-    notes.push("No matching Savant pitch row");
-  } else if (
-    savant.batterId !== pitch.batterId ||
-    savant.pitcherId !== pitch.pitcherId
-  ) {
-    notes.push("Savant row matched by index but batter/pitcher IDs differ");
+  if (!pitchHasLocation(pitch)) {
+    notes.push("No pitch location data in MLB live feed");
   }
 
-  const savantZoneResult = savant
-    ? deriveSavantZoneResult(
-        savant.zone,
-        savant.plateX,
-        savant.plateZ,
-        savant.szTop,
-        savant.szBot
-      )
-    : "unknown";
+  const zoneResult = deriveMlbZoneResult(
+    pitch.mlbZone,
+    pitch.plateX,
+    pitch.plateZ,
+    pitch.strikeZoneTop,
+    pitch.strikeZoneBottom
+  );
 
   const callWasProbablyWrong =
-    mapLiveCall(pitch.callCode) === "strike" && savantZoneResult === "ball";
+    mapLiveCall(pitch.callCode) === "strike" && zoneResult === "ball";
 
   const liveRecommendation = recommendation.recommendation;
   const shouldHaveChallenged =
@@ -120,7 +114,6 @@ export function buildAuditInput(
     pitchNumber: pitch.pitchNumber,
     pitchEventId: pitch.id,
     recommendationId: recommendation.id,
-    savantPitchEventId: savant?.id ?? null,
     inning: pitch.inning,
     halfInning: pitch.halfInning,
     balls: pitch.ballsBefore,
@@ -129,11 +122,11 @@ export function buildAuditInput(
     batterId: pitch.batterId,
     pitcherId: pitch.pitcherId,
     originalCall: mapLiveCall(pitch.callCode),
-    plateX: savant?.plateX ?? null,
-    plateZ: savant?.plateZ ?? null,
-    szTop: savant?.szTop ?? null,
-    szBot: savant?.szBot ?? null,
-    savantZoneResult,
+    plateX: pitch.plateX,
+    plateZ: pitch.plateZ,
+    szTop: pitch.strikeZoneTop,
+    szBot: pitch.strikeZoneBottom,
+    zoneResult,
     callWasProbablyWrong,
     liveRecommendation,
     playerConfidence: recommendation.minimumConfidenceRequired,
@@ -146,37 +139,60 @@ export function buildAuditInput(
   };
 }
 
-function indexSavantByAtBatIndex(
-  rows: SavantPitchEvent[]
-): Map<string, SavantPitchEvent> {
-  const map = new Map<string, SavantPitchEvent>();
-  for (const row of rows) {
-    map.set(`${row.atBatIndex}-${row.pitchNumber}`, row);
-  }
-  return map;
-}
+/**
+ * Backfill pitch location columns from stored rawPayload when live poll omitted pitchData.
+ */
+export async function enrichPitchLocationsFromRawPayload(
+  gamePk: number
+): Promise<number> {
+  const { prisma } = await import("../db/prisma");
+  const pitches = await prisma.livePitchEvent.findMany({
+    where: {
+      gamePk,
+      plateX: null,
+      plateZ: null,
+    },
+  });
 
-export async function persistSavantPitchesAndAudit(
-  gamePk: number,
-  pitches: SavantPitchRow[]
-): Promise<void> {
-  await upsertSavantPitchEvents(gamePk, pitches);
-  await auditGame(gamePk);
-  await markSavantEnriched(gamePk);
+  let updated = 0;
+  for (const pitch of pitches) {
+    const location = extractPitchLocationFromPlayEvent(pitch.rawPayload);
+    if (
+      location.plateX === undefined &&
+      location.plateZ === undefined &&
+      location.strikeZoneTop === undefined &&
+      location.strikeZoneBottom === undefined &&
+      location.mlbZone === undefined
+    ) {
+      continue;
+    }
+
+    await prisma.livePitchEvent.update({
+      where: { id: pitch.id },
+      data: {
+        plateX: location.plateX ?? null,
+        plateZ: location.plateZ ?? null,
+        strikeZoneTop: location.strikeZoneTop ?? null,
+        strikeZoneBottom: location.strikeZoneBottom ?? null,
+        mlbZone: location.mlbZone ?? null,
+      },
+    });
+    updated++;
+  }
+
+  return updated;
 }
 
 export async function auditGame(gamePk: number): Promise<number> {
   const { prisma } = await import("../db/prisma");
 
-  const [pitches, recommendations, savantRows] = await Promise.all([
+  const [pitches, recommendations] = await Promise.all([
     prisma.livePitchEvent.findMany({ where: { gamePk } }),
     prisma.challengeRecommendation.findMany({
       where: { gamePk, triggeredAt: { not: null } },
     }),
-    findSavantPitchesForGame(gamePk),
   ]);
 
-  const savantByKey = indexSavantByAtBatIndex(savantRows);
   const recByCount = new Map<string, ChallengeRecommendation>();
   for (const rec of recommendations) {
     recByCount.set(`${rec.atBatIndex}-${rec.balls}-${rec.strikes}`, rec);
@@ -190,9 +206,7 @@ export async function auditGame(gamePk: number): Promise<number> {
     );
     if (!rec) continue;
 
-    const savant =
-      savantByKey.get(`${pitch.atBatIndex}-${pitch.pitchNumber}`) ?? null;
-    const audit = buildAuditInput(pitch, rec, savant);
+    const audit = buildAuditInput(pitch, rec);
     if (audit) audits.push(audit);
   }
 
@@ -201,8 +215,14 @@ export async function auditGame(gamePk: number): Promise<number> {
   return audits.length;
 }
 
-export async function recordSavantEnrichmentAttempt(gamePk: number): Promise<void> {
-  await incrementSavantEnrichmentAttempt(gamePk);
+/** Run postgame audit for a Final game using MLB live feed pitch location data. */
+export async function runPostgameAudit(gamePk: number): Promise<void> {
+  await enrichPitchLocationsFromRawPayload(gamePk);
+  const count = await auditGame(gamePk);
+  await markPostgameAudited(gamePk);
+  console.log(
+    `[postgameAuditService] audit complete for game ${gamePk} (${count} rows)`
+  );
 }
 
 export { findAuditsForGame };

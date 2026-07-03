@@ -60,6 +60,43 @@ describe("parsePitchEvents", () => {
     expect(event.callDescription).toBe("Called Strike");
   });
 
+  it("extracts pitch location from pitchData", () => {
+    const play = buildPlay({
+      playEvents: [
+        buildPlayEvent({
+          pitchData: {
+            strikeZoneTop: 3.42,
+            strikeZoneBottom: 1.62,
+            zone: 13,
+            coordinates: { pX: 0.95, pZ: 2.08 },
+          },
+        }),
+      ],
+    });
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [play], currentPlay: play },
+        linescore: buildLinescore(),
+      },
+    });
+
+    const [event] = parsePitchEvents(feed, FETCHED_AT);
+    expect(event.plateX).toBe(0.95);
+    expect(event.plateZ).toBe(2.08);
+    expect(event.strikeZoneTop).toBe(3.42);
+    expect(event.strikeZoneBottom).toBe(1.62);
+    expect(event.mlbZone).toBe(13);
+  });
+
+  it("omits location fields when pitchData is absent", () => {
+    const [event] = parsePitchEvents(buildLiveFeedResponse(), FETCHED_AT);
+    expect(event.plateX).toBeUndefined();
+    expect(event.plateZ).toBeUndefined();
+    expect(event.strikeZoneTop).toBeUndefined();
+    expect(event.strikeZoneBottom).toBeUndefined();
+    expect(event.mlbZone).toBeUndefined();
+  });
+
   it("sets ballsBefore and strikesBefore to 0 for the first pitch of an at-bat", () => {
     const [event] = parsePitchEvents(buildLiveFeedResponse(), FETCHED_AT);
 
@@ -552,6 +589,79 @@ describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
 
     const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
     expect(historical.map((s) => s.outs)).toEqual([0, 1, 2]);
+  });
+
+  it("maps runners and score from play matchup and previous play result", () => {
+    const play0 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 0 },
+      count: buildCount({ outs: 0 }),
+      result: {
+        type: "atBat",
+        event: "Single",
+        eventType: "single",
+        description: "Single.",
+        rbi: 0,
+        homeScore: 0,
+        awayScore: 0,
+      },
+      matchup: {
+        ...buildPlay().matchup,
+        postOnFirst: { id: 111111, fullName: "Runner One", link: "/api/v1/people/111111" },
+      },
+    });
+    const play1 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 1 },
+      count: buildCount({ outs: 0 }),
+      result: {
+        type: "atBat",
+        event: "Single",
+        eventType: "single",
+        description: "Single scores runner.",
+        rbi: 1,
+        homeScore: 0,
+        awayScore: 1,
+      },
+      matchup: {
+        ...buildPlay().matchup,
+        postOnSecond: { id: 222222, fullName: "Runner Two", link: "/api/v1/people/222222" },
+      },
+    });
+    const play2 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 2, isComplete: false },
+      count: buildCount({ outs: 1 }),
+    });
+
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: {
+          allPlays: [play0, play1, play2],
+          currentPlay: play2,
+        },
+        linescore: buildLinescore({ inningHalf: "Top", isTopInning: true, outs: 1 }),
+      },
+    });
+
+    const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
+    expect(historical).toHaveLength(2);
+
+    expect(historical[0]).toMatchObject({
+      atBatIndex: 0,
+      runnerOnFirst: true,
+      runnerOnSecond: false,
+      runnerOnThird: false,
+      runnerIds: { first: 111111 },
+      homeScore: 0,
+      awayScore: 0,
+    });
+    expect(historical[1]).toMatchObject({
+      atBatIndex: 1,
+      runnerOnFirst: false,
+      runnerOnSecond: true,
+      runnerOnThird: false,
+      runnerIds: { second: 222222 },
+      homeScore: 0,
+      awayScore: 0,
+    });
   });
 });
 

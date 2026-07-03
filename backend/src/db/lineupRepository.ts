@@ -50,6 +50,13 @@ export async function upsertGameLineup(
   );
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {
+    for (const failure of failures) {
+      const reason = failure.reason;
+      console.error(
+        `[lineupRepository] lineup upsert failed for game ${entries[0]?.gamePk}:`,
+        reason
+      );
+    }
     console.error(
       `[lineupRepository] ${failures.length} of ${entries.length} lineup upserts failed`
     );

@@ -178,14 +178,27 @@ export const SITUATION = {
   INNING_LEVERAGE_MIN: 0.60,
 
   /** Leverage multiplier for inning 9 and beyond. */
-  INNING_LEVERAGE_MAX: 1.25,
+  INNING_LEVERAGE_MAX: 1.45,
 
   // ── Walk-off bonus ────────────────────────────────────────────────────────
   // Applied when the home team is batting in the 9th or later while trailing
   // or tied — any run could end the game.
 
   /** Added to inning leverage in walk-off territory. */
-  WALK_OFF_BONUS: 0.10,
+  WALK_OFF_BONUS: 0.20,
+
+  // ── Late-inning challenge urgency ─────────────────────────────────────────
+  // Use-it-or-lose-it: with challenges left in the final inning(s), borderline
+  // wrong calls are worth spending a challenge on before the game ends.
+
+  /** Inning at or after which unused challenges incur an urgency multiplier. */
+  LATE_INNING_CHALLENGE_URGENCY: 9,
+
+  /** Multiplier bonus when 2+ challenges remain (full allotment). */
+  CHALLENGE_URGENCY_BONUS_WITH_TWO: 0.28,
+
+  /** Multiplier bonus when exactly 1 challenge remains. */
+  CHALLENGE_URGENCY_BONUS_WITH_ONE: 0.18,
 
   /**
    * Maximum run deficit for the home team to qualify for the walk-off bonus.
@@ -223,7 +236,7 @@ export const SITUATION = {
   WEIGHT_MIN: 0.30,
 
   /** Maximum combined situation weight (caps the leverage in peak scenarios). */
-  WEIGHT_MAX: 1.50,
+  WEIGHT_MAX: 1.90,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -260,7 +273,7 @@ export const SCARCITY = {
   // ── Scarce adjustments (1 challenge remaining) ────────────────────────────
 
   /** Points added to every recommendation score threshold when scarce. */
-  SCARCE_THRESHOLD_SHIFT: 20,
+  SCARCE_THRESHOLD_SHIFT: 14,
 
   /** Points added to minimum confidence required when scarce. */
   SCARCE_CONFIDENCE_SHIFT: 15,
@@ -277,13 +290,13 @@ export const SCORING = {
    * An EV below this produces a score under 50, which combined with scarcity
    * threshold shifts can push the result into DENY territory.
    */
-  BREAK_EVEN_EV: 0.04,
+  BREAK_EVEN_EV: 0.025,
 
   /**
    * The additional EV above BREAK_EVEN_EV needed to reach a score of 100.
-   * An EV of (BREAK_EVEN_EV + SCALE_EV) = 0.30 maps to score 100.
+   * An EV of (BREAK_EVEN_EV + SCALE_EV) = 0.245 maps to score 100.
    */
-  SCALE_EV: 0.26,
+  SCALE_EV: 0.22,
 
   /** The score value representing exactly break-even EV. Center of the scale. */
   MIDPOINT: 50,
@@ -412,10 +425,10 @@ export const THRESHOLDS = {
   AUTO_ALLOW: 75,
 
   /** Score at or above which the engine recommends ALLOW (below AUTO_ALLOW). */
-  ALLOW: 55,
+  ALLOW: 50,
 
   /** Score at or above which the engine recommends WARN (below ALLOW). */
-  WARN: 30,
+  WARN: 28,
 
   // ── Minimum confidence required — ALLOW zone ─────────────────────────────
   // Confidence interpolates linearly from ENTRY (at the ALLOW/WARN boundary)

@@ -16,9 +16,9 @@ export function HowItWorksPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-mono uppercase tracking-widest text-white/40">Postgame audit</h2>
         <ol className="list-decimal list-inside space-y-2 text-white/60 text-sm leading-relaxed">
-          <li>After a game goes Final, Savant pitch data is fetched (with retries).</li>
-          <li>Called strikes with triggered recommendations are joined to Statcast locations.</li>
-          <li>Missed opportunities are flagged when we recommended ALLOW but Savant says ball.</li>
+          <li>After a game goes Final, pitch location from the MLB live feed is used for audit.</li>
+          <li>Called strikes with triggered recommendations are checked against plate-crossing coordinates.</li>
+          <li>Missed opportunities are flagged when we recommended ALLOW but the pitch was out of zone.</li>
           <li>Total missed value sums expected run value across all missed challenges.</li>
         </ol>
       </section>

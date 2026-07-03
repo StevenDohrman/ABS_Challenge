@@ -8,12 +8,13 @@ async function main(): Promise<void> {
     console.error("[server] unhandled promise rejection:", reason);
   });
 
-  // Start the live polling pipeline and daily Savant job.
-  await startOrchestrator();
-
+  // Listen immediately — orchestrator startup (final backfill, rankings catch-up)
+  // can take several minutes and must not block HTTP.
   app.listen(PORT, () => {
     console.log(`[server] listening on http://localhost:${PORT}`);
   });
+
+  await startOrchestrator();
 }
 
 main().catch((err) => {

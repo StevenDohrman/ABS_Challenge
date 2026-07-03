@@ -11,14 +11,13 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, SavantPitchRow, ActiveGame, GameLineupEntry } from "@abs/data-pipeline";
-import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, ActiveGame, GameLineupEntry } from "@abs/data-pipeline";
+import { upsertGame, markGameFinal, markGameIngested, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
 import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
 import { upsertGameLineup } from "../db/lineupRepository";
 import { recordNamesFromPitchRow } from "../db/playerNameRepository";
-import { persistSavantPitchesAndAudit, recordSavantEnrichmentAttempt } from "./postgameAuditService";
 import {
   applyPitchReviewContribution,
   trackTeamGameAppearances,
@@ -66,6 +65,7 @@ export async function reconcileChallengeCounts(): Promise<void> {
 export async function handleGameOver(gamePk: number): Promise<void> {
   try {
     await markGameFinal(gamePk);
+    await markGameIngested(gamePk);
     console.log(`[ingestService] game ${gamePk} marked Final`);
   } catch (err) {
     console.error(
@@ -235,52 +235,45 @@ export async function handleSprintSpeed(
 
 /**
  * Persist batting order from the MLB live feed boxscore.
+ * Waits briefly for the games row — lineup updates can arrive before gameDiscovered finishes.
  */
 export async function handleLineupUpdate(
   entries: GameLineupEntry[]
 ): Promise<void> {
+  if (entries.length === 0) return;
+
+  const gamePk = entries[0].gamePk;
+  const gameReady = await waitForGameRow(gamePk);
+  if (!gameReady) {
+    console.warn(
+      `[ingestService] skipping lineup update — game ${gamePk} not in DB after wait`
+    );
+    return;
+  }
+
   try {
     await upsertGameLineup(entries);
   } catch (err) {
-    console.error("[ingestService] failed to upsert game lineup:", err);
+    console.error(
+      `[ingestService] failed to upsert game lineup for game ${gamePk}:`,
+      err
+    );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Savant postgame events
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Persist Savant pitch rows and run postgame challenge audits for a Final game.
- */
-export async function handleSavantPostgamePitches(
+/** Wait for the games FK parent row (gameDiscovered may still be in flight). */
+async function waitForGameRow(
   gamePk: number,
-  pitches: SavantPitchRow[]
-): Promise<void> {
-  try {
-    console.log(
-      `[ingestService] upserting ${pitches.length} Savant pitches for game ${gamePk}`
-    );
-    await persistSavantPitchesAndAudit(gamePk, pitches);
-    console.log(`[ingestService] postgame audit complete for game ${gamePk}`);
-  } catch (err) {
-    console.error(
-      `[ingestService] failed postgame Savant ingest for game ${gamePk}:`,
-      err
-    );
+  maxAttempts = 15,
+  delayMs = 100
+): Promise<boolean> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (await findGame(gamePk)) return true;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
+  return false;
 }
 
-/**
- * Record a failed/not-ready Savant fetch attempt (orchestrator uses for retries).
- */
-export async function handleSavantPostgameNotReady(gamePk: number): Promise<void> {
-  try {
-    await recordSavantEnrichmentAttempt(gamePk);
-  } catch (err) {
-    console.error(
-      `[ingestService] failed to record Savant attempt for game ${gamePk}:`,
-      err
-    );
-  }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Postgame audit (triggered when game goes Final)
+// ─────────────────────────────────────────────────────────────────────────────
