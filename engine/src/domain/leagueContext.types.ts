@@ -59,7 +59,7 @@ export interface LeagueAverages {
 
   /**
    * League wOBA for the average MLB batter. Used for lineup context multiplier.
-   * Falls back to LINEUP.LEAGUE_AVG_WOBA in constants when omitted.
+   * Falls back to LINEUP.LEAGUE_AVG_WOBA when omitted by the backend.
    */
-  woba?: number;
+  woba: number;
 }

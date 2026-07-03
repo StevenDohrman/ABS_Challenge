@@ -2,10 +2,8 @@ import { GameStateContext } from "./gameContext.types";
 import { PlayerChallengeContext } from "./playerContext.types";
 import { PitchCallContext } from "./pitchContext.types";
 import { LeagueAverages } from "./leagueContext.types";
-import {
-  BaserunningContextInput,
-  LineupContextInput,
-} from "./lineupContext.types";
+import { BaserunningContextInput } from "./baserunningContext.types";
+import { LineupContextInput } from "./lineupContext.types";
 
 export type ChallengeRecommendation = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 
@@ -37,6 +35,9 @@ export interface ChallengeDecisionInput {
   /**
    * Expected runs for the rest of the inning at the current count and base/out state.
    * This is the "do nothing, accept the call" baseline.
+   *
+   * Validated against computeChallengeOutcomeExpectancies() at decideChallenge entry
+   * to catch caller inconsistencies before scoring.
    */
   currentRunExpectancy: number;
 

@@ -49,6 +49,7 @@ import { PitchCallContext } from "../domain/pitchContext.types";
 import { GameStateContext } from "../domain/gameContext.types";
 import { LeagueAverages } from "../domain/leagueContext.types";
 import { CREDIBILITY } from "../constants";
+import { clamp } from "../utils/clamp";
 
 // ---------------------------------------------------------------------------
 // Total weight denominator — sum of all four signal weights (must equal 1.0)
@@ -302,7 +303,3 @@ function computeHistoricalBlendWeight(player: PlayerChallengeContext): number {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}

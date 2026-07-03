@@ -1,44 +1,11 @@
 import { computePlayerCredibility } from "../features/playerCredibility";
 import { PlayerChallengeContext } from "../domain/playerContext.types";
 import { PitchCallContext } from "../domain/pitchContext.types";
-import { GameStateContext } from "../domain/gameContext.types";
-import { LeagueAverages } from "../domain/leagueContext.types";
-import { CREDIBILITY, LEAGUE_AVERAGES } from "../constants";
+import { CREDIBILITY } from "../constants";
+import { makeGameState } from "./fixtures/gameState";
+import { defaultLeague } from "./fixtures/league";
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-// Default league averages (compile-time constants) passed explicitly so tests
-// remain deterministic and don't silently pick up constant changes.
-const defaultLeague: LeagueAverages = {
-  chaseRate:     LEAGUE_AVERAGES.CHASE_RATE,
-  walkRate:      LEAGUE_AVERAGES.WALK_RATE,
-  strikeoutRate: LEAGUE_AVERAGES.STRIKEOUT_RATE,
-  whiffRate:     LEAGUE_AVERAGES.WHIFF_RATE,
-  ops:           LEAGUE_AVERAGES.OPS,
-};
-
-const baseGameState: GameStateContext = {
-  gamePk: 1,
-  inning: 5,
-  halfInning: "top",
-  balls: 1,
-  strikes: 1,
-  outs: 1,
-  runnerOnFirst: false,
-  runnerOnSecond: false,
-  runnerOnThird: false,
-  homeScore: 3,
-  awayScore: 3,
-  runDifferentialForBattingTeam: 0,
-  battingTeamId: 1,
-  fieldingTeamId: 2,
-  batterId: 100,
-  pitcherId: 200,
-  challengesRemaining: 3,
-};
-
+const baseGameState = makeGameState();
 const basePitchContext: PitchCallContext = {
   callType: "called_strike",
   pitcherHandedness: "R",

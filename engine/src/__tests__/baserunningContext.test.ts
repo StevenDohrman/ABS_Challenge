@@ -1,29 +1,16 @@
 import { computeBaserunningContext } from "../features/baserunningContext";
-import { GameStateContext } from "../domain/gameContext.types";
-import { BaserunningContextInput } from "../domain/lineupContext.types";
+import { BaserunningContextInput } from "../domain/baserunningContext.types";
 import { BASEBALL_RULES } from "../constants";
+import { makeGameState as baseGameState } from "./fixtures/gameState";
 
-function makeGameState(overrides: Partial<GameStateContext> = {}): GameStateContext {
-  return {
-    gamePk: 1,
-    inning: 5,
-    halfInning: "top",
+function makeGameState(overrides: Parameters<typeof baseGameState>[0] = {}) {
+  return baseGameState({
     balls: 3,
     strikes: 1,
-    outs: 1,
-    runnerOnFirst: false,
-    runnerOnSecond: false,
-    runnerOnThird: false,
     homeScore: 0,
     awayScore: 0,
-    runDifferentialForBattingTeam: 0,
-    battingTeamId: 1,
-    fieldingTeamId: 2,
-    batterId: 100,
-    pitcherId: 200,
-    challengesRemaining: 2,
     ...overrides,
-  };
+  });
 }
 
 function makeBaserunning(

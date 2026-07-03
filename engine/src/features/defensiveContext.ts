@@ -35,6 +35,7 @@
 
 import { PlayerChallengeContext } from "../domain/playerContext.types";
 import { DEFENSIVE } from "../constants";
+import { clamp } from "../utils/clamp";
 
 // ---------------------------------------------------------------------------
 // Output type
@@ -111,7 +112,3 @@ export function computeDefensiveContext(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}

@@ -23,6 +23,7 @@
 
 import { GameStateContext } from "../domain/gameContext.types";
 import { BASEBALL_RULES, SITUATION } from "../constants";
+import { clamp } from "../utils/clamp";
 
 // ---------------------------------------------------------------------------
 // Output type
@@ -171,7 +172,3 @@ function computeChallengeUrgency(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}

@@ -110,6 +110,10 @@ function computeMinConfidence(
 
     case "ALLOW": {
       const zoneWidth = thresholds.autoAllow - thresholds.allow;
+      if (zoneWidth <= 0) {
+        base = THRESHOLDS.ALLOW_CONFIDENCE_EXIT;
+        break;
+      }
       const positionInZone = score - thresholds.allow;
       const confidenceRange =
         THRESHOLDS.ALLOW_CONFIDENCE_ENTRY - THRESHOLDS.ALLOW_CONFIDENCE_EXIT;
@@ -122,6 +126,10 @@ function computeMinConfidence(
 
     case "WARN": {
       const zoneWidth = thresholds.allow - thresholds.warn;
+      if (zoneWidth <= 0) {
+        base = THRESHOLDS.WARN_CONFIDENCE_EXIT;
+        break;
+      }
       const positionInZone = score - thresholds.warn;
       const confidenceRange =
         THRESHOLDS.WARN_CONFIDENCE_ENTRY - THRESHOLDS.WARN_CONFIDENCE_EXIT;

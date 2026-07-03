@@ -1,3 +1,5 @@
+import { Balls, Outs, Strikes } from "./baseball.types";
+
 /**
  * The state of the game at the moment of a challenge decision.
  *
@@ -6,6 +8,7 @@
  * represent the count BEFORE the pitch was thrown, not the count after.
  */
 export interface GameStateContext {
+  /** Backend correlation ID — not read by the engine. */
   gamePk: number;
 
   inning: number;
@@ -15,15 +18,15 @@ export interface GameStateContext {
    * Ball count BEFORE this pitch. Range: 0–3.
    * The challenge decision is made before the outcome of the pitch is recorded.
    */
-  balls: number;
+  balls: Balls;
 
   /**
    * Strike count BEFORE this pitch. Range: 0–2.
    * The challenge decision is made before the outcome of the pitch is recorded.
    */
-  strikes: number;
+  strikes: Strikes;
 
-  outs: number;
+  outs: Outs;
 
   runnerOnFirst: boolean;
   runnerOnSecond: boolean;
@@ -38,6 +41,7 @@ export interface GameStateContext {
    */
   runDifferentialForBattingTeam: number;
 
+  /** Backend correlation IDs — not read by the engine. */
   battingTeamId: number;
   fieldingTeamId: number;
 
