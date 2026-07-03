@@ -21,33 +21,20 @@
  * If OPS is null but OBP is available, OBP is used as a proxy (scaled to an
  * approximate OPS equivalent). If neither is available, the multiplier is 1.00
  * (no adjustment — the RE table's league-average assumption is left unchanged).
- *
- * The adjustment is intentionally small (±15% maximum) because:
- *   - The RE delta already captures the structural value of the situation.
- *   - Batter quality effects are partially embedded in team run environments.
- *   - Overcorrecting for batter quality could mask the situational signal.
  */
 
 import { PlayerChallengeContext } from "../domain/playerContext.types";
 import { LeagueAverages } from "../domain/leagueContext.types";
-import { CREDIBILITY } from "../constants";
-
-// OBP roughly correlates with OPS at about 1.8× (OPS ≈ OBP × 1.8 on average).
-// Used to approximate OPS when only OBP is available.
-const OBP_TO_OPS_SCALE = 1.8;
+import { OFFENSIVE } from "../constants";
+import { scaleMultiplier } from "../utils/clamp";
+import { OBP_TO_OPS_SCALE } from "../utils/conversion";
 
 // ---------------------------------------------------------------------------
 // Output type
 // ---------------------------------------------------------------------------
 
 export interface OffensiveValueResult {
-  /**
-   * Multiplier applied to the RE delta.
-   * Clamped to [OFFENSIVE_VALUE_MIN_MULTIPLIER, OFFENSIVE_VALUE_MAX_MULTIPLIER].
-   */
   multiplier: number;
-
-  /** Whether OPS was available (true) or estimated from OBP / defaulted (false). */
   opsWasAvailable: boolean;
 }
 
@@ -55,14 +42,6 @@ export interface OffensiveValueResult {
 // Main function
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a multiplier reflecting how much more (or less) valuable it is to
- * keep this specific batter's at-bat alive, relative to a league-average batter.
- *
- * @param league - Current-season league averages. The batter's OPS is compared
- *   against league.ops so the baseline reflects the current season, not a
- *   historical constant.
- */
 export function computeOffensiveValue(
   player: PlayerChallengeContext,
   league: LeagueAverages
@@ -75,16 +54,12 @@ export function computeOffensiveValue(
 
   const deviation = effectiveOps - league.ops;
 
-  // Scale: each 0.100 OPS above/below average shifts the multiplier by ~0.05.
-  // So a .900 OPS batter (0.172 above avg) → multiplier ≈ 1.086.
-  // A .600 OPS batter (0.128 below avg) → multiplier ≈ 0.936.
-  const rawMultiplier = 1.0 + deviation * 0.50;
-
   return {
-    multiplier: clamp(
-      rawMultiplier,
-      CREDIBILITY.OFFENSIVE_VALUE_MIN_MULTIPLIER,
-      CREDIBILITY.OFFENSIVE_VALUE_MAX_MULTIPLIER
+    multiplier: scaleMultiplier(
+      deviation,
+      OFFENSIVE.OPS_DEVIATION_SCALE,
+      OFFENSIVE.MIN_MULTIPLIER,
+      OFFENSIVE.MAX_MULTIPLIER
     ),
     opsWasAvailable: player.ops !== null,
   };
@@ -94,16 +69,8 @@ export function computeOffensiveValue(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the batter's OPS (or a proxy from OBP) for the multiplier calculation.
- * Returns null if neither OPS nor OBP is available.
- */
 function resolveOps(player: PlayerChallengeContext): number | null {
   if (player.ops !== null) return player.ops;
   if (player.obp !== null) return player.obp * OBP_TO_OPS_SCALE;
   return null;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

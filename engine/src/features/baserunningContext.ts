@@ -12,8 +12,9 @@
  */
 
 import { GameStateContext } from "../domain/gameContext.types";
-import { BaserunningContextInput } from "../domain/lineupContext.types";
+import { BaserunningContextInput } from "../domain/baserunningContext.types";
 import { BASEBALL_RULES, BASERUNNING } from "../constants";
+import { clamp } from "../utils/clamp";
 
 export interface BaserunningContextResult {
   multiplier: number;
@@ -166,8 +167,4 @@ function describeNote(
   }
 
   return multiplier > 1 ? "fast_batter" : "slow_batter";
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

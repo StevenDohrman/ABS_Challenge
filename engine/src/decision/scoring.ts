@@ -19,7 +19,7 @@
  * through hard gates) when low EV combined with scarcity threshold shifts
  * pushes the score below the effective WARN threshold.
  *
- * All tunable values live in SCORING in constants.ts.
+ * All tunable values live in SCORING in engine/src/constants/scoring.ts.
  */
 
 import { SCORING } from "../constants";

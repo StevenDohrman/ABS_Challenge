@@ -2,10 +2,8 @@ import { GameStateContext } from "./gameContext.types";
 import { PlayerChallengeContext } from "./playerContext.types";
 import { PitchCallContext } from "./pitchContext.types";
 import { LeagueAverages } from "./leagueContext.types";
-import {
-  BaserunningContextInput,
-  LineupContextInput,
-} from "./lineupContext.types";
+import { BaserunningContextInput } from "./baserunningContext.types";
+import { LineupContextInput } from "./lineupContext.types";
 
 export type ChallengeRecommendation = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 
@@ -26,8 +24,8 @@ export interface ChallengeDecisionInput {
    * Current-season league averages used as baselines for batter comparisons.
    *
    * Computed by the data pipeline's weekly league-average job and supplied by
-   * the backend. Overrides the compile-time constants in constants.ts field by
-   * field — any field not provided falls back to the constant automatically.
+   * the backend. Overrides compile-time constants in engine/src/constants/
+   * field by field — any field not provided falls back via resolveLeagueAverages().
    *
    * Omit entirely (or pass undefined) to use compile-time constants only.
    * This keeps the engine fully functional in tests and offline scenarios.
@@ -37,6 +35,9 @@ export interface ChallengeDecisionInput {
   /**
    * Expected runs for the rest of the inning at the current count and base/out state.
    * This is the "do nothing, accept the call" baseline.
+   *
+   * Validated against computeChallengeOutcomeExpectancies() at decideChallenge entry
+   * to catch caller inconsistencies before scoring.
    */
   currentRunExpectancy: number;
 

@@ -104,11 +104,12 @@ export interface PlayerChallengeContext {
    * multiplier defaults to 1.0× (no adjustment).
    */
   sprayProfile: {
-    /** Fraction of batted balls pulled (0–1). */
+    /**
+     * Pull/straightaway/oppo rates are backend metadata for future spray-zone
+     * features. V1 defensive logic uses only GB/FB/LD below.
+     */
     pullPercent: number | null;
-    /** Fraction of batted balls hit straightaway (0–1). */
     straightawayPercent: number | null;
-    /** Fraction of batted balls hit opposite field (0–1). */
     oppoPercent: number | null;
     /** Fraction of batted balls that are ground balls (0–1). */
     gbPercent: number | null;

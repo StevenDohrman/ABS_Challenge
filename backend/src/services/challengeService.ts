@@ -25,6 +25,7 @@ import {
   decideChallenge,
   computeChallengeOutcomeExpectancies,
   buildDueUpWindow,
+  toOuts,
   type GameStateContext,
   type PitchCallContext,
   type ChallengeDecisionInput,
@@ -146,7 +147,7 @@ export async function precomputeAtBatRecommendations(
   const lineupPlayerIds = buildDueUpWindow(
     battingOrder,
     snapshot.batterId,
-    snapshot.outs
+    toOuts(snapshot.outs)
   );
 
   const lineupStatRows = await findPlayerStatSnapshotBatch(
@@ -196,7 +197,7 @@ export async function precomputeAtBatRecommendations(
         halfInning: snapshot.halfInning,
         balls,
         strikes,
-        outs: snapshot.outs,
+        outs: toOuts(snapshot.outs),
         runnerOnFirst: snapshot.runnerOnFirst,
         runnerOnSecond: snapshot.runnerOnSecond,
         runnerOnThird: snapshot.runnerOnThird,
@@ -211,9 +212,9 @@ export async function precomputeAtBatRecommendations(
       };
 
       const reValues = computeChallengeOutcomeExpectancies(
-        snapshot.outs,
-        balls,
-        strikes,
+        gameState.outs,
+        gameState.balls,
+        gameState.strikes,
         runners
       );
 

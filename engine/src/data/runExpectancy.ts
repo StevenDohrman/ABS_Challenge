@@ -21,6 +21,7 @@
  */
 
 import { BASEBALL_RULES } from "../constants";
+import { Balls, Outs, Strikes } from "../domain/baseball.types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -220,9 +221,9 @@ function strikeoutRE(outs: number, runners: Runners): number {
  * @param runners      Which bases are occupied.
  */
 export function computeChallengeOutcomeExpectancies(
-  outs: number,
-  ballsBefore: number,
-  strikesBefore: number,
+  outs: Outs,
+  ballsBefore: Balls,
+  strikesBefore: Strikes,
   runners: Runners
 ): ChallengeOutcomeExpectancies {
   const baseRE = lookupBaseRE(outs, runners);

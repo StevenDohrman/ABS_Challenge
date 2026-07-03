@@ -1,34 +1,5 @@
 import { computeSituationWeight } from "../features/situationWeight";
-import { GameStateContext } from "../domain/gameContext.types";
-
-// ---------------------------------------------------------------------------
-// Fixture factory
-// ---------------------------------------------------------------------------
-
-function makeGameState(
-  overrides: Partial<GameStateContext> = {}
-): GameStateContext {
-  return {
-    gamePk: 1,
-    inning: 5,
-    halfInning: "top",
-    balls: 0,
-    strikes: 0,
-    outs: 0,
-    runnerOnFirst: false,
-    runnerOnSecond: false,
-    runnerOnThird: false,
-    homeScore: 3,
-    awayScore: 3,
-    runDifferentialForBattingTeam: 0,
-    battingTeamId: 1,
-    fieldingTeamId: 2,
-    batterId: 100,
-    pitcherId: 200,
-    challengesRemaining: 3,
-    ...overrides,
-  };
-}
+import { makeGameState } from "./fixtures/gameState";
 
 // ---------------------------------------------------------------------------
 // Tests

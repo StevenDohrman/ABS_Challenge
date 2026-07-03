@@ -35,30 +35,28 @@ import { SCARCITY } from "../constants";
 // ---------------------------------------------------------------------------
 
 export interface ChallengeScarcityResult {
-  /** How many challenges remain. */
   challengesRemaining: number;
 
   /**
    * How many points to ADD to score thresholds.
-   * A positive shift makes it harder to reach AUTO_ALLOW, ALLOW, or WARN.
    *
-   *   2+ challenges:  0  (no penalty — a full allotment, spend freely)
-   *   1 challenge:   20  (significant caution — save it for a great spot)
-   *   0 challenges:   0  (no penalty — show the call's raw value for auditing)
+   *   2+ challenges:   0  (full allotment — spend freely)
+   *   moderate tier:  8  (between scarce and plenty; unreachable with 2-challenge allotment)
+   *   1 challenge:  14  (significant caution)
+   *   0 challenges:   0  (no penalty — audit raw value)
    */
   thresholdShift: number;
 
   /**
    * How many points to ADD to the minimum confidence required.
-   * Stacks on top of the base confidence from the score.
    *
-   *   2+ challenges:  0
-   *   1 challenge:   15
-   *   0 challenges:   0  (no penalty — show the call's raw value for auditing)
+   *   2+ challenges:   0
+   *   moderate tier:  5
+   *   1 challenge:  15
+   *   0 challenges:   0
    */
   confidenceShift: number;
 
-  /** Convenience label for explanation generation. */
   scarcityLevel: "plenty" | "moderate" | "scarce" | "none";
 }
 
@@ -69,8 +67,11 @@ export interface ChallengeScarcityResult {
 /**
  * Computes the scarcity profile for the given number of challenges remaining.
  *
- * 0 (or fewer) returns the "none" level with no shifts; the recommendation
- * remains value-based and availability is handled outside the engine.
+ * Tier order (highest remaining first):
+ *   plenty   — remaining >= PLENTY_MIN_CHALLENGES (2 under current ABS rules)
+ *   moderate — remaining between SCARCE and PLENTY (unreachable when allotment is 2)
+ *   scarce   — exactly SCARCE_CHALLENGES (1)
+ *   none     — remaining <= 0
  */
 export function computeChallengeScarcity(
   challengesRemaining: number
@@ -93,20 +94,20 @@ export function computeChallengeScarcity(
     };
   }
 
-  if (challengesRemaining === SCARCITY.MODERATE_CHALLENGES) {
+  if (challengesRemaining === SCARCITY.SCARCE_CHALLENGES) {
     return {
       challengesRemaining,
-      thresholdShift: SCARCITY.MODERATE_THRESHOLD_SHIFT,
-      confidenceShift: SCARCITY.MODERATE_CONFIDENCE_SHIFT,
-      scarcityLevel: "moderate",
+      thresholdShift: SCARCITY.SCARCE_THRESHOLD_SHIFT,
+      confidenceShift: SCARCITY.SCARCE_CONFIDENCE_SHIFT,
+      scarcityLevel: "scarce",
     };
   }
 
-  // SCARCITY.SCARCE_CHALLENGES (1) remaining
+  // Between scarce and plenty — active when allotment exceeds PLENTY_MIN.
   return {
     challengesRemaining,
-    thresholdShift: SCARCITY.SCARCE_THRESHOLD_SHIFT,
-    confidenceShift: SCARCITY.SCARCE_CONFIDENCE_SHIFT,
-    scarcityLevel: "scarce",
+    thresholdShift: SCARCITY.MODERATE_THRESHOLD_SHIFT,
+    confidenceShift: SCARCITY.MODERATE_CONFIDENCE_SHIFT,
+    scarcityLevel: "moderate",
   };
 }

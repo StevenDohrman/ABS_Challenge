@@ -75,7 +75,6 @@ import {
   ChallengeDecisionInput,
   ChallengeDecision,
 } from "../domain/challengeDecision.types";
-import { LeagueAverages } from "../domain/leagueContext.types";
 import { computePlayerCredibility } from "../features/playerCredibility";
 import { computeOffensiveValue } from "../features/offensiveValue";
 import { computeDefensiveContext } from "../features/defensiveContext";
@@ -86,48 +85,66 @@ import { computeChallengeScarcity } from "../features/challengeScarcity";
 import { normalizeScore } from "./scoring";
 import { applyThresholds } from "./thresholds";
 import { buildExplanation } from "./explanation";
-import { LEAGUE_AVERAGES } from "../constants";
+import { resolveLeagueAverages } from "../utils/leagueAverages";
+import { validateChallengeDecisionInput } from "../validation/validateInput";
+import { PipelineContext } from "./pipeline.types";
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecision {
-  // ── Step 1: Hard gate ───────────────────────────────────────────────────────
-  // Only a non-challengeable call type short-circuits with a zero value, because
-  // the expected value of challenging is structurally undefined there.
-  //
-  // Being out of challenges is deliberately NOT a gate: the recommendation is
-  // value-based regardless of how many challenges remain, so the system can
-  // surface high-value calls a team could not challenge (a "missed opportunity").
-  // Whether the team can actually challenge is recorded separately by the backend.
-
   if (input.pitchContext.callType !== "called_strike") {
     return hardDeny(
       `Call type "${input.pitchContext.callType}" is not a challengeable called strike.`
     );
   }
 
-  // ── Step 1b: Resolve league averages ───────────────────────────────────────
-  // Merge caller-supplied values over compile-time constants. Any field the
-  // backend omits falls back to the constant — this keeps the engine functional
-  // in tests and offline scenarios with no DB connection.
+  validateChallengeDecisionInput(input);
 
+  const pipeline = runPipeline(input);
+
+  const explanation = buildExplanation({
+    recommendation: pipeline.thresholdResult.recommendation,
+    score: pipeline.score,
+    reDelta: pipeline.reDelta,
+    adjustedEV: pipeline.adjustedEV,
+    credibility: pipeline.credibility,
+    baserunning: pipeline.baserunning,
+    lineupContext: pipeline.lineupContext,
+    situation: pipeline.situation,
+    scarcity: pipeline.scarcity,
+    thresholdResult: pipeline.thresholdResult,
+    balls: input.gameState.balls,
+    strikes: input.gameState.strikes,
+    inning: input.gameState.inning,
+    halfInning: input.gameState.halfInning,
+  });
+
+  return {
+    recommendation: pipeline.thresholdResult.recommendation,
+    score: pipeline.score,
+    expectedValueOfChallenge: pipeline.adjustedEV,
+    minimumPlayerConfidenceRequired:
+      pipeline.thresholdResult.minimumPlayerConfidenceRequired,
+    explanation,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline stages
+// ---------------------------------------------------------------------------
+
+function runPipeline(input: ChallengeDecisionInput): PipelineContext {
   const league = resolveLeagueAverages(input.leagueAverages);
-
-  // ── Step 2: Run expectancy delta ────────────────────────────────────────────
 
   const reDelta =
     input.runExpectancyIfSuccessful - input.runExpectancyIfFailed;
-
-  // ── Step 2b: Baserunning multiplier (walk paths only) ─────────────────────
 
   const baserunning = computeBaserunningContext(
     input.gameState,
     input.baserunningContext
   );
-
-  // ── Step 3: Player credibility  →  P(call was wrong) ───────────────────────
 
   const credibility = computePlayerCredibility(
     input.playerContext,
@@ -136,25 +153,11 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
     league
   );
 
-  // ── Step 4: Offensive value multiplier ─────────────────────────────────────
-  // Scale the RE delta by how valuable this specific batter is relative to a
-  // league-average batter. Null OPS/OBP → multiplier of 1.0 (no adjustment).
-
   const offensiveValue = computeOffensiveValue(input.playerContext, league);
-
-  // ── Step 4c: Lineup context multiplier ──────────────────────────────────────
-  // Value of extending the inning for upcoming hitters in the due-up window.
 
   const lineupContext = computeLineupContext(input.lineupContext, league);
 
-  // ── Step 4b: Defensive context multiplier ───────────────────────────────────
-  // Small ±10% spray-based correction. GB-heavy batters generate more infield
-  // outs (slight penalty); LD/FB-heavy batters have higher BABIP (slight bonus).
-  // Null spray profile → 1.0× (no adjustment — same behaviour as pre-v1).
-
   const defensiveContext = computeDefensiveContext(input.playerContext);
-
-  // ── Step 5: Raw expected value ──────────────────────────────────────────────
 
   const rawEV =
     credibility.pCallWasWrong *
@@ -164,46 +167,27 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
     lineupContext.multiplier *
     defensiveContext.multiplier;
 
-  // ── Step 6: Situation weight ────────────────────────────────────────────────
-
   const situation = computeSituationWeight(input.gameState);
   const adjustedEV = rawEV * situation.weight;
-
-  // ── Step 7: Score normalization ─────────────────────────────────────────────
-
   const score = normalizeScore(adjustedEV);
-
-  // ── Step 8: Scarcity + thresholds ──────────────────────────────────────────
 
   const scarcity = computeChallengeScarcity(input.gameState.challengesRemaining);
   const thresholdResult = applyThresholds(score, scarcity);
 
-  // ── Step 9: Explanation ─────────────────────────────────────────────────────
-
-  const explanation = buildExplanation({
-    recommendation: thresholdResult.recommendation,
-    score,
+  return {
+    league,
     reDelta,
-    adjustedEV,
     credibility,
     baserunning,
+    offensiveValue,
     lineupContext,
+    defensiveContext,
+    rawEV,
     situation,
+    adjustedEV,
+    score,
     scarcity,
     thresholdResult,
-    balls: input.gameState.balls,
-    strikes: input.gameState.strikes,
-    inning: input.gameState.inning,
-    halfInning: input.gameState.halfInning,
-  });
-
-  return {
-    recommendation: thresholdResult.recommendation,
-    score,
-    expectedValueOfChallenge: adjustedEV,
-    minimumPlayerConfidenceRequired:
-      thresholdResult.minimumPlayerConfidenceRequired,
-    explanation,
   };
 }
 
@@ -211,25 +195,6 @@ export function decideChallenge(input: ChallengeDecisionInput): ChallengeDecisio
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Merges caller-supplied league averages over the compile-time constants.
- * Fields present in `override` take precedence; missing fields fall back to
- * LEAGUE_AVERAGES from constants.ts.
- */
-function resolveLeagueAverages(override?: Partial<LeagueAverages>): LeagueAverages {
-  return {
-    chaseRate:      override?.chaseRate      ?? LEAGUE_AVERAGES.CHASE_RATE,
-    walkRate:       override?.walkRate       ?? LEAGUE_AVERAGES.WALK_RATE,
-    strikeoutRate:  override?.strikeoutRate  ?? LEAGUE_AVERAGES.STRIKEOUT_RATE,
-    whiffRate:      override?.whiffRate      ?? LEAGUE_AVERAGES.WHIFF_RATE,
-    ops:            override?.ops            ?? LEAGUE_AVERAGES.OPS,
-    woba:           override?.woba,
-  };
-}
-
-/**
- * Produces a DENY decision for situations that do not require EV computation.
- */
 function hardDeny(reason: string): ChallengeDecision {
   return {
     recommendation: "DENY",

@@ -16,6 +16,7 @@
  */
 
 import { ChallengeDecision, ChallengeRecommendation } from "../domain/challengeDecision.types";
+import { Balls, Strikes } from "../domain/baseball.types";
 import { PlayerCredibilityResult } from "../features/playerCredibility";
 import { BaserunningContextResult } from "../features/baserunningContext";
 import { LineupContextResult } from "../features/lineupContext";
@@ -39,8 +40,8 @@ export interface ExplanationInput {
   scarcity: ChallengeScarcityResult;
   thresholdResult: ThresholdResult;
 
-  balls: number;
-  strikes: number;
+  balls: Balls;
+  strikes: Strikes;
   inning: number;
   halfInning: "top" | "bottom";
 }

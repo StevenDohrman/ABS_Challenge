@@ -58,6 +58,14 @@ coverage/
 .nyc_output/
 *.lcov
 
+# Jest / Node test caches (including workspace-local TMPDIR overrides)
+.tmp/
+**/.tmp/
+jest_dx/
+**/jest_dx/
+node-compile-cache/
+**/node-compile-cache/
+
 # ─────────────────────────────────────────────────────────────────────────────
 # OS & editor artifacts
 # ─────────────────────────────────────────────────────────────────────────────

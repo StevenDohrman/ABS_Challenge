@@ -3,8 +3,10 @@ import {
   buildDueUpWindow,
 } from "../features/lineupContext";
 import { LineupContextInput } from "../domain/lineupContext.types";
+import { defaultLeague } from "./fixtures/league";
 
 const ORDER = [100, 101, 102, 103, 104, 105, 106, 107, 108];
+const league = defaultLeague;
 
 describe("buildDueUpWindow", () => {
   it("returns on-deck plus next batters sized by outs remaining", () => {
@@ -18,8 +20,6 @@ describe("buildDueUpWindow", () => {
 });
 
 describe("computeLineupContext", () => {
-  const league = { chaseRate: 0.3, walkRate: 0.085, strikeoutRate: 0.225, whiffRate: 0.25, ops: 0.728 };
-
   it("returns 1.0× when lineup data is missing", () => {
     expect(computeLineupContext(undefined, league).multiplier).toBe(1);
   });

@@ -1,116 +1,19 @@
 import { decideChallenge } from "../decision/decideChallenge";
-import { ChallengeDecisionInput } from "../domain/challengeDecision.types";
-import { GameStateContext } from "../domain/gameContext.types";
 import { PlayerChallengeContext } from "../domain/playerContext.types";
-import { PitchCallContext } from "../domain/pitchContext.types";
+import { Balls, Strikes } from "../domain/baseball.types";
 import { computeChallengeOutcomeExpectancies } from "../data/runExpectancy";
+import { makeGameState } from "./fixtures/gameState";
+import {
+  averagePlayer,
+  disciplinedPlayer,
+  aggressivePlayer,
+} from "./fixtures/players";
+import {
+  calledStrike,
+  makeDecisionInput,
+} from "./fixtures/makeDecisionInput";
 
-// ---------------------------------------------------------------------------
-// Fixture builders
-// ---------------------------------------------------------------------------
-
-function makeGameState(
-  overrides: Partial<GameStateContext> = {}
-): GameStateContext {
-  return {
-    gamePk: 1,
-    inning: 5,
-    halfInning: "top",
-    balls: 1,
-    strikes: 1,
-    outs: 1,
-    runnerOnFirst: false,
-    runnerOnSecond: false,
-    runnerOnThird: false,
-    homeScore: 3,
-    awayScore: 3,
-    runDifferentialForBattingTeam: 0,
-    battingTeamId: 1,
-    fieldingTeamId: 2,
-    batterId: 100,
-    pitcherId: 200,
-    challengesRemaining: 3,
-    ...overrides,
-  };
-}
-
-const disciplinedPlayer: PlayerChallengeContext = {
-  playerId: 100,
-  battingHand: "L",
-  obp: 0.390,
-  ops: 0.920,
-  walkRate: 0.13,
-  strikeoutRate: 0.16,
-  chasePercent: 0.17,
-  whiffPercent: 0.19,
-  historicalChallengeAttempts: 0,
-  historicalChallengeSuccessRate: null,
-  sprayProfile: null,
-  fielderOaa: null,
-};
-
-const averagePlayer: PlayerChallengeContext = {
-  playerId: 101,
-  battingHand: "R",
-  obp: 0.320,
-  ops: 0.750,
-  walkRate: 0.085,
-  strikeoutRate: 0.225,
-  chasePercent: 0.30,
-  whiffPercent: 0.25,
-  historicalChallengeAttempts: 0,
-  historicalChallengeSuccessRate: null,
-  sprayProfile: null,
-  fielderOaa: null,
-};
-
-const aggressivePlayer: PlayerChallengeContext = {
-  playerId: 102,
-  battingHand: "R",
-  obp: 0.290,
-  ops: 0.700,
-  walkRate: 0.045,
-  strikeoutRate: 0.32,
-  chasePercent: 0.45,
-  whiffPercent: 0.38,
-  historicalChallengeAttempts: 0,
-  historicalChallengeSuccessRate: null,
-  sprayProfile: null,
-  fielderOaa: null,
-};
-
-const calledStrike: PitchCallContext = {
-  callType: "called_strike",
-  pitcherHandedness: "R",
-};
-
-function makeInput(
-  gameState: GameStateContext,
-  player: PlayerChallengeContext = averagePlayer,
-  pitch: PitchCallContext = calledStrike
-): ChallengeDecisionInput {
-  const runners = {
-    first: gameState.runnerOnFirst,
-    second: gameState.runnerOnSecond,
-    third: gameState.runnerOnThird,
-  };
-
-  const { current, ifSucceeds, ifFails } = computeChallengeOutcomeExpectancies(
-    gameState.outs,
-    gameState.balls,
-    gameState.strikes,
-    runners
-  );
-
-  return {
-    gameState,
-    playerContext: player,
-    pitchContext: pitch,
-    currentRunExpectancy: current,
-    runExpectancyIfSuccessful: ifSucceeds,
-    runExpectancyIfFailed: ifFails,
-  };
-}
+const makeInput = makeDecisionInput;
 
 // ---------------------------------------------------------------------------
 // Hard gate tests
@@ -178,7 +81,7 @@ describe("decideChallenge — recommendation labels", () => {
     expect(result.minimumPlayerConfidenceRequired).toBe(0);
   });
 
-  test("produces DENY in minimal scenario: 0-0 count, early inning, blowout, aggressive batter, 1 challenge left", () => {
+  test("produces WARN in minimal scenario: 0-0 count, early inning, blowout, aggressive batter, 1 challenge left", () => {
     const lowValueState = makeGameState({
       inning: 2,
       balls: 0,
@@ -395,10 +298,10 @@ describe("decideChallenge — monotonicity", () => {
     // Hold everything else constant, vary the RE delta by changing the count
     const emptyBases = { first: false, second: false, third: false };
 
-    const scenarios: Array<[number, number]> = [
-      [0, 0], // 0-0: moderate delta
-      [2, 2], // 2-2: larger delta (K possible)
-      [3, 2], // 3-2: largest delta (walk or K)
+    const scenarios: Array<[Balls, Strikes]> = [
+      [0, 0],
+      [2, 2],
+      [3, 2],
     ];
 
     const scores = scenarios.map(([balls, strikes]) => {
