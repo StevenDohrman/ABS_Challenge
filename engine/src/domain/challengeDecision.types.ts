@@ -24,8 +24,8 @@ export interface ChallengeDecisionInput {
    * Current-season league averages used as baselines for batter comparisons.
    *
    * Computed by the data pipeline's weekly league-average job and supplied by
-   * the backend. Overrides the compile-time constants in constants.ts field by
-   * field — any field not provided falls back to the constant automatically.
+   * the backend. Overrides compile-time constants in engine/src/constants/
+   * field by field — any field not provided falls back via resolveLeagueAverages().
    *
    * Omit entirely (or pass undefined) to use compile-time constants only.
    * This keeps the engine fully functional in tests and offline scenarios.

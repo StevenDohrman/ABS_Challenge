@@ -12,6 +12,8 @@
  *   DB_LIMITS       — Database concurrency guardrails
  */
 
+import type { Balls, Strikes } from "@abs/engine";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Game rules — MLB challenge-count rules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ export const CALL_CODES = {
  * Each tuple is [balls, strikes]. The maximum balls before a walk is 3,
  * and the maximum strikes before a strikeout is 2 (on the third strike).
  */
-export const ALL_COUNT_STATES: ReadonlyArray<readonly [number, number]> = [
+export const ALL_COUNT_STATES: ReadonlyArray<readonly [Balls, Strikes]> = [
   [0, 0], [0, 1], [0, 2],
   [1, 0], [1, 1], [1, 2],
   [2, 0], [2, 1], [2, 2],

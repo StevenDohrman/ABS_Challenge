@@ -48,6 +48,7 @@ import { PlayerChallengeContext } from "../domain/playerContext.types";
 import { PitchCallContext } from "../domain/pitchContext.types";
 import { GameStateContext } from "../domain/gameContext.types";
 import { LeagueAverages } from "../domain/leagueContext.types";
+import { Balls, Strikes } from "../domain/baseball.types";
 import { CREDIBILITY } from "../constants";
 import { clamp } from "../utils/clamp";
 
@@ -256,7 +257,7 @@ function computeHandednessModifier(
  * Pitchers in pitcher-friendly counts (0-2, 1-2) work the corners and throw
  * borderline pitches — a called strike is more likely to be genuinely close.
  */
-function computeCountModifier(balls: number, strikes: number): number {
+function computeCountModifier(balls: Balls, strikes: Strikes): number {
   const COUNT_MODIFIERS: Record<string, number> = {
     "3-0": -0.06, // pitcher aiming for heart of plate; called strike likely correct
     "2-0": -0.03,

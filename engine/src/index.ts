@@ -8,6 +8,8 @@
 
 // Main entry point
 export { decideChallenge } from "./decision/decideChallenge";
+export { toBalls, toStrikes, toOuts, toCountState } from "./domain/baseball.types";
+export { isBalls, isStrikes, isOuts } from "./domain/baseball.types";
 
 // Domain types — used by backend and tests to build inputs / interpret outputs
 export type {
@@ -21,6 +23,9 @@ export type {
   BaserunningContextInput,
   LineupContextInput,
   DueUpBatter,
+  Balls,
+  Strikes,
+  Outs,
 } from "./domain/index";
 
 // Run expectancy utilities — used by backend to pre-compute RE values before

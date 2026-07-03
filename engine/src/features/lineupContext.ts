@@ -1,5 +1,6 @@
 import { LeagueAverages } from "../domain/leagueContext.types";
 import { LineupContextInput } from "../domain/lineupContext.types";
+import { Outs } from "../domain/baseball.types";
 import { LINEUP } from "../constants";
 import { scaleMultiplier } from "../utils/clamp";
 import { OPS_TO_WOBA_SCALE } from "../utils/conversion";
@@ -65,7 +66,7 @@ function resolveQuality(batter: { ops: number | null; woba: number | null }): nu
 export function buildDueUpWindow(
   battingOrder: number[],
   currentBatterId: number,
-  outs: number
+  outs: Outs
 ): number[] {
   const windowSize = Math.max(1, LINEUP.WINDOW_BASE - outs);
   const currentIndex = battingOrder.indexOf(currentBatterId);

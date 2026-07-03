@@ -12,6 +12,32 @@ export class ChallengeInputValidationError extends Error {
   }
 }
 
+function assertFiniteNumber(value: number, field: string): void {
+  if (!Number.isFinite(value)) {
+    throw new ChallengeInputValidationError(
+      `${field} must be a finite number, got ${value}`
+    );
+  }
+}
+
+function assertPositiveInteger(value: number, field: string): void {
+  assertFiniteNumber(value, field);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new ChallengeInputValidationError(
+      `${field} must be a positive integer, got ${value}`
+    );
+  }
+}
+
+function assertNonNegativeInteger(value: number, field: string): void {
+  assertFiniteNumber(value, field);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ChallengeInputValidationError(
+      `${field} must be a non-negative integer, got ${value}`
+    );
+  }
+}
+
 function assertRateInRange(
   value: number | null,
   field: string,
@@ -19,6 +45,9 @@ function assertRateInRange(
   max = 1
 ): void {
   if (value === null) return;
+
+  assertFiniteNumber(value, field);
+
   if (value < min || value > max) {
     throw new ChallengeInputValidationError(
       `${field} must be between ${min} and ${max}, got ${value}`
@@ -35,35 +64,29 @@ export function validateChallengeDecisionInput(
 ): void {
   const { gameState, playerContext } = input;
 
-  if (!isBalls(gameState.balls)) {
+  if (!Number.isFinite(gameState.balls) || !isBalls(gameState.balls)) {
     throw new ChallengeInputValidationError(
       `balls must be 0–3, got ${gameState.balls}`
     );
   }
 
-  if (!isStrikes(gameState.strikes)) {
+  if (!Number.isFinite(gameState.strikes) || !isStrikes(gameState.strikes)) {
     throw new ChallengeInputValidationError(
       `strikes must be 0–2, got ${gameState.strikes}`
     );
   }
 
-  if (!isOuts(gameState.outs)) {
+  if (!Number.isFinite(gameState.outs) || !isOuts(gameState.outs)) {
     throw new ChallengeInputValidationError(
       `outs must be 0–2, got ${gameState.outs}`
     );
   }
 
-  if (gameState.inning < 1) {
-    throw new ChallengeInputValidationError(
-      `inning must be >= 1, got ${gameState.inning}`
-    );
-  }
-
-  if (gameState.challengesRemaining < 0) {
-    throw new ChallengeInputValidationError(
-      `challengesRemaining must be >= 0, got ${gameState.challengesRemaining}`
-    );
-  }
+  assertPositiveInteger(gameState.inning, "inning");
+  assertNonNegativeInteger(
+    gameState.challengesRemaining,
+    "challengesRemaining"
+  );
 
   assertRateInRange(playerContext.walkRate, "walkRate");
   assertRateInRange(playerContext.strikeoutRate, "strikeoutRate");
@@ -74,11 +97,10 @@ export function validateChallengeDecisionInput(
     "historicalChallengeSuccessRate"
   );
 
-  if (playerContext.historicalChallengeAttempts < 0) {
-    throw new ChallengeInputValidationError(
-      `historicalChallengeAttempts must be >= 0, got ${playerContext.historicalChallengeAttempts}`
-    );
-  }
+  assertNonNegativeInteger(
+    playerContext.historicalChallengeAttempts,
+    "historicalChallengeAttempts"
+  );
 
   const runners = {
     first: gameState.runnerOnFirst,
@@ -92,6 +114,14 @@ export function validateChallengeDecisionInput(
     gameState.strikes,
     runners
   );
+
+  for (const [field, value] of [
+    ["currentRunExpectancy", input.currentRunExpectancy],
+    ["runExpectancyIfSuccessful", input.runExpectancyIfSuccessful],
+    ["runExpectancyIfFailed", input.runExpectancyIfFailed],
+  ] as const) {
+    assertFiniteNumber(value, field);
+  }
 
   if (
     Math.abs(input.currentRunExpectancy - expected.current) >

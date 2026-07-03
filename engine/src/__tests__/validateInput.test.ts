@@ -49,4 +49,45 @@ describe("validateChallengeDecisionInput", () => {
       /challengesRemaining/
     );
   });
+
+  test("rejects NaN chase rate", () => {
+    const input = makeDecisionInput(makeGameState(), {
+      ...aggressivePlayer,
+      chasePercent: NaN,
+    });
+    expect(() => validateChallengeDecisionInput(input)).toThrow(/chasePercent/);
+  });
+
+  test("rejects NaN currentRunExpectancy", () => {
+    const input = makeDecisionInput(makeGameState());
+    input.currentRunExpectancy = NaN;
+    expect(() => validateChallengeDecisionInput(input)).toThrow(
+      /currentRunExpectancy/
+    );
+  });
+
+  test("rejects NaN inning", () => {
+    const input = makeDecisionInput(makeGameState({ inning: NaN }));
+    expect(() => validateChallengeDecisionInput(input)).toThrow(/inning/);
+  });
+
+  test("rejects NaN challengesRemaining", () => {
+    const input = makeDecisionInput(makeGameState({ challengesRemaining: NaN }));
+    expect(() => validateChallengeDecisionInput(input)).toThrow(
+      /challengesRemaining/
+    );
+  });
+
+  test("rejects Infinity runExpectancyIfSuccessful", () => {
+    const input = makeDecisionInput(makeGameState());
+    input.runExpectancyIfSuccessful = Infinity;
+    expect(() => validateChallengeDecisionInput(input)).toThrow(
+      /runExpectancyIfSuccessful/
+    );
+  });
+
+  test("rejects NaN balls", () => {
+    const input = makeDecisionInput(makeGameState({ balls: NaN as 0 }));
+    expect(() => validateChallengeDecisionInput(input)).toThrow(/balls/);
+  });
 });

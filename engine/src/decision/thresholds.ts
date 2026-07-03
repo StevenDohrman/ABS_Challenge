@@ -17,7 +17,7 @@
  *   ALLOW zone: from ALLOW_CONFIDENCE_ENTRY (at zone bottom) to ALLOW_CONFIDENCE_EXIT (at top)
  *   WARN zone:  from WARN_CONFIDENCE_ENTRY  (at zone bottom) to WARN_CONFIDENCE_EXIT  (at top)
  *
- * All tunable values live in THRESHOLDS in constants.ts.
+ * All tunable values live in THRESHOLDS in engine/src/constants/thresholds.ts.
  */
 
 import { ChallengeRecommendation } from "../domain/challengeDecision.types";
