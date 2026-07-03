@@ -103,10 +103,31 @@ describe("computeSituationWeight", () => {
       expect(lateClose.components.isLateAndClose).toBe(true);
     });
 
-    test("weight is clamped to [0.30, 1.50]", () => {
+    test("weight is clamped to [0.30, 1.90]", () => {
       const anyState = computeSituationWeight(makeGameState());
       expect(anyState.weight).toBeGreaterThanOrEqual(0.30);
-      expect(anyState.weight).toBeLessThanOrEqual(1.50);
+      expect(anyState.weight).toBeLessThanOrEqual(1.90);
+    });
+  });
+
+  describe("challenge urgency", () => {
+    test("9th inning with 2 challenges boosts weight vs same inning with none", () => {
+      const withChallenges = computeSituationWeight(
+        makeGameState({ inning: 9, challengesRemaining: 2 })
+      );
+      const withoutChallenges = computeSituationWeight(
+        makeGameState({ inning: 9, challengesRemaining: 0 })
+      );
+
+      expect(withChallenges.components.challengeUrgency).toBeGreaterThan(1);
+      expect(withChallenges.weight).toBeGreaterThan(withoutChallenges.weight);
+    });
+
+    test("challenge urgency does not apply before the 9th inning", () => {
+      const result = computeSituationWeight(
+        makeGameState({ inning: 8, challengesRemaining: 2 })
+      );
+      expect(result.components.challengeUrgency).toBe(1);
     });
   });
 

@@ -57,12 +57,11 @@ export async function backfillMissingRankingsContributions(): Promise<{
     result.teamGames++;
   }
 
-  if (result.pitchReviews > 0 || result.audits > 0) {
-    console.log(
-      `[rankingsBackfill] applied ${result.pitchReviews} pitch reviews, ` +
-        `${result.audits} audits, ${result.teamGames} team game appearances`
-    );
-  }
+  console.log(
+    `[rankingsBackfill] complete — ${result.pitchReviews} pitch reviews, ` +
+      `${result.audits} audits, ${result.teamGames} team games, ` +
+      `${result.playerNames} player names`
+  );
 
   return result;
 }

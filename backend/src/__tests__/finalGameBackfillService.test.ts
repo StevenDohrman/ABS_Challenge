@@ -1,5 +1,9 @@
 import { prisma } from "../db/prisma";
-import { gameNeedsFinalBackfill } from "../services/finalGameBackfillService";
+import {
+  gameNeedsFinalBackfill,
+  shouldSkipFinalBackfillFetch,
+} from "../services/finalGameBackfillService";
+import { isLiveGameBackfillInProgress } from "../db/pipelineDbQueue";
 
 jest.mock("../db/prisma", () => ({
   prisma: {
@@ -15,13 +19,19 @@ jest.mock("../db/prisma", () => ({
   },
 }));
 
+jest.mock("../db/pipelineDbQueue", () => ({
+  isLiveGameBackfillInProgress: jest.fn(),
+}));
+
 const mockFindUnique = prisma.game.findUnique as jest.Mock;
 const mockSnapshotCount = prisma.liveGameSnapshot.count as jest.Mock;
 const mockPitchCount = prisma.livePitchEvent.count as jest.Mock;
+const mockIngestInProgress = isLiveGameBackfillInProgress as jest.Mock;
 
 describe("gameNeedsFinalBackfill", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIngestInProgress.mockReturnValue(false);
   });
 
   it("returns true when no game row exists", async () => {
@@ -44,5 +54,35 @@ describe("gameNeedsFinalBackfill", () => {
     mockPitchCount.mockResolvedValue(100);
 
     expect(await gameNeedsFinalBackfill(824991, 10, 100)).toBe(false);
+  });
+});
+
+describe("shouldSkipFinalBackfillFetch", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIngestInProgress.mockReturnValue(false);
+  });
+
+  it("returns in_progress when ingest is running", async () => {
+    mockIngestInProgress.mockReturnValue(true);
+    expect(await shouldSkipFinalBackfillFetch(824991)).toBe("in_progress");
+  });
+
+  it("returns ingested for Final games with ingestedAt set", async () => {
+    mockFindUnique.mockResolvedValue({
+      gamePk: 824991,
+      status: "Final",
+      ingestedAt: new Date(),
+    });
+    expect(await shouldSkipFinalBackfillFetch(824991)).toBe("ingested");
+  });
+
+  it("returns null when game is not yet ingested", async () => {
+    mockFindUnique.mockResolvedValue({
+      gamePk: 824991,
+      status: "Final",
+      ingestedAt: null,
+    });
+    expect(await shouldSkipFinalBackfillFetch(824991)).toBeNull();
   });
 });

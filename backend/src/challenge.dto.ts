@@ -9,7 +9,6 @@
  */
 
 import type { ChallengeRecommendation as DbRecommendation, LiveGameSnapshot, LivePitchEvent, PostgameChallengeAudit } from "@prisma/client";
-import { savantPollEarliestAt } from "./db/constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Recommendation response
@@ -474,7 +473,7 @@ export interface PostgameAuditItemDto {
   challengeAvailable: boolean;
 
   originalCall: "ball" | "strike" | "unknown";
-  savantZoneResult: "ball" | "strike" | "unknown";
+  zoneResult: "ball" | "strike" | "unknown";
   plateX: number | null;
   plateZ: number | null;
 
@@ -511,7 +510,7 @@ export interface PostgameAuditResponseDto {
   gamePk: number;
   status: PostgameAuditStatus;
   enrichedAt: string | null;
-  /** ISO timestamp when Savant polling becomes eligible (Final + 14h). Null when unknown. */
+  /** @deprecated Always null — audit runs shortly after Final using MLB live feed data. */
   pollEarliestAt: string | null;
   summary: PostgameAuditSummaryDto;
   missedChallenges: PostgameAuditItemDto[];
@@ -542,7 +541,7 @@ export function toPostgameAuditItemDto(
     expectedValue: audit.runExpectancySwing,
     challengeAvailable: audit.challengeAvailable,
     originalCall: audit.originalCall as PostgameAuditItemDto["originalCall"],
-    savantZoneResult: audit.savantZoneResult as PostgameAuditItemDto["savantZoneResult"],
+    zoneResult: audit.zoneResult as PostgameAuditItemDto["zoneResult"],
     plateX: audit.plateX,
     plateZ: audit.plateZ,
     callWasProbablyWrong: audit.callWasProbablyWrong,
@@ -577,7 +576,6 @@ export function toPostgameAuditResponseDto(
   status: PostgameAuditStatus,
   enrichedAt: Date | null,
   audits: PostgameChallengeAudit[],
-  finalizedAt: Date | null = null,
   teamIds?: { homeTeamId: number; awayTeamId: number }
 ): PostgameAuditResponseDto {
   const allAudits = audits.map(toPostgameAuditItemDto);
@@ -597,7 +595,7 @@ export function toPostgameAuditResponseDto(
     gamePk,
     status,
     enrichedAt: enrichedAt?.toISOString() ?? null,
-    pollEarliestAt: finalizedAt ? savantPollEarliestAt(finalizedAt).toISOString() : null,
+    pollEarliestAt: null,
     summary: {
       totalMissedValue,
       missedChallengeCount: missedChallenges.length,

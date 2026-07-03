@@ -1,8 +1,7 @@
 import { prisma } from "./prisma";
-import type { SavantPitchRow } from "@abs/data-pipeline";
-import type { PostgameChallengeAudit, SavantPitchEvent } from "@prisma/client";
+import type { PostgameChallengeAudit } from "@prisma/client";
 
-export type SavantZoneResult = "ball" | "strike" | "unknown";
+export type ZoneResult = "ball" | "strike" | "unknown";
 export type OriginalCall = "ball" | "strike" | "unknown";
 
 export interface PostgameAuditInput {
@@ -11,7 +10,6 @@ export interface PostgameAuditInput {
   pitchNumber: number;
   pitchEventId: number;
   recommendationId: number;
-  savantPitchEventId: number | null;
   inning: number;
   halfInning: string;
   balls: number;
@@ -24,7 +22,7 @@ export interface PostgameAuditInput {
   plateZ: number | null;
   szTop: number | null;
   szBot: number | null;
-  savantZoneResult: SavantZoneResult;
+  zoneResult: ZoneResult;
   callWasProbablyWrong: boolean;
   liveRecommendation: string;
   playerConfidence: number | null;
@@ -36,62 +34,6 @@ export interface PostgameAuditInput {
   notes: string[];
 }
 
-export async function upsertSavantPitchEvents(
-  gamePk: number,
-  pitches: SavantPitchRow[]
-): Promise<void> {
-  for (const pitch of pitches) {
-    const atBatIndex = pitch.atBatNumber - 1;
-    await prisma.savantPitchEvent.upsert({
-      where: {
-        gamePk_atBatNumber_pitchNumber: {
-          gamePk,
-          atBatNumber: pitch.atBatNumber,
-          pitchNumber: pitch.pitchNumber,
-        },
-      },
-      update: {
-        atBatIndex,
-        batterId: pitch.batterId,
-        pitcherId: pitch.pitcherId,
-        plateX: pitch.plateX,
-        plateZ: pitch.plateZ,
-        szTop: pitch.szTop,
-        szBot: pitch.szBot,
-        zone: pitch.zone !== null ? Math.round(pitch.zone) : null,
-        description: pitch.description,
-        fetchedAt: new Date(pitch.fetchedAt),
-        rawPayload: pitch.raw,
-      },
-      create: {
-        gamePk,
-        atBatNumber: pitch.atBatNumber,
-        atBatIndex,
-        pitchNumber: pitch.pitchNumber,
-        batterId: pitch.batterId,
-        pitcherId: pitch.pitcherId,
-        plateX: pitch.plateX,
-        plateZ: pitch.plateZ,
-        szTop: pitch.szTop,
-        szBot: pitch.szBot,
-        zone: pitch.zone !== null ? Math.round(pitch.zone) : null,
-        description: pitch.description,
-        fetchedAt: new Date(pitch.fetchedAt),
-        rawPayload: pitch.raw,
-      },
-    });
-  }
-}
-
-export async function findSavantPitchesForGame(
-  gamePk: number
-): Promise<SavantPitchEvent[]> {
-  return prisma.savantPitchEvent.findMany({
-    where: { gamePk },
-    orderBy: [{ atBatIndex: "asc" }, { pitchNumber: "asc" }],
-  });
-}
-
 export async function upsertPostgameAudits(
   audits: PostgameAuditInput[]
 ): Promise<void> {
@@ -99,8 +41,7 @@ export async function upsertPostgameAudits(
     await prisma.postgameChallengeAudit.upsert({
       where: { pitchEventId: audit.pitchEventId },
       update: {
-        savantPitchEventId: audit.savantPitchEventId,
-        savantZoneResult: audit.savantZoneResult,
+        zoneResult: audit.zoneResult,
         callWasProbablyWrong: audit.callWasProbablyWrong,
         shouldHaveChallenged: audit.shouldHaveChallenged,
         missedChallenge: audit.missedChallenge,
@@ -118,7 +59,6 @@ export async function upsertPostgameAudits(
         pitchNumber: audit.pitchNumber,
         pitchEventId: audit.pitchEventId,
         recommendationId: audit.recommendationId,
-        savantPitchEventId: audit.savantPitchEventId,
         inning: audit.inning,
         halfInning: audit.halfInning,
         balls: audit.balls,
@@ -131,7 +71,7 @@ export async function upsertPostgameAudits(
         plateZ: audit.plateZ,
         szTop: audit.szTop,
         szBot: audit.szBot,
-        savantZoneResult: audit.savantZoneResult,
+        zoneResult: audit.zoneResult,
         callWasProbablyWrong: audit.callWasProbablyWrong,
         liveRecommendation: audit.liveRecommendation,
         playerConfidence: audit.playerConfidence,

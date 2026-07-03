@@ -137,6 +137,18 @@ export interface MlbReviewDetails {
   player: { id: number; fullName: string; link: string };
 }
 
+/** Plate-crossing location and strike zone bounds from the MLB live feed. */
+export interface MlbPitchData {
+  strikeZoneTop?: number;
+  strikeZoneBottom?: number;
+  /** MLB zone bucket (1–9 in zone, 11–14 out of zone). */
+  zone?: number;
+  coordinates?: {
+    pX?: number;
+    pZ?: number;
+  };
+}
+
 export interface MlbPlayEvent {
   details: MlbPitchDetails;
   count: MlbCount;
@@ -147,6 +159,7 @@ export interface MlbPlayEvent {
   playId?: string;
   /** Populated when this pitch triggered an ABS challenge review. */
   reviewDetails?: MlbReviewDetails;
+  pitchData?: MlbPitchData;
 }
 
 export interface MlbMatchup {
@@ -154,6 +167,10 @@ export interface MlbMatchup {
   pitcher: { id: number; fullName: string };
   batSide: { code: "L" | "R" | "S" };
   pitchHand: { code: "L" | "R" };
+  /** Runners occupying each base at the start of this at-bat. */
+  postOnFirst?: { id: number; fullName?: string; link?: string };
+  postOnSecond?: { id: number; fullName?: string; link?: string };
+  postOnThird?: { id: number; fullName?: string; link?: string };
 }
 
 export interface MlbAboutPlay {
@@ -172,6 +189,10 @@ export interface MlbPlay {
     event: string;
     eventType: string;
     description: string;
+    rbi?: number;
+    /** Score after this at-bat completes. */
+    homeScore?: number;
+    awayScore?: number;
   };
   about: MlbAboutPlay;
   count: MlbCount;

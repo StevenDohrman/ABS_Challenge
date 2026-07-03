@@ -159,7 +159,7 @@ export interface PostgameAuditItem {
   challengeAvailable: boolean;
 
   originalCall: "ball" | "strike" | "unknown";
-  savantZoneResult: "ball" | "strike" | "unknown";
+  zoneResult: "ball" | "strike" | "unknown";
   plateX: number | null;
   plateZ: number | null;
 

@@ -74,6 +74,15 @@ export interface MlbLivePitchEvent {
   /** Team ID of the team that issued the challenge. Compare to battingTeamId/fieldingTeamId to determine side. */
   challengerTeamId: number | null;
 
+  /** Plate crossing location from pitchData.coordinates (feet). */
+  plateX?: number;
+  plateZ?: number;
+  /** Per-pitch strike zone height from pitchData (feet). */
+  strikeZoneTop?: number;
+  strikeZoneBottom?: number;
+  /** MLB zone bucket from pitchData.zone when present. */
+  mlbZone?: number;
+
   raw: unknown;
   fetchedAt: string;
 }

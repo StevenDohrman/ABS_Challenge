@@ -58,6 +58,16 @@ export async function waitForGameBackfillPitchReady(gamePk: number): Promise<voi
   await (backfillPitchReadyByGame.get(gamePk) ?? Promise.resolve());
 }
 
+/** True when a live mid-game backfill batch is running for this game. */
+export function isLiveGameBackfillInProgress(gamePk: number): boolean {
+  return backfillByGame.has(gamePk);
+}
+
+/** Wait for any in-progress live ingest work on this game. */
+export async function waitForGameIngest(gamePk: number): Promise<void> {
+  await waitForGameBackfill(gamePk);
+}
+
 /**
  * Enqueue pipeline DB work on the high or low priority queue.
  * Failures are logged but do not block subsequent jobs on that queue.

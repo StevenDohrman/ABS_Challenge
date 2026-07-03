@@ -9,12 +9,12 @@ export function AboutPage() {
         strikes occur.
       </p>
       <p className="text-white/60 leading-relaxed">
-        After games finish, Baseball Savant pitch-location data is joined to evaluate
+        After games finish, MLB live feed pitch location data is used to evaluate
         missed high-value challenge opportunities. Recommendations are guidance only —
         not real-time zone calls.
       </p>
       <p className="text-xs text-white/30 font-mono">
-        Data sources: MLB Live Feed, Baseball Savant Statcast
+        Data sources: MLB Live Feed, Baseball Savant (pregame batter stats)
       </p>
     </div>
   );

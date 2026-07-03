@@ -40,8 +40,7 @@ export async function markGameFinal(gamePk: number): Promise<void> {
 }
 
 /**
- * Mark a game Final and record when it ended. finalizedAt is only set once so
- * Savant scheduling and backfill do not reset the 14-hour window.
+ * Mark a game Final and record when it ended. finalizedAt is only set once.
  */
 export async function ensureGameFinalized(
   gamePk: number,
@@ -65,34 +64,35 @@ export async function countGamePitches(gamePk: number): Promise<number> {
   return prisma.livePitchEvent.count({ where: { gamePk } });
 }
 
-export async function markSavantEnriched(gamePk: number): Promise<void> {
+export async function markPostgameAudited(gamePk: number): Promise<void> {
   await prisma.game.updateMany({
     where: { gamePk },
-    data: { savantEnrichedAt: new Date(), updatedAt: new Date() },
+    data: { postgameAuditedAt: new Date(), updatedAt: new Date() },
   });
 }
 
-/** Record when postgame Savant polling began (idempotent — only sets once). */
-export async function markSavantEnrichmentStarted(gamePk: number): Promise<void> {
+/** Record that live/backfill ingest is complete (idempotent — only sets once). */
+export async function markGameIngested(gamePk: number): Promise<void> {
   await prisma.game.updateMany({
-    where: { gamePk, savantEnrichmentStartedAt: null },
-    data: { savantEnrichmentStartedAt: new Date(), updatedAt: new Date() },
+    where: { gamePk, ingestedAt: null },
+    data: { ingestedAt: new Date(), updatedAt: new Date() },
   });
 }
 
-export async function incrementSavantEnrichmentAttempt(gamePk: number): Promise<void> {
-  await prisma.game.update({
-    where: { gamePk },
-    data: { savantEnrichmentAttempts: { increment: 1 } },
-  });
-}
-
-export async function isSavantEnriched(gamePk: number): Promise<boolean> {
+export async function isGameIngested(gamePk: number): Promise<boolean> {
   const game = await prisma.game.findUnique({
     where: { gamePk },
-    select: { savantEnrichedAt: true },
+    select: { ingestedAt: true },
   });
-  return game?.savantEnrichedAt != null;
+  return game?.ingestedAt != null;
+}
+
+export async function isPostgameAudited(gamePk: number): Promise<boolean> {
+  const game = await prisma.game.findUnique({
+    where: { gamePk },
+    select: { postgameAuditedAt: true },
+  });
+  return game?.postgameAuditedAt != null;
 }
 
 /**
@@ -294,6 +294,11 @@ export async function upsertPitchEvent(
     isOverturned: event.isOverturned ?? null,
     challengerName: event.challengerName ?? null,
     challengerTeamId: event.challengerTeamId ?? null,
+    plateX: event.plateX ?? null,
+    plateZ: event.plateZ ?? null,
+    strikeZoneTop: event.strikeZoneTop ?? null,
+    strikeZoneBottom: event.strikeZoneBottom ?? null,
+    mlbZone: event.mlbZone ?? null,
     fetchedAt: new Date(event.fetchedAt),
     rawPayload: event.raw as object,
   };

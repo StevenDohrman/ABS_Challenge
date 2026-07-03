@@ -45,12 +45,14 @@ model Game {
   homeChallengesRemaining Int @default(2)
   awayChallengesRemaining Int @default(2)
 
-  // Postgame Savant enrichment (Phase 5).
-  savantEnrichedAt          DateTime?
-  /** When the game was marked Final — used to delay Savant polling. */
-  finalizedAt               DateTime?
-  savantEnrichmentStartedAt DateTime?
-  savantEnrichmentAttempts  Int       @default(0)
+  // Postgame challenge audit (Phase 5) — runs shortly after Final using MLB live feed pitchData.
+  postgameAuditedAt DateTime?
+  /** When the game was marked Final. */
+  finalizedAt       DateTime?
+  /** Live or backfill ingest complete — skip re-fetching the archived feed. */
+  ingestedAt        DateTime?
+  /** Base/runner/score snapshots repaired from archived feed matchup data. */
+  baseStateRepairedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -138,6 +140,13 @@ model LivePitchEvent {
   isOverturned     Boolean?
   challengerName   String?
   challengerTeamId Int?
+
+  // Plate location from MLB live feed pitchData (postgame audit source).
+  plateX            Float?
+  plateZ            Float?
+  strikeZoneTop     Float?
+  strikeZoneBottom  Float?
+  mlbZone           Int?
 
   fetchedAt DateTime
 
@@ -287,8 +296,7 @@ model SavantPitchEvent {
 
   rawPayload Json
 
-  game         Game                    @relation(fields: [gamePk], references: [gamePk])
-  postgameAudit PostgameChallengeAudit?
+  game         Game @relation(fields: [gamePk], references: [gamePk])
 
   @@unique([gamePk, atBatNumber, pitchNumber])
   @@index([gamePk, atBatIndex, pitchNumber])
@@ -306,9 +314,8 @@ model PostgameChallengeAudit {
   atBatIndex Int
   pitchNumber Int
 
-  pitchEventId      Int @unique
-  recommendationId  Int @unique
-  savantPitchEventId Int? @unique
+  pitchEventId     Int @unique
+  recommendationId Int @unique
 
   inning     Int
   halfInning String
@@ -326,7 +333,7 @@ model PostgameChallengeAudit {
   szTop  Float?
   szBot  Float?
 
-  savantZoneResult String // "ball" | "strike" | "unknown"
+  zoneResult String // "ball" | "strike" | "unknown"
   callWasProbablyWrong Boolean
 
   liveRecommendation String // AUTO_ALLOW | ALLOW | WARN | DENY
@@ -343,9 +350,8 @@ model PostgameChallengeAudit {
   createdAt DateTime @default(now())
 
   game             Game                   @relation(fields: [gamePk], references: [gamePk])
-  pitchEvent       LivePitchEvent         @relation(fields: [pitchEventId], references: [id])
-  recommendation   ChallengeRecommendation @relation(fields: [recommendationId], references: [id])
-  savantPitchEvent SavantPitchEvent?      @relation(fields: [savantPitchEventId], references: [id])
+  pitchEvent     LivePitchEvent          @relation(fields: [pitchEventId], references: [id])
+  recommendation ChallengeRecommendation @relation(fields: [recommendationId], references: [id])
 
   @@index([gamePk, missedChallenge])
   @@index([gamePk, runExpectancySwing])

@@ -1,0 +1,1 @@
+ALTER TABLE "games" ADD COLUMN "ingestedAt" TIMESTAMP(3);

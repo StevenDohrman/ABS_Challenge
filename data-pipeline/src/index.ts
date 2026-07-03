@@ -8,7 +8,6 @@
 // Jobs — the primary integration surface for the backend orchestrator.
 export { LivePollJob } from "./jobs/livePollJob";
 export { SavantDailyJob } from "./jobs/savantDailyJob";
-export { SavantPostgameJob } from "./jobs/savantPostgameJob";
 
 export { fetchLiveFeed } from "./sources/mlb-live/mlbLive.client";
 export {
@@ -20,7 +19,11 @@ export {
   buildFinalGameBackfillPayload,
   inferFinalizedAtFromFeed,
 } from "./sources/mlb-live/mlbLive.backfill";
-export { parsePitchEvents, parseGameLineups } from "./sources/mlb-live/mlbLive.parser";
+export {
+  parsePitchEvents,
+  parseGameLineups,
+  extractPitchLocationFromPlayEvent,
+} from "./sources/mlb-live/mlbLive.parser";
 
 // MLB live types — emitted by LivePollJob events.
 export type {

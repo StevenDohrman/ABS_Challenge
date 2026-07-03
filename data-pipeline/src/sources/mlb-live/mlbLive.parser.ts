@@ -1,4 +1,9 @@
-import { MlbLiveFeedResponse, MlbPlay } from "./mlbLive.api.types";
+import {
+  MlbLiveFeedResponse,
+  MlbMatchup,
+  MlbPlay,
+  MlbPlayEvent,
+} from "./mlbLive.api.types";
 import {
   MlbLivePitchEvent,
   MlbLiveGameSnapshot,
@@ -17,6 +22,40 @@ function parseRunnerIds(
   if (offense?.second?.id) result.second = offense.second.id;
   if (offense?.third?.id) result.third = offense.third.id;
   return result;
+}
+
+/** Runners on base at the start of an at-bat from play.matchup.postOn*. */
+function parseRunnersFromMatchup(matchup: MlbMatchup | undefined): {
+  runnerOnFirst: boolean;
+  runnerOnSecond: boolean;
+  runnerOnThird: boolean;
+  runnerIds?: BaseRunners;
+} {
+  const runnerIds: BaseRunners = {};
+  if (matchup?.postOnFirst?.id) runnerIds.first = matchup.postOnFirst.id;
+  if (matchup?.postOnSecond?.id) runnerIds.second = matchup.postOnSecond.id;
+  if (matchup?.postOnThird?.id) runnerIds.third = matchup.postOnThird.id;
+
+  return {
+    runnerOnFirst: runnerIds.first !== undefined,
+    runnerOnSecond: runnerIds.second !== undefined,
+    runnerOnThird: runnerIds.third !== undefined,
+    runnerIds: Object.keys(runnerIds).length > 0 ? runnerIds : undefined,
+  };
+}
+
+/** Score at the start of an at-bat — end-of-play score from the previous at-bat. */
+function scoreAtPlayStart(previousPlay: MlbPlay | undefined): {
+  homeScore: number;
+  awayScore: number;
+} {
+  if (!previousPlay?.result) {
+    return { homeScore: 0, awayScore: 0 };
+  }
+  return {
+    homeScore: previousPlay.result.homeScore ?? 0,
+    awayScore: previousPlay.result.awayScore ?? 0,
+  };
 }
 
 /**
@@ -198,8 +237,8 @@ export function parseAtBatSnapshot(
  *
  * Outs are tracked sequentially per half-inning across the whole allPlays
  * array so the outs value is correct even when the range starts mid-inning.
- * Runners and score are approximated as 0/false since the play object doesn't
- * carry per-at-bat state; the engine still produces a useful recommendation.
+ * Runners and score come from play.matchup.postOn* and the previous play's
+ * result.homeScore / awayScore (same archived feed used for pitch locations).
  */
 function parsePlaysInIndexRange(
   feed: MlbLiveFeedResponse,
@@ -215,6 +254,7 @@ function parsePlaysInIndexRange(
 
   let outsInHalfInning = 0;
   let prevHalfInningKey = "";
+  let previousPlay: MlbPlay | undefined;
 
   for (const play of feed.liveData.plays.allPlays) {
     const idx = play.about.atBatIndex;
@@ -231,6 +271,7 @@ function parsePlaysInIndexRange(
       const pitcherId = play.matchup?.pitcher?.id;
       if (batterId && pitcherId) {
         const { halfInning } = play.about;
+        const { homeScore, awayScore } = scoreAtPlayStart(previousPlay);
         snapshots.push({
           gamePk: feed.gamePk,
           atBatIndex: idx,
@@ -239,11 +280,9 @@ function parsePlaysInIndexRange(
           inning: play.about.inning,
           halfInning,
           outs: normalizeOutsAtAtBatStart(outsInHalfInning),
-          runnerOnFirst: false,
-          runnerOnSecond: false,
-          runnerOnThird: false,
-          homeScore: 0,
-          awayScore: 0,
+          ...parseRunnersFromMatchup(play.matchup),
+          homeScore,
+          awayScore,
           battingTeamId: halfInning === "top" ? awayTeamId : homeTeamId,
           fieldingTeamId: halfInning === "top" ? homeTeamId : awayTeamId,
           fetchedAt,
@@ -251,6 +290,7 @@ function parsePlaysInIndexRange(
       }
     }
 
+    previousPlay = play;
     outsInHalfInning = normalizeOutsAtAtBatStart(
       play.count?.outs ?? outsInHalfInning
     );
@@ -342,6 +382,42 @@ function parseDefensiveLineup(
   return hasPositionalFielder ? result : undefined;
 }
 
+/** Extract plate location and strike zone from an MLB playEvent (live feed or rawPayload). */
+export function extractPitchLocationFromPlayEvent(
+  playEvent: MlbPlayEvent | unknown
+): Pick<
+  MlbLivePitchEvent,
+  "plateX" | "plateZ" | "strikeZoneTop" | "strikeZoneBottom" | "mlbZone"
+> {
+  const event = playEvent as MlbPlayEvent;
+  const pitchData = event?.pitchData;
+  if (!pitchData) return {};
+
+  const result: Pick<
+    MlbLivePitchEvent,
+    "plateX" | "plateZ" | "strikeZoneTop" | "strikeZoneBottom" | "mlbZone"
+  > = {};
+
+  const pX = pitchData.coordinates?.pX;
+  const pZ = pitchData.coordinates?.pZ;
+  if (typeof pX === "number" && Number.isFinite(pX)) result.plateX = pX;
+  if (typeof pZ === "number" && Number.isFinite(pZ)) result.plateZ = pZ;
+  if (typeof pitchData.strikeZoneTop === "number" && Number.isFinite(pitchData.strikeZoneTop)) {
+    result.strikeZoneTop = pitchData.strikeZoneTop;
+  }
+  if (
+    typeof pitchData.strikeZoneBottom === "number" &&
+    Number.isFinite(pitchData.strikeZoneBottom)
+  ) {
+    result.strikeZoneBottom = pitchData.strikeZoneBottom;
+  }
+  if (typeof pitchData.zone === "number" && Number.isFinite(pitchData.zone)) {
+    result.mlbZone = Math.round(pitchData.zone);
+  }
+
+  return result;
+}
+
 function parsePitchEventsFromPlay(
   gamePk: number,
   play: MlbPlay,
@@ -355,6 +431,7 @@ function parsePitchEventsFromPlay(
     if (!playEvent.isPitch) continue;
 
     const rd = playEvent.reviewDetails;
+    const location = extractPitchLocationFromPlayEvent(playEvent);
     events.push({
       gamePk,
       playId: playEvent.playId,
@@ -375,6 +452,7 @@ function parsePitchEventsFromPlay(
       isOverturned: rd ? (rd.inProgress ? null : rd.isOverturned) : null,
       challengerName: rd?.player?.fullName ?? null,
       challengerTeamId: rd?.challengeTeamId ?? null,
+      ...location,
       raw: playEvent,
       fetchedAt,
     });

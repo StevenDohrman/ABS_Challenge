@@ -8,7 +8,7 @@
  *   3. Ingest all at-bats + pre-compute recommendations (gameBackfillService)
  *   4. Replay all pitch events + trigger called-strike recommendations
  *   5. Recompute challenge counts
- *   6. Schedule Savant postgame enrichment
+ *   6. Schedule postgame challenge audit
  */
 
 import type { ActiveGame, MlbLivePitchEvent } from "@abs/data-pipeline";
@@ -18,18 +18,25 @@ import {
   buildFinalGameBackfillPayload,
   inferFinalizedAtFromFeed,
   parsePitchEvents,
+  parseGameLineups,
 } from "@abs/data-pipeline";
 import { prisma } from "../db/prisma";
 import {
   ensureGameFinalized,
+  findGame,
+  markGameIngested,
   recomputeChallengesRemaining,
 } from "../db/gameRepository";
-import { handleGameDiscovered } from "./ingestService";
+import { handleGameDiscovered, handleLineupUpdate } from "./ingestService";
 import { processGameBackfill } from "./gameBackfillService";
 import { handlePitchEvent } from "./ingestService";
 import { triggerRecommendationIfCalledStrike } from "./challengeService";
-import { scheduleSavantPostgameEnrichment } from "./postgameScheduler";
-import { enqueuePipelineDbWork } from "../db/pipelineDbQueue";
+import { schedulePostgameAudit } from "./postgameScheduler";
+import {
+  enqueuePipelineDbWork,
+  isLiveGameBackfillInProgress,
+  waitForGameIngest,
+} from "../db/pipelineDbQueue";
 
 export interface FinalBackfillScanResult {
   candidates: number;
@@ -77,6 +84,58 @@ export async function gameNeedsFinalBackfill(
   return false;
 }
 
+/**
+ * Skip feed fetch when the game is Final and already ingested, or ingest is running.
+ */
+export async function shouldSkipFinalBackfillFetch(
+  gamePk: number
+): Promise<"ingested" | "in_progress" | null> {
+  if (isLiveGameBackfillInProgress(gamePk)) {
+    return "in_progress";
+  }
+
+  const game = await findGame(gamePk);
+  if (game?.status === "Final" && game.ingestedAt) {
+    return "ingested";
+  }
+
+  return null;
+}
+
+async function resolveFinalBackfillSkip(
+  gamePk: number
+): Promise<"ingested" | "proceed"> {
+  let skipReason = await shouldSkipFinalBackfillFetch(gamePk);
+
+  if (skipReason === "ingested") {
+    console.log(
+      `[finalGameBackfill] game=${gamePk} — already ingested, skipping feed fetch`
+    );
+    schedulePostgameAudit(gamePk);
+    return "ingested";
+  }
+
+  if (skipReason === "in_progress") {
+    console.log(
+      `[finalGameBackfill] game=${gamePk} — live ingest in progress, waiting`
+    );
+    await waitForGameIngest(gamePk);
+    skipReason = await shouldSkipFinalBackfillFetch(gamePk);
+    if (skipReason === "ingested") {
+      schedulePostgameAudit(gamePk);
+      return "ingested";
+    }
+    if (skipReason === "in_progress") {
+      console.warn(
+        `[finalGameBackfill] game=${gamePk} — live ingest still running after wait`
+      );
+      return "ingested";
+    }
+  }
+
+  return "proceed";
+}
+
 async function replayPitchEvents(events: MlbLivePitchEvent[]): Promise<void> {
   const sorted = [...events].sort(
     (a, b) => a.atBatIndex - b.atBatIndex || a.pitchNumber - b.pitchNumber
@@ -98,6 +157,11 @@ export async function backfillFinalGame(
   activeGame: ActiveGame
 ): Promise<boolean> {
   const { gamePk } = activeGame;
+
+  if ((await resolveFinalBackfillSkip(gamePk)) !== "proceed") {
+    return false;
+  }
+
   const fetchedAt = new Date().toISOString();
 
   const feed = await fetchLiveFeed(gamePk);
@@ -123,7 +187,8 @@ export async function backfillFinalGame(
   if (!needsBackfill) {
     console.log(`[finalGameBackfill] game=${gamePk} — already fully ingested`);
     await ensureGameFinalized(gamePk, inferFinalizedAtFromFeed(feed));
-    scheduleSavantPostgameEnrichment(gamePk);
+    await markGameIngested(gamePk);
+    schedulePostgameAudit(gamePk);
     return false;
   }
 
@@ -135,13 +200,19 @@ export async function backfillFinalGame(
   await handleGameDiscovered({ ...activeGame, status: "Final" });
   await ensureGameFinalized(gamePk, inferFinalizedAtFromFeed(feed));
 
+  const lineups = parseGameLineups(feed, fetchedAt);
+  if (lineups.length > 0) {
+    await handleLineupUpdate(lineups);
+  }
+
   await new Promise<void>((resolve) => {
     void processGameBackfill(payload, resolve);
   });
 
   await replayPitchEvents(pitchEvents);
   await recomputeChallengesRemaining(gamePk);
-  scheduleSavantPostgameEnrichment(gamePk);
+  await markGameIngested(gamePk);
+  schedulePostgameAudit(gamePk);
 
   console.log(`[finalGameBackfill] game=${gamePk} — backfill complete`);
   return true;

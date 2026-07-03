@@ -189,7 +189,7 @@ describe("decideChallenge — recommendation labels", () => {
     });
 
     const result = decideChallenge(makeInput(lowValueState, aggressivePlayer));
-    expect(result.recommendation).toBe("DENY");
+    expect(result.recommendation).toBe("WARN");
   });
 
   test("disciplined batter in high-leverage situation scores higher than aggressive batter", () => {

@@ -45,8 +45,8 @@ import {
 } from "./services/challengeService";
 import { processGameBackfill } from "./services/gameBackfillService";
 import {
-  scheduleSavantPostgameEnrichment,
-  resumePendingSavantEnrichments,
+  schedulePostgameAudit,
+  resumePendingPostgameAudits,
 } from "./services/postgameScheduler";
 import { scanAndBackfillFinalGames } from "./services/finalGameBackfillService";
 import { backfillMissingRankingsContributions } from "./services/rankingsBackfillService";
@@ -88,10 +88,10 @@ export async function startOrchestrator(): Promise<void> {
   await reconcileChallengeCounts();
   startLivePollJob();
   scheduleSavantDailyJob();  // Then schedule daily reruns.
-  await resumePendingSavantEnrichments();
+  await resumePendingPostgameAudits();
   await runFinalGameBackfill();
   scheduleFinalGameBackfill();
-  await runRankingsBackfill();
+  void runRankingsBackfill();
   await runCleanupJob();     // Purge old data at startup and schedule daily reruns.
   scheduleCleanupJob();
 }
@@ -104,7 +104,11 @@ function startLivePollJob(): void {
   const job = new LivePollJob();
 
   job.on("gameDiscovered", async (game) => {
-    await handleGameDiscovered(game);
+    await enqueuePipelineDbWork(
+      `game-discovered game=${game.gamePk}`,
+      () => handleGameDiscovered(game),
+      "high"
+    );
   });
 
   /**
@@ -158,11 +162,17 @@ function startLivePollJob(): void {
 
   job.on("gameOver", async ({ gamePk }) => {
     await handleGameOver(gamePk);
-    scheduleSavantPostgameEnrichment(gamePk);
+    schedulePostgameAudit(gamePk);
   });
 
   job.on("lineupUpdate", async (entries) => {
-    await handleLineupUpdate(entries);
+    if (entries.length === 0) return;
+    const gamePk = entries[0].gamePk;
+    await enqueuePipelineDbWork(
+      `lineup game=${gamePk} count=${entries.length}`,
+      () => handleLineupUpdate(entries),
+      "high"
+    );
   });
 
   job.on("error", (err) => {
@@ -233,11 +243,13 @@ function scheduleFinalGameBackfill(): void {
 
 async function runRankingsBackfill(): Promise<void> {
   try {
+    console.log("[orchestrator] running rankings backfill");
     await enqueuePipelineDbWork(
       "rankings-backfill",
       () => backfillMissingRankingsContributions(),
       "low"
     );
+    console.log("[orchestrator] rankings backfill complete");
   } catch (err) {
     console.error("[orchestrator] rankings backfill error:", err);
   }
