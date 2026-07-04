@@ -32,8 +32,8 @@ export function buildPlayerChallengeContext(
     battingHand: toHandedness(snapshot.battingHand),
 
     // Offensive value signals (used to scale the RE delta).
-    obp: snapshot.obp,
-    ops: snapshot.ops,
+    obp: finiteOrNull(snapshot.obp),
+    ops: finiteOrNull(snapshot.ops),
 
     // Plate discipline rates — converted from stored percentages.
     walkRate: toRate(snapshot.bbPercent),
@@ -59,7 +59,7 @@ export function buildPlayerChallengeContext(
       : null,
 
     // OAA for the fielder covering this batter's primary spray zone.
-    fielderOaa,
+    fielderOaa: finiteOrNull(fielderOaa),
   };
 }
 
@@ -95,9 +95,12 @@ export function buildDefaultPlayerChallengeContext(
  * Returns null when the value is null (metric was not available in Savant).
  */
 function toRate(percent: number | null): number | null {
-  return percent === null
-    ? null
-    : percent / STAT_CONVERSION.PERCENT_TO_RATE_DIVISOR;
+  if (percent === null || !Number.isFinite(percent)) return null;
+  return percent / STAT_CONVERSION.PERCENT_TO_RATE_DIVISOR;
+}
+
+function finiteOrNull(value: number | null | undefined): number | null {
+  return value != null && Number.isFinite(value) ? value : null;
 }
 
 /**

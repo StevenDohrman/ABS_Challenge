@@ -76,19 +76,20 @@ export function computeDefensiveContext(
   let sprayAdj = 0;
   let oaaAdj = 0;
   const sprayDataAvailable = !!player.sprayProfile;
-  const fielderOaaAvailable = player.fielderOaa !== null;
+  const fielderOaaAvailable =
+    player.fielderOaa !== null && Number.isFinite(player.fielderOaa);
 
   // ── Spray component ────────────────────────────────────────────────────────
   if (player.sprayProfile) {
     const { gbPercent, fbPercent, ldPercent } = player.sprayProfile;
 
-    if (gbPercent !== null) {
+    if (gbPercent !== null && Number.isFinite(gbPercent)) {
       sprayAdj -= (gbPercent - DEFENSIVE.LEAGUE_AVG_GB_RATE) * DEFENSIVE.GB_SCALE;
     }
-    if (fbPercent !== null) {
+    if (fbPercent !== null && Number.isFinite(fbPercent)) {
       sprayAdj += (fbPercent - DEFENSIVE.LEAGUE_AVG_FB_RATE) * DEFENSIVE.FB_SCALE;
     }
-    if (ldPercent !== null) {
+    if (ldPercent !== null && Number.isFinite(ldPercent)) {
       sprayAdj += (ldPercent - DEFENSIVE.LEAGUE_AVG_LD_RATE) * DEFENSIVE.LD_SCALE;
     }
   }
@@ -96,8 +97,8 @@ export function computeDefensiveContext(
   // ── Fielder OAA component ──────────────────────────────────────────────────
   // Positive OAA = elite defender in this batter's zone → fewer hits → penalty.
   // Negative OAA = poor defender → more hits → bonus.
-  if (player.fielderOaa !== null) {
-    oaaAdj = -player.fielderOaa * DEFENSIVE.OAA_SCALE;
+  if (fielderOaaAvailable) {
+    oaaAdj = -player.fielderOaa! * DEFENSIVE.OAA_SCALE;
   }
 
   const multiplier = clamp(

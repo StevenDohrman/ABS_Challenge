@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "prebuild": "rm -f dist/constants.js dist/constants.d.ts dist/constants.js.map dist/constants.d.ts.map",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",

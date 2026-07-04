@@ -162,8 +162,8 @@ export async function precomputeAtBatRecommendations(
     const row = lineupStatById.get(playerId);
     return {
       playerId,
-      ops: row?.ops ?? null,
-      woba: row?.woba ?? null,
+      ops: finiteStat(row?.ops),
+      woba: finiteStat(row?.woba),
     };
   });
 
@@ -565,7 +565,7 @@ async function resolveFielderOaa(
     if (!row) continue;
 
     const oaa = oaaForRow(row);
-    if (oaa === null) continue;
+    if (oaa === null || !Number.isFinite(oaa)) continue;
 
     weightedSum += oaa * weight;
     weightUsed += weight;
@@ -573,5 +573,10 @@ async function resolveFielderOaa(
 
   if (weightUsed === 0) return null;
 
-  return weightedSum / weightUsed;
+  const average = weightedSum / weightUsed;
+  return Number.isFinite(average) ? average : null;
+}
+
+function finiteStat(value: number | null | undefined): number | null {
+  return value != null && Number.isFinite(value) ? value : null;
 }

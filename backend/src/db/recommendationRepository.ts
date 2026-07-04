@@ -34,14 +34,18 @@ export interface WriteRecommendationInput {
  * re-processed (e.g. after a pipeline restart), the existing row is refreshed
  * with the latest engine output.
  */
+function finiteFloat(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export async function upsertRecommendation(
   input: WriteRecommendationInput
 ): Promise<ChallengeRecommendation> {
   const sharedFields = {
     recommendation: input.decision.recommendation,
     minimumConfidenceRequired: input.decision.minimumPlayerConfidenceRequired,
-    expectedValue: input.decision.expectedValueOfChallenge,
-    score: input.decision.score,
+    expectedValue: finiteFloat(input.decision.expectedValueOfChallenge),
+    score: finiteFloat(input.decision.score),
     challengeAvailable: input.challengeAvailable,
     explanationJson: input.decision.explanation as object,
   };
@@ -62,11 +66,11 @@ export async function upsertRecommendation(
       pitchEventId: null,
     },
     create: {
-      gamePk: input.gamePk,
       atBatIndex: input.atBatIndex,
       balls: input.balls,
       strikes: input.strikes,
       ...sharedFields,
+      game: { connect: { gamePk: input.gamePk } },
     },
   });
 }

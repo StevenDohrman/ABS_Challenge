@@ -54,8 +54,10 @@ export function computeLineupContext(
 }
 
 function resolveQuality(batter: { ops: number | null; woba: number | null }): number | null {
-  if (batter.woba !== null) return batter.woba;
-  if (batter.ops !== null) return batter.ops / OPS_TO_WOBA_SCALE;
+  if (batter.woba !== null && Number.isFinite(batter.woba)) return batter.woba;
+  if (batter.ops !== null && Number.isFinite(batter.ops)) {
+    return batter.ops / OPS_TO_WOBA_SCALE;
+  }
   return null;
 }
 

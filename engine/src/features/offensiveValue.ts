@@ -70,7 +70,9 @@ export function computeOffensiveValue(
 // ---------------------------------------------------------------------------
 
 function resolveOps(player: PlayerChallengeContext): number | null {
-  if (player.ops !== null) return player.ops;
-  if (player.obp !== null) return player.obp * OBP_TO_OPS_SCALE;
+  if (player.ops !== null && Number.isFinite(player.ops)) return player.ops;
+  if (player.obp !== null && Number.isFinite(player.obp)) {
+    return player.obp * OBP_TO_OPS_SCALE;
+  }
   return null;
 }
