@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { Request, Response } from "express";
 import {
   countTrackedGames,
   fetchPlayerRankingRows,
@@ -37,8 +37,7 @@ function buildMeta(
 /** GET /api/rankings — precomputed totals; sort applied in memory. */
 export async function getRankingsBundle(
   req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ): Promise<void> {
   const period = resolveRankingsPeriod(req.query["period"]);
   const sortOptions = parseRankingsSortOptions(req.query["sort"], req.query["order"]);
@@ -60,8 +59,7 @@ export async function getRankingsBundle(
 
 export async function getPlayerRankings(
   req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ): Promise<void> {
   const period = resolveRankingsPeriod(req.query["period"]);
   const sortOptions = parseRankingsSortOptions(req.query["sort"], req.query["order"]);
@@ -81,8 +79,7 @@ export async function getPlayerRankings(
 
 export async function getTeamRankings(
   req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ): Promise<void> {
   const period = resolveRankingsPeriod(req.query["period"]);
   const sortOptions = parseRankingsSortOptions(req.query["sort"], req.query["order"]);

@@ -1,6 +1,20 @@
 import { Prisma } from "@prisma/client";
 
+/** Typed HTTP error for controllers — caught by asyncHandler and mapped to JSON. */
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
 export function httpStatusForError(err: unknown): number {
+  if (err instanceof HttpError) {
+    return err.status;
+  }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // P1001: can't reach server, P1002: server timeout, P1017: connection closed
     if (err.code === "P1001" || err.code === "P1002" || err.code === "P1017") {
@@ -20,6 +34,9 @@ export function httpStatusForError(err: unknown): number {
 }
 
 export function publicErrorMessage(err: unknown, status: number): string {
+  if (err instanceof HttpError) {
+    return err.message;
+  }
   if (status === 503) {
     return "Database temporarily unavailable";
   }
