@@ -12,10 +12,10 @@
  *   LivePollJob.atBatStart  → ingestService.handleAtBatStart
  *                           → challengeService.precomputeAtBatRecommendations
  *
- *   LivePollJob.pitchEvent  → ingestService.handlePitchEvent
- *                           → challengeService.triggerRecommendationIfCalledStrike
+ *   LivePollJob.pitchEvent  → pitchEventPipeline.ingestPitchAndTriggerRecommendation
  *
- *   LivePollJob.gameOver    → ingestService.handleGameOver
+ *   LivePollJob.gameOver    → ingestService.handleGameOver (queued)
+ *                           → postgameScheduler.schedulePostgameAudit
  *
  *   SavantDailyJob.batterStatlines       → ingestService.handleBatterStatlines
  *   SavantDailyJob.sprayProfiles         → ingestService.handleSprayProfiles
@@ -30,7 +30,6 @@ import { LivePollJob, SavantDailyJob } from "@abs/data-pipeline";
 import {
   handleGameDiscovered,
   handleAtBatStart,
-  handlePitchEvent,
   handleGameOver,
   handleBatterStatlines,
   handleSprayProfiles,
@@ -39,10 +38,8 @@ import {
   handleLineupUpdate,
   reconcileChallengeCounts,
 } from "./services/ingestService";
-import {
-  precomputeAtBatRecommendations,
-  triggerRecommendationIfCalledStrike,
-} from "./services/challengeService";
+import { precomputeAtBatRecommendations } from "./services/challengeService";
+import { ingestPitchAndTriggerRecommendation } from "./services/pitchEventPipeline";
 import { processGameBackfill } from "./services/gameBackfillService";
 import {
   schedulePostgameAudit,
@@ -150,19 +147,20 @@ function startLivePollJob(): void {
     await waitForGameBackfillPitchReady(event.gamePk);
     await enqueuePipelineDbWork(
       `pitch game=${event.gamePk} atBat=${event.atBatIndex} pitch=${event.pitchNumber}`,
-      async () => {
-        const dbRowId = await handlePitchEvent(event);
-        if (dbRowId !== null) {
-          await triggerRecommendationIfCalledStrike(event, dbRowId);
-        }
-      },
+      () => ingestPitchAndTriggerRecommendation(event),
       "high"
     );
   });
 
   job.on("gameOver", async ({ gamePk }) => {
-    await handleGameOver(gamePk);
-    schedulePostgameAudit(gamePk);
+    await enqueuePipelineDbWork(
+      `game-over game=${gamePk}`,
+      async () => {
+        await handleGameOver(gamePk);
+        schedulePostgameAudit(gamePk);
+      },
+      "high"
+    );
   });
 
   job.on("lineupUpdate", async (entries) => {

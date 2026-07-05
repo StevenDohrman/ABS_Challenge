@@ -29,8 +29,7 @@ import {
 } from "../db/gameRepository";
 import { handleGameDiscovered, handleLineupUpdate } from "./ingestService";
 import { processGameBackfill } from "./gameBackfillService";
-import { handlePitchEvent } from "./ingestService";
-import { triggerRecommendationIfCalledStrike } from "./challengeService";
+import { ingestPitchAndTriggerRecommendation } from "./pitchEventPipeline";
 import { schedulePostgameAudit } from "./postgameScheduler";
 import {
   enqueuePipelineDbWork,
@@ -142,10 +141,7 @@ async function replayPitchEvents(events: MlbLivePitchEvent[]): Promise<void> {
   );
 
   for (const event of sorted) {
-    const dbRowId = await handlePitchEvent(event);
-    if (dbRowId !== null) {
-      await triggerRecommendationIfCalledStrike(event, dbRowId);
-    }
+    await ingestPitchAndTriggerRecommendation(event);
   }
 }
 

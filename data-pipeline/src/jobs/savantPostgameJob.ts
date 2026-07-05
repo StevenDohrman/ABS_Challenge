@@ -18,8 +18,11 @@ export interface SavantPostgameJob {
 /**
  * Fetches postgame Statcast pitch data for a single completed game.
  *
+ * Not wired by the backend orchestrator — postgame audit uses the MLB live feed.
+ * Export is available for optional Statcast enrichment or future integrations.
+ *
  * Savant typically lags 30–60+ minutes after game end. When the CSV is empty
- * or header-only, emits `notReady` so the orchestrator can schedule a retry.
+ * or header-only, emits `notReady` so callers can schedule a retry.
  */
 export class SavantPostgameJob extends EventEmitter implements SavantPostgameJob {
   async run(gamePk: number): Promise<void> {

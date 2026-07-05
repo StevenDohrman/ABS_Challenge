@@ -41,6 +41,9 @@ const DEFAULT_BATCH_DELAY_MS = 500;
 /**
  * Fetches per-player Statcast pitch history for a confirmed game lineup.
  *
+ * Not wired by the backend orchestrator — pregame context comes from
+ * SavantDailyJob. Export is available for optional lineup-time enrichment.
+ *
  * Called at lineup confirmation time (not as part of the daily bulk job).
  * Typically covers ~18–26 players across both teams in a single game.
  *
