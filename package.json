@@ -13,6 +13,7 @@
     "backend:dev": "npm run build --workspace=data-pipeline && npm run dev --workspace=backend",
     "frontend:build": "npm run build --workspace=frontend",
     "pipeline:build": "npm run build --workspace=data-pipeline",
-    "typecheck": "npm run typecheck --workspace=frontend && npm run typecheck --workspace=backend"
+    "typecheck": "npm run typecheck --workspace=frontend && npm run typecheck --workspace=backend",
+    "frontend:test": "npm run test --workspace=frontend"
   }
 }

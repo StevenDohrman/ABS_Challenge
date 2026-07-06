@@ -1,44 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ScheduleGame } from "../api/types";
-import type {
-  ChallengeRecommendationResponse,
-  AtBatRecommendationGridResponse,
-  GameAtBatHistoryResponse,
-  PostgameAuditResponse,
-} from "../api/types";
-import {
-  fetchLatestRecommendation,
-  fetchCurrentAtBatGrid,
-  fetchGameAtBatHistory,
-  fetchTodaySchedule,
-  fetchPostgameAudit,
-} from "../api/client";
 import { LivePitchCard } from "../components/LivePitchCard";
 import { PreAtBatBanner } from "../components/PreAtBatBanner";
 import { AtBatHistory } from "../components/AtBatHistory";
 import { PostgameAuditSummary } from "../components/PostgameAuditSummary";
 import { StatusDot } from "../components/StatusDot";
-import { mlbToday } from "../utils/scheduleDates";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Props + helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-const LIVE_PITCH_POLL_MS  = 5_000;
-const PRE_BAT_POLL_MS     = 8_000;
-const HISTORY_POLL_MS     = 15_000;
-const SCHEDULE_REFRESH_MS = 30_000;
-const AUDIT_POLL_MS       = 30_000;
-
-function PulsingDot() {
-  return (
-    <span className="relative inline-flex h-2 w-2">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40" />
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-    </span>
-  );
-}
+import { EmptyState } from "../components/ui/EmptyState";
+import { GameDetailSkeleton, HistoryRowSkeleton } from "../components/ui/LoadingSkeleton";
+import { PulsingDot } from "../components/ui/PulsingDot";
+import { useGameDetailData } from "../hooks/useGameDetailData";
+import { useScheduleGame } from "../hooks/useSchedule";
+import { formatInningShort, teamAbbrev } from "../utils/baseballDisplay";
+import { formatTimestamp } from "../utils/format";
 
 const CHALLENGES_PER_TEAM = 2;
 
@@ -84,36 +57,13 @@ function ScorePill({ abbrev, score, isWinner }: { abbrev: string; score: number 
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function GameDetailScreen() {
   const { gamePk: gamePkParam } = useParams<{ gamePk: string }>();
   const [searchParams] = useSearchParams();
   const scheduleDate = searchParams.get("date") ?? undefined;
   const gamePk = parseInt(gamePkParam ?? "", 10);
 
-  const [game, setGame] = useState<ScheduleGame | null>(null);
-  const [gameLoading, setGameLoading] = useState(true);
-
-  useEffect(() => {
-    if (isNaN(gamePk)) return;
-    async function refreshGame() {
-      setGameLoading(true);
-      const r = await fetchTodaySchedule(scheduleDate);
-      if (r.status === "ok") {
-        const found = r.data.games.find((g) => g.gamePk === gamePk);
-        setGame(found ?? null);
-      }
-      setGameLoading(false);
-    }
-    void refreshGame();
-    const isHistoricalDate = scheduleDate != null && scheduleDate !== mlbToday();
-    if (isHistoricalDate) return;
-    const id = setInterval(() => void refreshGame(), SCHEDULE_REFRESH_MS);
-    return () => clearInterval(id);
-  }, [gamePk, scheduleDate]);
+  const { game, loading: gameLoading } = useScheduleGame(gamePk, scheduleDate);
 
   if (isNaN(gamePk) || (!gameLoading && !game)) {
     return (
@@ -124,20 +74,13 @@ export function GameDetailScreen() {
         >
           <span>←</span> All games
         </Link>
-        <div className="rounded-xl border border-white/10 px-5 py-8 text-center">
-          <p className="text-sm text-white/40">Game not found.</p>
-        </div>
+        <EmptyState title="Game not found." />
       </div>
     );
   }
 
   if (!game) {
-    return (
-      <div className="space-y-4">
-        <div className="h-8 w-24 bg-white/5 rounded animate-pulse" />
-        <div className="h-40 rounded-2xl bg-white/5 border border-white/10 animate-pulse" />
-      </div>
-    );
+    return <GameDetailSkeleton />;
   }
 
   return <GameDetailContent game={game} scheduleDate={scheduleDate} />;
@@ -150,103 +93,33 @@ function GameDetailContent({
   game: ScheduleGame;
   scheduleDate?: string;
 }) {
-  const isLive   = game.abstractState === "Live";
-  const isFinal  = game.abstractState === "Final";
-  const isPre    = game.abstractState === "Preview";
+  const isLive = game.abstractState === "Live";
+  const isFinal = game.abstractState === "Final";
+  const isPre = game.abstractState === "Preview";
 
-  const awayAbbrev = game.awayTeamAbbrev || game.awayTeamName.slice(0, 3).toUpperCase();
-  const homeAbbrev = game.homeTeamAbbrev || game.homeTeamName.slice(0, 3).toUpperCase();
+  const awayAbbrev = teamAbbrev(game.awayTeamAbbrev, game.awayTeamName);
+  const homeAbbrev = teamAbbrev(game.homeTeamAbbrev, game.homeTeamName);
   const awayWins = (game.awayScore ?? 0) > (game.homeScore ?? 0);
   const homeWins = (game.homeScore ?? 0) > (game.awayScore ?? 0);
 
-  // ── Live mode state ───────────────────────────────────────────────────────
-  const [livePitch, setLivePitch] = useState<ChallengeRecommendationResponse | null>(null);
-  const [preBat, setPreBat] = useState<AtBatRecommendationGridResponse | null>(null);
-  const [showGrid, setShowGrid] = useState(false);
-  const [liveLastUpdated, setLiveLastUpdated] = useState<Date | null>(null);
+  const {
+    livePitch,
+    preBat,
+    showGrid,
+    setShowGrid,
+    liveLastUpdated,
+    history,
+    historyLoading,
+    postgameAudit,
+    auditLoading,
+  } = useGameDetailData({
+    gamePk: game.gamePk,
+    isLive,
+    isFinal,
+    isTracked: game.isTracked,
+  });
 
-  // ── History state ─────────────────────────────────────────────────────────
-  const [history, setHistory] = useState<GameAtBatHistoryResponse | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-
-  // ── Postgame audit state ──────────────────────────────────────────────────
-  const [postgameAudit, setPostgameAudit] = useState<PostgameAuditResponse | null>(null);
-  const [auditLoading, setAuditLoading] = useState(false);
-
-  // ── Live polling ──────────────────────────────────────────────────────────
-  const pollLive = useCallback(async () => {
-    if (!isLive) return;
-    const [pitchResult, preBatResult] = await Promise.all([
-      fetchLatestRecommendation(game.gamePk),
-      fetchCurrentAtBatGrid(game.gamePk),
-    ]);
-    if (pitchResult.status === "ok") setLivePitch(pitchResult.data);
-    else if (pitchResult.status === "no_content") setLivePitch(null);
-
-    if (preBatResult.status === "ok") setPreBat(preBatResult.data);
-    else if (preBatResult.status === "no_content") setPreBat(null);
-
-    setLiveLastUpdated(new Date());
-  }, [game.gamePk, isLive]);
-
-  useEffect(() => {
-    if (!isLive) return;
-    void pollLive();
-    const id = setInterval(() => void pollLive(), LIVE_PITCH_POLL_MS);
-    return () => clearInterval(id);
-  }, [isLive, pollLive]);
-
-  // ── History polling / loading ─────────────────────────────────────────────
-  const loadHistory = useCallback(async () => {
-    if (!game.isTracked && !isFinal) return;
-    setHistoryLoading(true);
-    const result = await fetchGameAtBatHistory(game.gamePk);
-    if (result.status === "ok") setHistory(result.data);
-    setHistoryLoading(false);
-  }, [game.gamePk, game.isTracked, isFinal]);
-
-  useEffect(() => {
-    void loadHistory();
-    if (!isLive) return;
-    const id = setInterval(() => void loadHistory(), HISTORY_POLL_MS);
-    return () => clearInterval(id);
-  }, [isLive, loadHistory]);
-
-  const loadPostgameAudit = useCallback(async () => {
-    if (!isFinal) return;
-    setAuditLoading(true);
-    const result = await fetchPostgameAudit(game.gamePk);
-    if (result.status === "ok") setPostgameAudit(result.data);
-    setAuditLoading(false);
-  }, [game.gamePk, isFinal]);
-
-  useEffect(() => {
-    void loadPostgameAudit();
-    if (!isFinal) return;
-    const id = setInterval(() => {
-      if (postgameAudit?.status === "ready") return;
-      void loadPostgameAudit();
-    }, AUDIT_POLL_MS);
-    return () => clearInterval(id);
-  }, [isFinal, loadPostgameAudit, postgameAudit?.status]);
-
-  // ── Pre-bat polling (separate for banner update rate) ─────────────────────
-  useEffect(() => {
-    if (!isLive) return;
-    const id = setInterval(async () => {
-      const r = await fetchCurrentAtBatGrid(game.gamePk);
-      if (r.status === "ok") setPreBat(r.data);
-    }, PRE_BAT_POLL_MS);
-    return () => clearInterval(id);
-  }, [isLive, game.gamePk]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const liveUpdatedStr = liveLastUpdated
-    ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(liveLastUpdated)
-    : null;
+  const liveUpdatedStr = liveLastUpdated ? formatTimestamp(liveLastUpdated) : null;
 
   return (
     <div className="space-y-6">
@@ -286,7 +159,7 @@ function GameDetailContent({
             {isLive && game.currentInning ? (
               <div className="space-y-1">
                 <p className="text-lg font-mono text-white/60">
-                  {game.currentInningHalf === "Top" ? "▲" : "▼"}&nbsp;{game.currentInning}
+                  {formatInningShort(game.currentInningHalf, game.currentInning)}
                 </p>
                 {game.balls !== null && game.strikes !== null && (
                   <p className="text-xs font-mono text-white/40">
@@ -338,7 +211,6 @@ function GameDetailContent({
       {/* ── LIVE MODE ─────────────────────────────────────────────────────── */}
       {isLive && game.isTracked && (
         <>
-          {/* Pre-at-bat banner */}
           {preBat ? (
             <PreAtBatBanner
               data={preBat}
@@ -352,7 +224,6 @@ function GameDetailContent({
             </div>
           )}
 
-          {/* Latest called-strike card */}
           {livePitch ? (
             <section className="space-y-2">
               <div className="flex items-center gap-2">
@@ -368,7 +239,6 @@ function GameDetailContent({
             </div>
           ) : null}
 
-          {/* In-game history */}
           {history && history.atBats.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2">
@@ -383,13 +253,12 @@ function GameDetailContent({
 
       {/* ── PRE-GAME MODE ─────────────────────────────────────────────────── */}
       {isPre && (
-        <div className="rounded-2xl border border-white/10 bg-white/3 px-6 py-10 text-center space-y-2">
-          <p className="text-3xl">⏰</p>
-          <p className="text-white/60 font-medium">Game hasn't started yet</p>
-          <p className="text-sm text-white/30">
-            Recommendations will appear once the pipeline begins tracking this game.
-          </p>
-        </div>
+        <EmptyState
+          size="md"
+          icon="⏰"
+          title="Game hasn't started yet"
+          description="Recommendations will appear once the pipeline begins tracking this game."
+        />
       )}
 
       {/* ── POST-GAME MODE ────────────────────────────────────────────────── */}
@@ -405,30 +274,18 @@ function GameDetailContent({
           <section className="space-y-3">
             <p className="text-xs text-white/40 font-mono uppercase tracking-widest">At-bat review</p>
 
-          {historyLoading && !history && (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-14 rounded-xl bg-white/5 border border-white/10 animate-pulse" />
-              ))}
-            </div>
-          )}
+          {historyLoading && !history && <HistoryRowSkeleton />}
 
           {!historyLoading && !history && game.isTracked && (
-            <div className="rounded-xl border border-white/10 px-5 py-6 text-center">
-              <p className="text-sm text-white/40">No at-bat data found for this game.</p>
-            </div>
+            <EmptyState title="No at-bat data found for this game." />
           )}
 
           {!historyLoading && !history && !game.isTracked && (
-            <div className="rounded-xl border border-white/10 px-5 py-8 text-center space-y-2">
-              <p className="text-2xl">⏳</p>
-              <p className="text-sm text-white/50">
-                Ingesting game data from the MLB archive…
-              </p>
-              <p className="text-xs text-white/30">
-                Final games are backfilled automatically; refresh in a few minutes.
-              </p>
-            </div>
+            <EmptyState
+              icon="⏳"
+              title="Ingesting game data from the MLB archive…"
+              description="Final games are backfilled automatically; refresh in a few minutes."
+            />
           )}
 
           {history && <AtBatHistory atBats={history.atBats} />}

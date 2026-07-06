@@ -1,189 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { fetchRankingsBundle } from "../api/client";
-import type {
-  PlayerRankingRow,
-  RankingsLeaderboardSort,
-  RankingsPeriod,
-  RankingsSortOrder,
-  TeamRankingRow,
-} from "../api/types";
-import { sortPlayerRows, sortTeamRows } from "../utils/rankingsSort";
-
-type ViewMode = "players" | "teams";
-
-interface RankingsMeta {
-  period: RankingsPeriod;
-  periodLabel: string;
-  periodStart: string;
-  periodEnd: string;
-  trackingStartDate: string;
-  windowDays: number;
-  gameCount: number;
-}
-
-function parseSort(value: string | null): RankingsLeaderboardSort {
-  if (value === "challengeSuccess") return "challengeSuccess";
-  if (value === "gainedRe") return "gainedRe";
-  return "missedRe";
-}
-
-function parseOrder(value: string | null): RankingsSortOrder {
-  return value === "asc" ? "asc" : "desc";
-}
-
-function SegmentedControl<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            value === opt.value
-              ? "bg-emerald-500/20 text-emerald-300"
-              : "text-white/50 hover:text-white/80"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function formatRate(rate: number | null): string {
-  if (rate === null) return "—";
-  return `${Math.round(rate * 100)}%`;
-}
-
-function formatRe(value: number): string {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)} RE`;
-}
-
-function orderLabel(sort: RankingsLeaderboardSort, order: RankingsSortOrder): string {
-  if (sort === "missedRe") {
-    return order === "desc" ? "Highest missed RE first" : "Lowest missed RE first";
-  }
-  if (sort === "gainedRe") {
-    return order === "desc" ? "Most gained RE first" : "Least gained RE first";
-  }
-  return order === "desc" ? "Best success % first" : "Worst success % first";
-}
+import { Link } from "react-router-dom";
+import type { PlayerRankingRow, RankingsLeaderboardSort, TeamRankingRow } from "../api/types";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { LoadingText } from "../components/ui/LoadingSkeleton";
+import { orderLabel, useRankings } from "../hooks/useRankings";
+import { formatRate, formatRe } from "../utils/format";
 
 export function RankingsScreen() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [view, setView] = useState<ViewMode>(
-    searchParams.get("view") === "teams" ? "teams" : "players"
-  );
-  const [period, setPeriod] = useState<RankingsPeriod>(
-    searchParams.get("period") === "season" ? "season" : "week"
-  );
-  const [sort, setSort] = useState<RankingsLeaderboardSort>(
-    parseSort(searchParams.get("sort"))
-  );
-  const [order, setOrder] = useState<RankingsSortOrder>(
-    parseOrder(searchParams.get("order"))
-  );
-
-  const [meta, setMeta] = useState<RankingsMeta | null>(null);
-  const [playerRows, setPlayerRows] = useState<PlayerRankingRow[]>([]);
-  const [teamRows, setTeamRows] = useState<TeamRankingRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const syncParams = useCallback(
-    (
-      nextView: ViewMode,
-      nextPeriod: RankingsPeriod,
-      nextSort: RankingsLeaderboardSort,
-      nextOrder: RankingsSortOrder
-    ) => {
-      const params: Record<string, string> = {};
-      if (nextView === "teams") params.view = "teams";
-      if (nextPeriod === "season") params.period = "season";
-      if (nextSort !== "missedRe") params.sort = nextSort;
-      if (nextOrder !== "desc") params.order = nextOrder;
-      setSearchParams(params, { replace: true });
-    },
-    [setSearchParams]
-  );
-
-  const load = useCallback(async (activePeriod: RankingsPeriod) => {
-    setLoading(true);
-    setError(null);
-
-    const result = await fetchRankingsBundle({ period: activePeriod });
-
-    if (result.status !== "ok") {
-      setError(result.status === "error" ? result.message : "Failed to load rankings");
-      setPlayerRows([]);
-      setTeamRows([]);
-      setMeta(null);
-      setLoading(false);
-      return;
-    }
-
-    setPlayerRows(result.data.players);
-    setTeamRows(result.data.teams);
-    setMeta({
-      period: result.data.period,
-      periodLabel: result.data.periodLabel,
-      periodStart: result.data.periodStart,
-      periodEnd: result.data.periodEnd,
-      trackingStartDate: result.data.trackingStartDate,
-      windowDays: result.data.windowDays,
-      gameCount: result.data.gameCount,
-    });
-    setError(null);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void load(period);
-  }, [period, load]);
-
-  const sortedPlayerRows = useMemo(
-    () => sortPlayerRows(playerRows, sort, order),
-    [playerRows, sort, order]
-  );
-
-  const sortedTeamRows = useMemo(
-    () => sortTeamRows(teamRows, sort, order),
-    [teamRows, sort, order]
-  );
+  const {
+    view,
+    period,
+    sort,
+    order,
+    meta,
+    loading,
+    error,
+    sortedPlayerRows,
+    sortedTeamRows,
+    setViewAndSync,
+    setPeriodAndSync,
+    setSortAndSync,
+    setOrderAndSync,
+  } = useRankings();
 
   const displayedRows = view === "players" ? sortedPlayerRows : sortedTeamRows;
-
-  const setViewAndSync = (next: ViewMode) => {
-    setView(next);
-    syncParams(next, period, sort, order);
-  };
-
-  const setPeriodAndSync = (next: RankingsPeriod) => {
-    setPeriod(next);
-    syncParams(view, next, sort, order);
-  };
-
-  const setSortAndSync = (next: RankingsLeaderboardSort) => {
-    setSort(next);
-    syncParams(view, period, next, order);
-  };
-
-  const setOrderAndSync = (next: RankingsSortOrder) => {
-    setOrder(next);
-    syncParams(view, period, sort, next);
-  };
 
   return (
     <div className="space-y-5">
@@ -243,9 +82,7 @@ export function RankingsScreen() {
         </p>
       )}
 
-      {loading && (
-        <p className="text-sm text-white/40 animate-pulse">Loading rankings…</p>
-      )}
+      {loading && <LoadingText>Loading rankings…</LoadingText>}
 
       {error && !loading && (
         <p className="text-sm text-red-400">{error}</p>

@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ScheduleGame } from "../api/types";
+import { formatInningShort, teamAbbrev } from "../utils/baseballDisplay";
+import { formatScheduledTime } from "../utils/format";
 
 interface Props {
   game: ScheduleGame;
@@ -34,14 +36,6 @@ function statusCfg(detailedState: string) {
   return STATUS_CONFIG[detailedState] ?? DEFAULT_STATUS;
 }
 
-function formatTime(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric", minute: "2-digit", timeZoneName: "short",
-    }).format(new Date(iso));
-  } catch { return ""; }
-}
-
 // ── Score display ──────────────────────────────────────────────────────────
 
 function ScoreRow({
@@ -67,9 +61,7 @@ function LiveSituation({ game }: { game: ScheduleGame }) {
   const { currentInning, currentInningHalf, balls, strikes, outs } = game;
   return (
     <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-3 text-xs font-mono text-white/50">
-      <span>
-        {currentInningHalf === "Top" ? "▲" : "▼"}&nbsp;{currentInning}
-      </span>
+      <span>{formatInningShort(currentInningHalf, currentInning)}</span>
       {balls !== null && strikes !== null && (
         <span>{balls}-{strikes}</span>
       )}
@@ -101,8 +93,8 @@ function ChallengeCounts({ game }: { game: ScheduleGame }) {
   if (!game.isTracked) return null;
   if (game.homeChallengesRemaining === null && game.awayChallengesRemaining === null) return null;
 
-  const awayAbbrev = game.awayTeamAbbrev || game.awayTeamName.slice(0, 3).toUpperCase();
-  const homeAbbrev = game.homeTeamAbbrev || game.homeTeamName.slice(0, 3).toUpperCase();
+  const awayAbbrev = teamAbbrev(game.awayTeamAbbrev, game.awayTeamName);
+  const homeAbbrev = teamAbbrev(game.homeTeamAbbrev, game.homeTeamName);
 
   return (
     <div className="mt-2.5 pt-2.5 border-t border-white/10 flex items-center gap-1.5">
@@ -154,7 +146,7 @@ export function GameCard({ game, scheduleDate }: Props) {
           )}
           {!isLive && !isFinal && (
             <span className="text-xs text-white/30 font-mono">
-              {formatTime(game.scheduledStartTime)}
+              {formatScheduledTime(game.scheduledStartTime)}
             </span>
           )}
         </div>
@@ -163,13 +155,13 @@ export function GameCard({ game, scheduleDate }: Props) {
       {/* Teams + scores */}
       <div className="space-y-1.5">
         <ScoreRow
-          abbrev={game.awayTeamAbbrev || game.awayTeamName.slice(0, 3).toUpperCase()}
+          abbrev={teamAbbrev(game.awayTeamAbbrev, game.awayTeamName)}
           name={game.awayTeamName}
           score={game.awayScore}
           isWinner={awayWins}
         />
         <ScoreRow
-          abbrev={game.homeTeamAbbrev || game.homeTeamName.slice(0, 3).toUpperCase()}
+          abbrev={teamAbbrev(game.homeTeamAbbrev, game.homeTeamName)}
           name={game.homeTeamName}
           score={game.homeScore}
           isWinner={homeWins}

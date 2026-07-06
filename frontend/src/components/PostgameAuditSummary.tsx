@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { PostgameAuditResponse, PostgameAuditItem } from "../api/types";
+import { formatHalfInning } from "../utils/baseballDisplay";
+import { formatSignedDecimal } from "../utils/format";
+import { AuditSummarySkeleton } from "./ui/LoadingSkeleton";
+import { PulsingDot } from "./ui/PulsingDot";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
 
@@ -9,10 +13,6 @@ interface Props {
   loading: boolean;
   awayAbbrev: string;
   homeAbbrev: string;
-}
-
-function formatMissedValue(value: number): string {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
 function TeamMissedCard({
@@ -28,7 +28,7 @@ function TeamMissedCard({
         {abbrev}
       </p>
       <p className="text-xl font-bold font-mono text-orange-300 tabular-nums">
-        {formatMissedValue(summary.totalMissedValue)}
+        {formatSignedDecimal(summary.totalMissedValue)}
       </p>
       <p className="text-[11px] text-white/35 mt-1">Value missed (RE)</p>
       <p className="text-[11px] font-mono text-white/30 mt-2">
@@ -36,17 +36,6 @@ function TeamMissedCard({
       </p>
     </div>
   );
-}
-
-function formatHalfInning(half: string, inning: number): string {
-  const arrow = half === "Top" ? "▲" : "▼";
-  return `${arrow} ${inning}${ordinalSuffix(inning)}`;
-}
-
-function ordinalSuffix(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] ?? s[v] ?? s[0];
 }
 
 function MissedRow({ item, rank }: { item: PostgameAuditItem; rank?: number }) {
@@ -87,12 +76,7 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
   const [showAllMissed, setShowAllMissed] = useState(false);
 
   if (loading && !audit) {
-    return (
-      <div className="rounded-2xl border border-white/10 bg-white/3 px-5 py-6 animate-pulse">
-        <div className="h-4 w-32 bg-white/10 rounded mb-4" />
-        <div className="h-8 w-48 bg-white/10 rounded" />
-      </div>
-    );
+    return <AuditSummarySkeleton />;
   }
 
   if (!audit) return null;
@@ -121,7 +105,7 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
           )}
         </div>
         {status === "pending" && (
-          <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <PulsingDot color="amber" animation="pulse" />
         )}
       </div>
 
@@ -134,7 +118,7 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
                 Game
               </p>
               <p className="text-xl font-bold font-mono text-orange-300 tabular-nums">
-                {formatMissedValue(summary.totalMissedValue)}
+                {formatSignedDecimal(summary.totalMissedValue)}
               </p>
               <p className="text-[11px] text-white/35 mt-1">Total value missed (RE)</p>
               <p className="text-[11px] font-mono text-white/30 mt-2">

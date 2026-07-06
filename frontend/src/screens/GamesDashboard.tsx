@@ -1,10 +1,14 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { fetchTodaySchedule, fetchHealth } from "../api/client";
-import type { ScheduleGame } from "../api/types";
+import { fetchHealth } from "../api/client";
 import { GameCard } from "../components/GameCard";
 import { StatusDot } from "../components/StatusDot";
 import { ScheduleDateSlider } from "../components/ScheduleDateSlider";
+import { EmptyState } from "../components/ui/EmptyState";
+import { GameCardSkeletonGrid } from "../components/ui/LoadingSkeleton";
+import { useSchedule } from "../hooks/useSchedule";
+import { useInterval } from "../hooks/useInterval";
+import { formatTimestamp } from "../utils/format";
 import {
   buildScheduleDateOptions,
   daysAgoForDate,
@@ -12,7 +16,6 @@ import {
   mlbDateDaysAgo,
 } from "../utils/scheduleDates";
 
-const REFRESH_MS = 30_000;
 const HEALTH_POLL_MS = 10_000;
 
 export function GamesDashboard() {
@@ -29,11 +32,9 @@ export function GamesDashboard() {
   const selectedDate = mlbDateDaysAgo(daysAgo);
   const isToday = daysAgo === 0;
 
-  const [games, setGames] = useState<ScheduleGame[]>([]);
-  const [date, setDate] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const { games, scheduleDate: loadedDate, loading, error, lastRefresh, reload } =
+    useSchedule(selectedDate);
+
   const [serverOnline, setServerOnline] = useState(false);
   const [dbOnline, setDbOnline] = useState(false);
 
@@ -53,48 +54,22 @@ export function GamesDashboard() {
     }
   }, [searchParams]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const result = await fetchTodaySchedule(selectedDate);
-    if (result.status === "ok") {
-      setGames(result.data.games);
-      setDate(result.data.date);
-      setError(null);
-      setLastRefresh(new Date());
-    } else if (result.status === "error") {
-      setError(result.message);
-    }
-    setLoading(false);
-  }, [selectedDate]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  useEffect(() => {
-    if (!isToday) return;
-    const id = setInterval(() => void load(), REFRESH_MS);
-    return () => clearInterval(id);
-  }, [isToday, load]);
-
-  useEffect(() => {
-    async function check() {
+  useInterval(
+    async () => {
       const h = await fetchHealth();
       setServerOnline(h.server);
       setDbOnline(h.db);
-    }
-    void check();
-    const id = setInterval(() => void check(), HEALTH_POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+    },
+    HEALTH_POLL_MS
+  );
 
-  const liveGames   = games.filter((g) => g.abstractState === "Live");
+  const liveGames = games.filter((g) => g.abstractState === "Live");
   const previewGames = games.filter((g) => g.abstractState === "Preview");
-  const finalGames  = games.filter((g) => g.abstractState === "Final");
+  const finalGames = games.filter((g) => g.abstractState === "Final");
 
-  const lastRefreshStr = lastRefresh
-    ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(lastRefresh)
-    : null;
-
+  const lastRefreshStr = lastRefresh ? formatTimestamp(lastRefresh) : null;
   const selectedLabel = dateOptions[daysAgo]?.longLabel;
+  const displayDate = loadedDate || selectedDate;
 
   return (
     <div className="space-y-8">
@@ -150,14 +125,7 @@ export function GamesDashboard() {
         </div>
       )}
 
-      {/* Loading skeleton */}
-      {loading && games.length === 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-28 rounded-2xl bg-white/5 border border-white/10 animate-pulse" />
-          ))}
-        </div>
-      )}
+      {loading && games.length === 0 && <GameCardSkeletonGrid />}
 
       {/* Error state */}
       {error && !loading && (
@@ -165,7 +133,7 @@ export function GamesDashboard() {
           <p className="text-sm text-red-300 font-semibold">Failed to load schedule</p>
           <p className="text-xs text-red-400/70 font-mono">{error}</p>
           <button
-            onClick={() => void load()}
+            onClick={() => void reload()}
             className="text-xs text-red-300 hover:text-white underline"
           >
             Try again
@@ -175,10 +143,12 @@ export function GamesDashboard() {
 
       {/* No games */}
       {!loading && !error && games.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/3 px-6 py-12 text-center space-y-2">
-          <p className="text-3xl">🏟</p>
-          <p className="text-white/50">No MLB games scheduled for this date.</p>
-        </div>
+        <EmptyState
+          size="md"
+          icon="🏟"
+          title="No MLB games scheduled for this date."
+          className="py-12"
+        />
       )}
 
       {/* Live games */}
@@ -187,7 +157,7 @@ export function GamesDashboard() {
           <SectionHeader label="Live" count={liveGames.length} accent="text-red-400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {liveGames.map((g) => (
-              <GameCard key={g.gamePk} game={g} scheduleDate={date || selectedDate} />
+              <GameCard key={g.gamePk} game={g} scheduleDate={displayDate} />
             ))}
           </div>
         </section>
@@ -199,7 +169,7 @@ export function GamesDashboard() {
           <SectionHeader label="Upcoming" count={previewGames.length} accent="text-amber-400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {previewGames.map((g) => (
-              <GameCard key={g.gamePk} game={g} scheduleDate={date || selectedDate} />
+              <GameCard key={g.gamePk} game={g} scheduleDate={displayDate} />
             ))}
           </div>
         </section>
@@ -211,7 +181,7 @@ export function GamesDashboard() {
           <SectionHeader label="Final" count={finalGames.length} accent="text-slate-400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {finalGames.map((g) => (
-              <GameCard key={g.gamePk} game={g} scheduleDate={date || selectedDate} />
+              <GameCard key={g.gamePk} game={g} scheduleDate={displayDate} />
             ))}
           </div>
         </section>

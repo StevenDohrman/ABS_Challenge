@@ -1,4 +1,6 @@
 import type { ChallengeRecommendationResponse } from "../api/types";
+import { inningHalfArrow } from "../utils/baseballDisplay";
+import { formatTimestamp } from "../utils/format";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
 import { ScoreBar } from "./ScoreBar";
@@ -16,7 +18,7 @@ function InningIndicator({
 }) {
   return (
     <span className="inline-flex items-center gap-1 text-xs font-mono text-white/50">
-      <span>{halfInning === "Top" ? "▲" : "▼"}</span>
+      <span>{inningHalfArrow(halfInning)}</span>
       <span>{inning}</span>
     </span>
   );
@@ -48,12 +50,7 @@ export function LivePitchCard({ data }: Props) {
 
   const ring = URGENCY_RING[recommendation] ?? "";
 
-  const triggeredTime = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  }).format(new Date(triggeredAt));
+  const triggeredTime = formatTimestamp(new Date(triggeredAt));
 
   return (
     <div
