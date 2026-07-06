@@ -6,7 +6,7 @@ import type { Game, LiveGameSnapshot, LivePitchEvent } from "@prisma/client";
 export type { Game, LiveGameSnapshot, LivePitchEvent };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// games
+// games — discovery & lookup
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -33,6 +33,17 @@ export async function upsertGame(game: ActiveGame): Promise<Game> {
 }
 
 /**
+ * Returns the game row for the given gamePk, or null if not found.
+ */
+export async function findGame(gamePk: number): Promise<Game | null> {
+  return prisma.game.findUnique({ where: { gamePk } });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// games — lifecycle flags
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
  * Mark a game as Final.
  */
 export async function markGameFinal(gamePk: number): Promise<void> {
@@ -54,14 +65,6 @@ export async function ensureGameFinalized(
     where: { gamePk, finalizedAt: null },
     data: { finalizedAt, updatedAt: new Date() },
   });
-}
-
-export async function countGameAtBats(gamePk: number): Promise<number> {
-  return prisma.liveGameSnapshot.count({ where: { gamePk } });
-}
-
-export async function countGamePitches(gamePk: number): Promise<number> {
-  return prisma.livePitchEvent.count({ where: { gamePk } });
 }
 
 export async function markPostgameAudited(gamePk: number): Promise<void> {
@@ -95,12 +98,21 @@ export async function isPostgameAudited(gamePk: number): Promise<boolean> {
   return game?.postgameAuditedAt != null;
 }
 
-/**
- * Returns the game row for the given gamePk, or null if not found.
- */
-export async function findGame(gamePk: number): Promise<Game | null> {
-  return prisma.game.findUnique({ where: { gamePk } });
+// ─────────────────────────────────────────────────────────────────────────────
+// games — pitch / at-bat counts
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function countGameAtBats(gamePk: number): Promise<number> {
+  return prisma.liveGameSnapshot.count({ where: { gamePk } });
 }
+
+export async function countGamePitches(gamePk: number): Promise<number> {
+  return prisma.livePitchEvent.count({ where: { gamePk } });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// games — challenge counts (derived from review pitch events)
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Derive how many challenges a team has available at a given inning, from the

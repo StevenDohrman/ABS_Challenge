@@ -3,33 +3,21 @@ import { getLatestRecommendationForGame } from "../services/challengeService";
 import { toRecommendationDto, toAtBatGridDto, toGameAtBatHistoryDto } from "../challenge.dto";
 import { prisma } from "../db/prisma";
 import { findAllForAtBat, findAllForGame } from "../db/recommendationRepository";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/games/:gamePk/recommendation
-// ─────────────────────────────────────────────────────────────────────────────
+import { parseGamePkParam } from "../utils/requestParams";
 
 /**
- * Return the most recently triggered challenge recommendation for a game.
- *
- * Triggered means a called-strike pitch was received at this count state and
- * the engine's pre-computed output for that count was activated.
+ * GET /api/games/:gamePk/recommendation
  *
  * Responses:
- *   200  ChallengeRecommendationResponseDto — a recommendation has been triggered
- *   204  No content — game is tracked but no called-strike pitch yet this game
- *   404  Game not found in the system
+ *   200  ChallengeRecommendationResponseDto
+ *   204  Game tracked but no triggered recommendation yet
+ *   404  Game not found
  */
 export async function getLatestRecommendation(
   req: Request,
   res: Response
 ): Promise<void> {
-  const gamePk = parseInt(String(req.params["gamePk"]), 10);
-
-  if (isNaN(gamePk)) {
-    res.status(400).json({ error: "gamePk must be a number" });
-    return;
-  }
-
+  const gamePk = parseGamePkParam(req);
   const context = await getLatestRecommendationForGame(gamePk);
 
   if (!context) {
@@ -38,35 +26,22 @@ export async function getLatestRecommendation(
     return;
   }
 
-  const dto = toRecommendationDto(context.recommendation, context.snapshot);
-  res.json(dto);
+  res.json(toRecommendationDto(context.recommendation, context.snapshot));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/games/:gamePk/at-bats/current/recommendations
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Return all 12 pre-computed recommendations for the current at-bat.
- *
- * Used by the pre-at-bat banner before any pitch is thrown. The response
- * includes a summary sentence plus the full count-state grid.
+ * GET /api/games/:gamePk/at-bats/current/recommendations
  *
  * Responses:
  *   200  AtBatRecommendationGridResponseDto
- *   204  No at-bat snapshot yet (game tracked, no at-bat ingested)
+ *   204  No at-bat snapshot yet
  *   404  Game not found
  */
 export async function getCurrentAtBatRecommendations(
   req: Request,
   res: Response
 ): Promise<void> {
-  const gamePk = parseInt(String(req.params["gamePk"]), 10);
-
-  if (isNaN(gamePk)) {
-    res.status(400).json({ error: "gamePk must be a number" });
-    return;
-  }
+  const gamePk = parseGamePkParam(req);
 
   const game = await prisma.game.findUnique({ where: { gamePk } });
   if (!game) {
@@ -74,7 +49,6 @@ export async function getCurrentAtBatRecommendations(
     return;
   }
 
-  // Find the most recent at-bat snapshot to get the current atBatIndex.
   const latestSnapshot = await prisma.liveGameSnapshot.findFirst({
     where: { gamePk },
     orderBy: { atBatIndex: "desc" },
@@ -86,21 +60,21 @@ export async function getCurrentAtBatRecommendations(
   }
 
   const rows = await findAllForAtBat(gamePk, latestSnapshot.atBatIndex);
-
   const halfInningLabel = latestSnapshot.halfInning === "top" ? "Top" : "Bot";
-  const dto = toAtBatGridDto(gamePk, latestSnapshot.atBatIndex, rows, latestSnapshot.inning, halfInningLabel);
-  res.json(dto);
+
+  res.json(
+    toAtBatGridDto(
+      gamePk,
+      latestSnapshot.atBatIndex,
+      rows,
+      latestSnapshot.inning,
+      halfInningLabel
+    )
+  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/games/:gamePk/at-bats
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Return the full at-bat history for a game: every ingested at-bat with all
- * 12 pre-computed recommendations and which count was triggered (if any).
- *
- * Used by the post-game (and in-game history) view.
+ * GET /api/games/:gamePk/at-bats
  *
  * Responses:
  *   200  GameAtBatHistoryDto
@@ -111,12 +85,7 @@ export async function getGameAtBatHistory(
   req: Request,
   res: Response
 ): Promise<void> {
-  const gamePk = parseInt(String(req.params["gamePk"]), 10);
-
-  if (isNaN(gamePk)) {
-    res.status(400).json({ error: "gamePk must be a number" });
-    return;
-  }
+  const gamePk = parseGamePkParam(req);
 
   const game = await prisma.game.findUnique({ where: { gamePk } });
   if (!game) {
@@ -147,16 +116,9 @@ export async function getGameAtBatHistory(
     return;
   }
 
-  const auditsByAtBat = new Map(
-    postgameAudits.map((a) => [a.atBatIndex, a])
-  );
+  const auditsByAtBat = new Map(postgameAudits.map((a) => [a.atBatIndex, a]));
 
-  const dto = toGameAtBatHistoryDto(
-    gamePk,
-    snapshots,
-    allRecs,
-    reviewPitchEvents,
-    auditsByAtBat
+  res.json(
+    toGameAtBatHistoryDto(gamePk, snapshots, allRecs, reviewPitchEvents, auditsByAtBat)
   );
-  res.json(dto);
 }
