@@ -1,4 +1,5 @@
 import type { AtBatRecommendationGridResponse } from "../api/types";
+import { inningHalfArrow } from "../utils/baseballDisplay";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
 import { CountGrid } from "./CountGrid";
@@ -20,7 +21,7 @@ export function PreAtBatBanner({ data, showGrid, onToggleGrid }: Props) {
   const headerIcon = hasHighValueOpportunity ? "⚡" : "🛡";
 
   const inningLabel = data.inning
-    ? `${data.halfInning === "Top" ? "▲" : data.halfInning === "Bot" ? "▼" : ""} ${data.inning}`
+    ? `${inningHalfArrow(data.halfInning, true)} ${data.inning}`.trim()
     : null;
 
   return (

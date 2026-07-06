@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { AtBatHistoryItem, ChallengeOutcome } from "../api/types";
+import { formatOrdinal, inningHalfArrow } from "../utils/baseballDisplay";
+import { EmptyState } from "./ui/EmptyState";
 import { CountGrid } from "./CountGrid";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
@@ -22,9 +24,8 @@ function groupByInning(atBats: AtBatHistoryItem[]): InningGroup[] {
   for (const ab of atBats) {
     const key = `${ab.inning}-${ab.halfInning}`;
     if (!map.has(key)) {
-      const ordinal = ordinalSuffix(ab.inning);
       map.set(key, {
-        label: `${ab.halfInning === "Top" ? "▲" : "▼"} ${ordinal}`,
+        label: `${inningHalfArrow(ab.halfInning)} ${formatOrdinal(ab.inning)}`,
         inning: ab.inning,
         half: ab.halfInning,
         atBats: [],
@@ -33,12 +34,6 @@ function groupByInning(atBats: AtBatHistoryItem[]): InningGroup[] {
     map.get(key)!.atBats.push(ab);
   }
   return [...map.values()];
-}
-
-function ordinalSuffix(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
 // ── Challenge outcome badge ────────────────────────────────────────────────
@@ -209,11 +204,7 @@ export function AtBatHistory({ atBats }: Props) {
   const groups = groupByInning(atBats);
 
   if (atBats.length === 0) {
-    return (
-      <div className="rounded-xl border border-white/10 px-5 py-8 text-center">
-        <p className="text-white/40 text-sm">No at-bat data recorded yet.</p>
-      </div>
-    );
+    return <EmptyState title="No at-bat data recorded yet." elevated={false} />;
   }
 
   const challengeCount  = atBats.filter((ab) => ab.challengeOutcome !== null).length;
