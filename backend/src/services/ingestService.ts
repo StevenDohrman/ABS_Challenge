@@ -177,60 +177,45 @@ export async function handlePitchEvent(
 // Savant daily events
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Persist a batch of batter statlines from the SavantDailyJob.
- */
+async function ingestSavantBatch<T>(
+  label: string,
+  rows: T[],
+  upsert: (batch: T[]) => Promise<void>
+): Promise<void> {
+  try {
+    console.log(`[ingestService] upserting ${rows.length} ${label}`);
+    await upsert(rows);
+  } catch (err) {
+    console.error(`[ingestService] failed to upsert ${label} batch:`, err);
+  }
+}
+
+/** Persist a batch of batter statlines from the SavantDailyJob. */
 export async function handleBatterStatlines(
   statlines: SavantBatterStatline[]
 ): Promise<void> {
-  try {
-    console.log(`[ingestService] upserting ${statlines.length} batter statlines`);
-    await upsertBatterStatlines(statlines);
-  } catch (err) {
-    console.error("[ingestService] failed to upsert batter statlines batch:", err);
-  }
+  await ingestSavantBatch("batter statlines", statlines, upsertBatterStatlines);
 }
 
-/**
- * Persist a batch of batter spray profiles from the SavantDailyJob.
- */
+/** Persist a batch of batter spray profiles from the SavantDailyJob. */
 export async function handleSprayProfiles(
   profiles: SavantBatterSprayProfile[]
 ): Promise<void> {
-  try {
-    console.log(`[ingestService] upserting ${profiles.length} spray profiles`);
-    await upsertSprayProfiles(profiles);
-  } catch (err) {
-    console.error("[ingestService] failed to upsert spray profiles batch:", err);
-  }
+  await ingestSavantBatch("spray profiles", profiles, upsertSprayProfiles);
 }
 
-/**
- * Persist a batch of fielder OAA rows from the SavantDailyJob.
- */
+/** Persist a batch of fielder OAA rows from the SavantDailyJob. */
 export async function handleFielderOaa(
   oaaRows: SavantFielderOaa[]
 ): Promise<void> {
-  try {
-    console.log(`[ingestService] upserting ${oaaRows.length} fielder OAA rows`);
-    await upsertFielderOaa(oaaRows);
-  } catch (err) {
-    console.error("[ingestService] failed to upsert fielder OAA batch:", err);
-  }
+  await ingestSavantBatch("fielder OAA rows", oaaRows, upsertFielderOaa);
 }
 
-/**
- * Persist a batch of sprint speed rows from the SavantDailyJob.
- */
+/** Persist a batch of sprint speed rows from the SavantDailyJob. */
 export async function handleSprintSpeed(
   rows: SavantSprintSpeed[]
 ): Promise<void> {
-  try {
-    console.log(`[ingestService] upserting ${rows.length} sprint speed rows`);
-    await upsertSprintSpeed(rows);
-  } catch (err) {
-    console.error("[ingestService] failed to upsert sprint speed batch:", err);
-  }
+  await ingestSavantBatch("sprint speed rows", rows, upsertSprintSpeed);
 }
 
 /**
@@ -273,7 +258,3 @@ async function waitForGameRow(
   }
   return false;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Postgame audit (triggered when game goes Final)
-// ─────────────────────────────────────────────────────────────────────────────
