@@ -77,3 +77,11 @@ export async function findBattingOrder(
   });
   return rows.map((r) => r.playerId);
 }
+
+/** All lineup rows for a game (both teams), read-only. */
+export async function findGameLineups(gamePk: number): Promise<GameLineup[]> {
+  return prisma.gameLineup.findMany({
+    where: { gamePk },
+    orderBy: [{ teamId: "asc" }, { battingOrder: "asc" }],
+  });
+}

@@ -19,6 +19,7 @@ import {
   inferFinalizedAtFromFeed,
   parsePitchEvents,
   parseGameLineups,
+  resolveGameDataTeamIds,
 } from "@abs/data-pipeline";
 import { prisma } from "../db/prisma";
 import {
@@ -283,17 +284,17 @@ export async function backfillFinalGameByPk(gamePk: number): Promise<boolean> {
     if (feed.gameData?.status?.abstractGameState !== "Final") {
       throw new Error(`Game ${gamePk} is not Final`);
     }
-    const teams = feed.gameData.teams;
+    const { homeTeamId, awayTeamId, homeTeam, awayTeam } = resolveGameDataTeamIds(feed);
     activeGame = {
       gamePk,
       officialDate: feed.gameData.datetime.officialDate,
       scheduledStartTime: feed.gameData.datetime.dateTime,
       status: "Final",
       detailedState: feed.gameData.status.detailedState,
-      homeTeamId: teams.home.team.id,
-      homeTeamName: teams.home.team.name,
-      awayTeamId: teams.away.team.id,
-      awayTeamName: teams.away.team.name,
+      homeTeamId,
+      homeTeamName: homeTeam?.name ?? "",
+      awayTeamId,
+      awayTeamName: awayTeam?.name ?? "",
     };
   }
 

@@ -33,8 +33,25 @@ export {
 export {
   parsePitchEvents,
   parseGameLineups,
+  parseGameSnapshot,
+  parseGameBench,
+  parseGameBullpen,
+  parseLiveDefense,
+  parsePlayerNamesFromFeed,
+  assessBranchRosterFromFeed,
+  parseDefenseFromBoxscore,
+  resolveTeamDefenses,
+  isWarmupOrGameActive,
   extractPitchLocationFromPlayEvent,
 } from "./sources/mlb-live/mlbLive.parser";
+export {
+  resolveGameDataTeam,
+  resolveGameDataTeamIds,
+} from "./sources/mlb-live/mlbLive.teamRef";
+export type {
+  BranchRosterAssessment,
+  TeamRosterCounts,
+} from "./sources/mlb-live/branchRoster";
 
 // MLB live types — emitted by LivePollJob events.
 export type {

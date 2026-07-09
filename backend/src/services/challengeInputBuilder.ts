@@ -20,7 +20,7 @@ import {
   type Balls,
   type Strikes,
 } from "@abs/engine";
-import type { MlbAtBatSnapshot } from "@abs/data-pipeline";
+import type { MlbAtBatSnapshot, DefensiveLineup } from "@abs/data-pipeline";
 import { SEASONS } from "../db/constants";
 import { computeTeamChallengesRemaining } from "../db/gameRepository";
 import { findPlayerStatSnapshot, findPlayerStatSnapshotBatch } from "../db/playerRepository";
@@ -49,18 +49,28 @@ export interface AtBatChallengeContext {
   };
 }
 
+/** Optional overrides for branch preview (no DB challenge derivation). */
+export interface ChallengeContextOptions {
+  challengesRemainingOverride?: number;
+  battingOrderOverride?: number[];
+  defenseOverride?: DefensiveLineup;
+}
+
 /**
  * Load all shared inputs for an at-bat: player stats, lineup, baserunning,
  * fielder OAA, and challenge availability.
  */
 export async function buildAtBatChallengeContext(
-  snapshot: MlbAtBatSnapshot
+  snapshot: MlbAtBatSnapshot,
+  options?: ChallengeContextOptions
 ): Promise<AtBatChallengeContext> {
-  const challengesRemaining = await computeTeamChallengesRemaining(
-    snapshot.gamePk,
-    snapshot.battingTeamId,
-    snapshot.inning
-  );
+  const challengesRemaining =
+    options?.challengesRemainingOverride ??
+    (await computeTeamChallengesRemaining(
+      snapshot.gamePk,
+      snapshot.battingTeamId,
+      snapshot.inning
+    ));
 
   const challengeAvailable = challengesRemaining > 0;
 
@@ -74,7 +84,7 @@ export async function buildAtBatChallengeContext(
 
   const battingHand = statSnapshot?.battingHand ?? null;
   const fielderOaa = await resolveFielderOaa(
-    snapshot.defense,
+    options?.defenseOverride ?? snapshot.defense,
     sprayProfile,
     battingHand
   );
@@ -86,6 +96,7 @@ export async function buildAtBatChallengeContext(
   const baserunningContext = await resolveBaserunningContext(snapshot);
 
   const battingOrder =
+    options?.battingOrderOverride ??
     snapshot.battingOrder ??
     (await findBattingOrder(snapshot.gamePk, snapshot.battingTeamId));
 
