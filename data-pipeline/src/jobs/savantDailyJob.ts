@@ -14,6 +14,11 @@ import {
   parseSprintSpeed,
 } from "../sources/savant/savant.parser";
 import {
+  computeLeagueAveragesFromCsvs,
+  fetchLeagueOps,
+  type LeagueAveragesSnapshot,
+} from "../sources/savant/leagueAverages";
+import {
   SavantBatterStatline,
   SavantBatterSprayProfile,
   SavantFielderOaa,
@@ -51,6 +56,10 @@ export interface SavantDailyJob {
   on(
     event: "sprintSpeed",
     listener: (speeds: SavantSprintSpeed[]) => void
+  ): this;
+  on(
+    event: "leagueAverages",
+    listener: (averages: LeagueAveragesSnapshot) => void
   ): this;
   on(event: "error", listener: (err: Error) => void): this;
 }
@@ -90,6 +99,18 @@ export class SavantDailyJob extends EventEmitter {
       ]);
       const statlines = parseExpectedStats(xStatsCsv, fetchedAt);
       this.emit("batterStatlines", mergePlateDiscipline(statlines, disciplineCsv));
+
+      const leagueOps = await fetchLeagueOps(season);
+      this.emit(
+        "leagueAverages",
+        computeLeagueAveragesFromCsvs(
+          disciplineCsv,
+          xStatsCsv,
+          season,
+          leagueOps,
+          fetchedAt
+        )
+      );
     } catch (err) {
       this.emitError("batter statlines", err);
     }

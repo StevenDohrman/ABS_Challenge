@@ -76,3 +76,4 @@ export type {
   SavantSprintSpeed,
   SavantPitchRow,
 } from "./sources/savant/savant.types";
+export type { LeagueAveragesSnapshot } from "./sources/savant/leagueAverages";
