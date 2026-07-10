@@ -15,6 +15,7 @@ import {
 import {
   extractChallengerPlayerId,
 } from "../db/playerNameRepository";
+import { resolveGainedReForPitch } from "./rankingsGainedRe";
 
 const SOURCE_PITCH_REVIEW = "pitch_review";
 const SOURCE_POSTGAME_AUDIT = "postgame_audit";
@@ -93,21 +94,11 @@ async function applyAndRecord(
   return true;
 }
 
-async function gainedReForPitch(pitchEventId: number, gamePk: number): Promise<number> {
-  const [rec, audit] = await Promise.all([
-    prisma.challengeRecommendation.findFirst({
-      where: { pitchEventId },
-      select: { expectedValue: true },
-    }),
-    prisma.postgameChallengeAudit.findUnique({
-      where: { pitchEventId },
-      select: { runExpectancySwing: true },
-    }),
-  ]);
-
-  if (audit && audit.runExpectancySwing > 0) return audit.runExpectancySwing;
-  if (rec && rec.expectedValue > 0) return rec.expectedValue;
-  return 0;
+function totalGainedReInDelta(delta: RankingsEventDelta): number {
+  return delta.playerDeltas.reduce(
+    (sum, row) => sum + (row.battingGainedRe ?? 0) + (row.fieldingGainedRe ?? 0),
+    0
+  );
 }
 
 /** Record both teams appearing in a tracked game (for gamesAppeared). */
@@ -142,6 +133,11 @@ export async function applyPitchReviewContribution(
       challengerTeamId: true,
       batterId: true,
       halfInning: true,
+      atBatIndex: true,
+      ballsBefore: true,
+      strikesBefore: true,
+      outs: true,
+      callCode: true,
       rawPayload: true,
     },
   });
@@ -152,7 +148,7 @@ export async function applyPitchReviewContribution(
 
   const challengerPlayerId = extractChallengerPlayerId(pitch.rawPayload);
   const gainedRe =
-    pitch.isOverturned === true ? await gainedReForPitch(pitchEventId, pitch.gamePk) : 0;
+    pitch.isOverturned === true ? await resolveGainedReForPitch(pitch) : 0;
 
   const delta = buildPitchReviewDelta(game, {
     pitchEventId: pitch.id,
@@ -234,4 +230,95 @@ export async function applyPostgameAuditContributionsForGame(
     if (await applyPostgameAuditContribution(audit.id)) applied++;
   }
   return applied;
+}
+
+/**
+ * Repair pitch-review contributions that recorded overturns but missed gained RE
+ * (e.g. recommendation not linked yet, or fielding-side ball challenges).
+ * Idempotent — skips rows that already have gained RE credited.
+ */
+export async function repairMissingPitchReviewGainedRe(): Promise<number> {
+  const contributions = await prisma.rankingsContribution.findMany({
+    where: { sourceType: SOURCE_PITCH_REVIEW },
+    orderBy: { id: "asc" },
+  });
+
+  let repaired = 0;
+
+  for (const contribution of contributions) {
+    const storedDelta = contribution.payloadJson as unknown as RankingsEventDelta;
+    const hadOverturn = storedDelta.playerDeltas.some(
+      (row) => (row.challengesOverturned ?? 0) > 0
+    );
+    if (!hadOverturn || totalGainedReInDelta(storedDelta) > 0) {
+      continue;
+    }
+
+    const pitch = await prisma.livePitchEvent.findUnique({
+      where: { id: contribution.sourceId },
+      select: {
+        id: true,
+        gamePk: true,
+        hasReview: true,
+        isOverturned: true,
+        challengerTeamId: true,
+        batterId: true,
+        halfInning: true,
+        atBatIndex: true,
+        ballsBefore: true,
+        strikesBefore: true,
+        outs: true,
+        callCode: true,
+        rawPayload: true,
+      },
+    });
+    if (!pitch || pitch.isOverturned !== true) continue;
+
+    const game = await loadGameContext(pitch.gamePk);
+    if (!game || !isWithinTrackingWindow(game.gameDate)) continue;
+
+    const challengerPlayerId = extractChallengerPlayerId(pitch.rawPayload);
+    const gainedRe = await resolveGainedReForPitch(pitch);
+    const correctedDelta = buildPitchReviewDelta(game, {
+      pitchEventId: pitch.id,
+      gamePk: pitch.gamePk,
+      hasReview: pitch.hasReview,
+      isOverturned: pitch.isOverturned,
+      challengerTeamId: pitch.challengerTeamId,
+      challengerPlayerId,
+      batterId: pitch.batterId,
+      halfInning: pitch.halfInning,
+      gainedRe,
+    });
+    if (!correctedDelta || totalGainedReInDelta(correctedDelta) <= 0) continue;
+
+    const season = seasonFromGameDate(game.gameDate);
+    await applyRankingsDelta(
+      contribution.gameDate,
+      season,
+      negateRankingsEventDelta(storedDelta),
+      contribution.gamePk,
+      1
+    );
+    await applyRankingsDelta(
+      contribution.gameDate,
+      season,
+      correctedDelta,
+      contribution.gamePk,
+      1
+    );
+    await prisma.rankingsContribution.update({
+      where: { id: contribution.id },
+      data: { payloadJson: correctedDelta as object },
+    });
+    repaired++;
+  }
+
+  if (repaired > 0) {
+    console.log(
+      `[rankingsRepair] credited missing gained RE on ${repaired} pitch review(s)`
+    );
+  }
+
+  return repaired;
 }

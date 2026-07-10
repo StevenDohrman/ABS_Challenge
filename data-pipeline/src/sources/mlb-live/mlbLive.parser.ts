@@ -25,7 +25,7 @@ function parseRunnerIds(
   return result;
 }
 
-/** Runners on base at the start of an at-bat from play.matchup.postOn*. */
+/** Post-play runner positions from play.matchup.postOn* (end of that at-bat). */
 function parseRunnersFromMatchup(matchup: MlbMatchup | undefined): {
   runnerOnFirst: boolean;
   runnerOnSecond: boolean;
@@ -36,6 +36,48 @@ function parseRunnersFromMatchup(matchup: MlbMatchup | undefined): {
   if (matchup?.postOnFirst?.id) runnerIds.first = matchup.postOnFirst.id;
   if (matchup?.postOnSecond?.id) runnerIds.second = matchup.postOnSecond.id;
   if (matchup?.postOnThird?.id) runnerIds.third = matchup.postOnThird.id;
+
+  return {
+    runnerOnFirst: runnerIds.first !== undefined,
+    runnerOnSecond: runnerIds.second !== undefined,
+    runnerOnThird: runnerIds.third !== undefined,
+    runnerIds: Object.keys(runnerIds).length > 0 ? runnerIds : undefined,
+  };
+}
+
+/** Find the play immediately before atBatIndex in allPlays. */
+function findPlayBefore(allPlays: MlbPlay[], atBatIndex: number): MlbPlay | undefined {
+  let best: MlbPlay | undefined;
+  for (const play of allPlays) {
+    if (play.about.atBatIndex < atBatIndex) {
+      if (!best || play.about.atBatIndex > best.about.atBatIndex) {
+        best = play;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Runners on base when an at-bat begins.
+ * Uses the previous play's postOn* fields (state after the last completed at-bat).
+ * The current batter cannot occupy a base at the start of their own plate appearance.
+ */
+function parseRunnersAtAtBatStart(
+  priorMatchup: MlbMatchup | undefined,
+  batterId: number
+): {
+  runnerOnFirst: boolean;
+  runnerOnSecond: boolean;
+  runnerOnThird: boolean;
+  runnerIds?: BaseRunners;
+} {
+  const post = parseRunnersFromMatchup(priorMatchup);
+  const runnerIds: BaseRunners = { ...post.runnerIds };
+
+  if (runnerIds.first === batterId) delete runnerIds.first;
+  if (runnerIds.second === batterId) delete runnerIds.second;
+  if (runnerIds.third === batterId) delete runnerIds.third;
 
   return {
     runnerOnFirst: runnerIds.first !== undefined,
@@ -227,8 +269,10 @@ export function parseAtBatSnapshot(
     linescore?.defense?.fieldingTeam?.id ??
     (halfInning === "top" ? homeTeamId : awayTeamId);
 
-  const runnerIds = parseRunnerIds(linescore?.offense);
-  const hasRunner = (base: keyof BaseRunners) => runnerIds[base] !== undefined;
+  const previousPlay = findPlayBefore(
+    feed.liveData.plays.allPlays,
+    currentPlay.about.atBatIndex
+  );
 
   return {
     gamePk: feed.gamePk,
@@ -238,12 +282,8 @@ export function parseAtBatSnapshot(
     inning: currentPlay.about.inning,
     halfInning,
     outs: outsAtPlayStart(currentPlay, linescore?.outs ?? 0),
-    runnerOnFirst: hasRunner("first"),
-    runnerOnSecond: hasRunner("second"),
-    runnerOnThird: hasRunner("third"),
-    runnerIds,
-    homeScore: linescore?.teams?.home?.runs ?? 0,
-    awayScore: linescore?.teams?.away?.runs ?? 0,
+    ...parseRunnersAtAtBatStart(previousPlay?.matchup, batterId),
+    ...scoreAtPlayStart(previousPlay),
     battingTeamId,
     fieldingTeamId,
     defense: parseDefensiveLineup(linescore?.defense),
@@ -261,8 +301,8 @@ export function parseAtBatSnapshot(
  *
  * Outs are tracked sequentially per half-inning across the whole allPlays
  * array so the outs value is correct even when the range starts mid-inning.
- * Runners and score come from play.matchup.postOn* and the previous play's
- * result.homeScore / awayScore (same archived feed used for pitch locations).
+ * Runners at at-bat start come from the previous play's postOn* fields; score
+ * uses the previous play's result.homeScore / awayScore.
  */
 function parsePlaysInIndexRange(
   feed: MlbLiveFeedResponse,
@@ -303,7 +343,7 @@ function parsePlaysInIndexRange(
           inning: play.about.inning,
           halfInning,
           outs: normalizeOutsAtAtBatStart(outsInHalfInning),
-          ...parseRunnersFromMatchup(play.matchup),
+          ...parseRunnersAtAtBatStart(previousPlay?.matchup, batterId),
           homeScore,
           awayScore,
           battingTeamId: halfInning === "top" ? awayTeamId : homeTeamId,

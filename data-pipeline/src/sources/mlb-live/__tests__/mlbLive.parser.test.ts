@@ -347,17 +347,35 @@ describe("parseAtBatSnapshot", () => {
     expect(snapshot?.outs).toBe(0);
   });
 
-  it("maps runner occupancy from linescore offense", () => {
-    const linescore = buildLinescore({
-      offense: {
-        batter: { id: 682998, fullName: "Jacob Wilson" },
-        second: { id: 222222 },
+  it("maps runner occupancy from the previous play's postOn fields", () => {
+    const priorPlay = buildPlay({
+      about: {
+        atBatIndex: 4,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:29:00Z",
+        isComplete: true,
+      },
+      matchup: {
+        ...buildPlay().matchup,
+        postOnSecond: { id: 222222, fullName: "Runner Two", link: "/api/v1/people/222222" },
+      },
+    });
+    const currentPlay = buildPlay({
+      about: {
+        atBatIndex: 5,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:30:00Z",
+        isComplete: false,
       },
     });
     const feed = buildLiveFeedResponse({
       liveData: {
-        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
-        linescore,
+        plays: { allPlays: [priorPlay, currentPlay], currentPlay },
+        linescore: buildLinescore(),
       },
     });
     const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
@@ -400,8 +418,42 @@ describe("parseAtBatSnapshot", () => {
     expect(snapshot?.fieldingTeamId).toBe(133);
   });
 
-  it("maps home and away scores", () => {
-    const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
+  it("maps home and away scores at at-bat start from the previous play result", () => {
+    const priorPlay = buildPlay({
+      about: {
+        atBatIndex: 4,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:29:00Z",
+        isComplete: true,
+      },
+      result: {
+        type: "atBat",
+        event: "Groundout",
+        eventType: "field_out",
+        description: "Groundout.",
+        homeScore: 5,
+        awayScore: 6,
+      },
+    });
+    const currentPlay = buildPlay({
+      about: {
+        atBatIndex: 5,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:30:00Z",
+        isComplete: false,
+      },
+    });
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [priorPlay, currentPlay], currentPlay },
+        linescore: buildLinescore(),
+      },
+    });
+    const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
 
     expect(snapshot?.homeScore).toBe(5);
     expect(snapshot?.awayScore).toBe(6);
@@ -465,18 +517,36 @@ describe("parseAtBatSnapshot", () => {
     expect(snapshot?.defense).toBeUndefined();
   });
 
-  it("extracts runner IDs from linescore.offense", () => {
-    const linescore = buildLinescore({
-      offense: {
-        batter: { id: 682998, fullName: "Jacob Wilson" },
-        first: { id: 111111 },
-        third: { id: 333333 },
+  it("extracts runner IDs from the previous play's postOn fields", () => {
+    const priorPlay = buildPlay({
+      about: {
+        atBatIndex: 4,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:29:00Z",
+        isComplete: true,
+      },
+      matchup: {
+        ...buildPlay().matchup,
+        postOnFirst: { id: 111111, fullName: "Runner One", link: "/api/v1/people/111111" },
+        postOnThird: { id: 333333, fullName: "Runner Three", link: "/api/v1/people/333333" },
+      },
+    });
+    const currentPlay = buildPlay({
+      about: {
+        atBatIndex: 5,
+        halfInning: "bottom",
+        isTopInning: false,
+        inning: 9,
+        startTime: "2026-06-17T04:30:00Z",
+        isComplete: false,
       },
     });
     const feed = buildLiveFeedResponse({
       liveData: {
-        plays: { allPlays: [buildPlay()], currentPlay: buildPlay() },
-        linescore,
+        plays: { allPlays: [priorPlay, currentPlay], currentPlay },
+        linescore: buildLinescore(),
       },
     });
     const snapshot = parseAtBatSnapshot(feed, FETCHED_AT);
@@ -591,7 +661,7 @@ describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
     expect(historical.map((s) => s.outs)).toEqual([0, 1, 2]);
   });
 
-  it("maps runners and score from play matchup and previous play result", () => {
+  it("maps runners and score from previous play postOn and result", () => {
     const play0 = buildPlay({
       about: { ...aboutTop1, atBatIndex: 0 },
       count: buildCount({ outs: 0 }),
@@ -646,6 +716,14 @@ describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
 
     expect(historical[0]).toMatchObject({
       atBatIndex: 0,
+      runnerOnFirst: false,
+      runnerOnSecond: false,
+      runnerOnThird: false,
+      homeScore: 0,
+      awayScore: 0,
+    });
+    expect(historical[1]).toMatchObject({
+      atBatIndex: 1,
       runnerOnFirst: true,
       runnerOnSecond: false,
       runnerOnThird: false,
@@ -653,14 +731,57 @@ describe("parseHistoricalAtBatSnapshots — outs normalization", () => {
       homeScore: 0,
       awayScore: 0,
     });
-    expect(historical[1]).toMatchObject({
-      atBatIndex: 1,
+  });
+
+  it("does not show the batter as a runner during their own at-bat after they reached base", () => {
+    const batterId = 682998;
+    const play0 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 0 },
+      count: buildCount({ outs: 0 }),
+      result: {
+        type: "atBat",
+        event: "Single",
+        eventType: "single",
+        description: "Single.",
+        homeScore: 0,
+        awayScore: 0,
+      },
+      matchup: {
+        ...buildPlay().matchup,
+        batter: { id: batterId, fullName: "Jacob Wilson" },
+        postOnFirst: { id: batterId, fullName: "Jacob Wilson", link: `/api/v1/people/${batterId}` },
+      },
+    });
+    const play1 = buildPlay({
+      about: { ...aboutTop1, atBatIndex: 1, isComplete: false },
+      count: buildCount({ outs: 0 }),
+      matchup: {
+        ...buildPlay().matchup,
+        batter: { id: 222222, fullName: "Next Batter" },
+      },
+    });
+
+    const feed = buildLiveFeedResponse({
+      liveData: {
+        plays: { allPlays: [play0, play1], currentPlay: play1 },
+        linescore: buildLinescore({ inningHalf: "Top", isTopInning: true }),
+      },
+    });
+
+    const historical = parseHistoricalAtBatSnapshots(feed, FETCHED_AT);
+    expect(historical[0]).toMatchObject({
+      atBatIndex: 0,
+      batterId,
       runnerOnFirst: false,
-      runnerOnSecond: true,
+      runnerOnSecond: false,
       runnerOnThird: false,
-      runnerIds: { second: 222222 },
-      homeScore: 0,
-      awayScore: 0,
+    });
+
+    const live = parseAtBatSnapshot(feed, FETCHED_AT);
+    expect(live).toMatchObject({
+      atBatIndex: 1,
+      runnerOnFirst: true,
+      runnerIds: { first: batterId },
     });
   });
 });

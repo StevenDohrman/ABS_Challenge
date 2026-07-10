@@ -18,6 +18,7 @@
  *                           → postgameScheduler.schedulePostgameAudit
  *
  *   SavantDailyJob.batterStatlines       → ingestService.handleBatterStatlines
+ *   SavantDailyJob.leagueAverages        → ingestService.handleLeagueAverages
  *   SavantDailyJob.sprayProfiles         → ingestService.handleSprayProfiles
  *   SavantDailyJob.fielderOaa            → ingestService.handleFielderOaa
  *
@@ -36,6 +37,7 @@ import {
   handleFielderOaa,
   handleSprintSpeed,
   handleLineupUpdate,
+  handleLeagueAverages,
   reconcileChallengeCounts,
 } from "./services/ingestService";
 import { precomputeAtBatRecommendations } from "./services/challengeService";
@@ -202,6 +204,10 @@ async function runSavantDailyJob(): Promise<void> {
 
   job.on("sprintSpeed", async (speeds) => {
     await handleSprintSpeed(speeds);
+  });
+
+  job.on("leagueAverages", async (averages) => {
+    handleLeagueAverages(averages);
   });
 
   job.on("error", (err) => {

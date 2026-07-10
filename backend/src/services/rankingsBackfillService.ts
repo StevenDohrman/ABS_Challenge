@@ -3,6 +3,7 @@ import { backfillPlayerNamesFromExistingData } from "../db/playerNameRepository"
 import {
   applyPitchReviewContribution,
   applyPostgameAuditContribution,
+  repairMissingPitchReviewGainedRe,
   trackTeamGameAppearances,
 } from "./rankingsIncrementalService";
 
@@ -13,10 +14,17 @@ import {
 export async function backfillMissingRankingsContributions(): Promise<{
   pitchReviews: number;
   audits: number;
+  gainedReRepairs: number;
   teamGames: number;
   playerNames: number;
 }> {
-  const result = { pitchReviews: 0, audits: 0, teamGames: 0, playerNames: 0 };
+  const result = {
+    pitchReviews: 0,
+    audits: 0,
+    gainedReRepairs: 0,
+    teamGames: 0,
+    playerNames: 0,
+  };
 
   result.playerNames = await backfillPlayerNamesFromExistingData();
 
@@ -47,6 +55,8 @@ export async function backfillMissingRankingsContributions(): Promise<{
     }
   }
 
+  result.gainedReRepairs = await repairMissingPitchReviewGainedRe();
+
   const games = await prisma.game.findMany({
     select: { gamePk: true },
     orderBy: { gamePk: "asc" },
@@ -59,7 +69,8 @@ export async function backfillMissingRankingsContributions(): Promise<{
 
   console.log(
     `[rankingsBackfill] complete — ${result.pitchReviews} pitch reviews, ` +
-      `${result.audits} audits, ${result.teamGames} team games, ` +
+      `${result.audits} audits, ${result.gainedReRepairs} gained-RE repairs, ` +
+      `${result.teamGames} team games, ` +
       `${result.playerNames} player names`
   );
 

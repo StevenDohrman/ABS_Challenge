@@ -32,6 +32,7 @@ import {
   buildDefaultPlayerChallengeContext,
 } from "./playerContextBuilder";
 import { resolveFielderOaa } from "./fielderOaaResolver";
+import { getLeagueAveragesForEngine } from "./leagueAveragesStore";
 
 /** Shared context computed once per at-bat, reused for all 12 count states. */
 export interface AtBatChallengeContext {
@@ -190,6 +191,7 @@ export function buildChallengeInputForCount(
     runExpectancyIfFailed: reValues.ifFails,
     baserunningContext: ctx.baserunningContext,
     lineupContext: ctx.lineupContext,
+    leagueAverages: getLeagueAveragesForEngine(),
   };
 }
 
