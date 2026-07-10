@@ -296,3 +296,67 @@ export function toAtBatGridDto(
     recommendations,
   };
 }
+
+/** Build grid DTO from in-memory engine decisions (branch preview — no DB). */
+export function toAtBatGridFromDecisions(
+  gamePk: number,
+  atBatIndex: number,
+  rows: Array<{
+    balls: number;
+    strikes: number;
+    recommendation: string;
+    minimumConfidenceRequired: number;
+    expectedValue: number;
+    score: number;
+    challengeAvailable: boolean;
+  }>,
+  inning?: number,
+  halfInning?: string
+): AtBatRecommendationGridResponseDto {
+  const recommendations: CountStateRecommendationDto[] = rows.map((r) => ({
+    count: `${r.balls}-${r.strikes}`,
+    balls: r.balls,
+    strikes: r.strikes,
+    recommendation: r.recommendation as CountStateRecommendationDto["recommendation"],
+    minimumConfidenceThreshold: r.minimumConfidenceRequired,
+    expectedValue: r.expectedValue,
+    score: r.score,
+    challengeAvailable: r.challengeAvailable,
+    displayMessage: buildDisplayMessage(r.recommendation, r.challengeAvailable),
+  }));
+
+  const best =
+    rows.length > 0
+      ? rows.reduce((prev, cur) => (cur.score > prev.score ? cur : prev))
+      : null;
+
+  const hasHighValueOpportunity =
+    best !== null &&
+    (best.recommendation === "AUTO_ALLOW" || best.recommendation === "ALLOW");
+
+  let summaryMessage: string;
+  if (!best) {
+    summaryMessage = "No recommendations computed for this situation.";
+  } else if (hasHighValueOpportunity) {
+    const sign = best.expectedValue >= 0 ? "+" : "";
+    const detail = `${best.recommendation}, ${sign}${best.expectedValue.toFixed(2)} RE`;
+    summaryMessage = best.challengeAvailable
+      ? `Best opportunity at ${best.balls}-${best.strikes} (${detail})`
+      : `Missed opportunity at ${best.balls}-${best.strikes} — out of challenges (${detail})`;
+  } else {
+    summaryMessage = "Low challenge value this situation — save your challenges.";
+  }
+
+  return {
+    gamePk,
+    atBatIndex,
+    inning: inning ?? null,
+    halfInning: halfInning ?? null,
+    hasHighValueOpportunity,
+    bestCount: best ? `${best.balls}-${best.strikes}` : null,
+    bestRecommendation: best ? best.recommendation : null,
+    bestExpectedValue: best ? best.expectedValue : null,
+    summaryMessage,
+    recommendations,
+  };
+}

@@ -4,6 +4,7 @@ import {
   MlbPlay,
   MlbPlayEvent,
 } from "./mlbLive.api.types";
+import { resolveGameDataTeamIds } from "./mlbLive.teamRef";
 import {
   MlbLivePitchEvent,
   MlbLiveGameSnapshot,
@@ -91,6 +92,29 @@ export function parseGameLineups(
 }
 
 /**
+ * Bench player IDs per team — boxscore batters not in batting order or bullpen.
+ */
+export {
+  parseGameBench,
+  parseGameBullpen,
+  parsePlayerNamesFromFeed,
+  assessBranchRosterFromFeed,
+  parseDefenseFromBoxscore,
+  resolveTeamDefenses,
+  isWarmupOrGameActive,
+} from "./branchRoster";
+export type { BranchRosterAssessment, TeamRosterCounts } from "./branchRoster";
+
+/**
+ * Current defensive alignment from the live feed linescore.
+ */
+export function parseLiveDefense(
+  feed: MlbLiveFeedResponse
+): DefensiveLineup | undefined {
+  return parseDefensiveLineup(feed.liveData?.linescore?.defense);
+}
+
+/**
  * Batting order (player IDs) for the team currently batting.
  */
 function parseBattingOrderForTeam(
@@ -146,7 +170,8 @@ export function parseGameSnapshot(
   fetchedAt: string
 ): MlbLiveGameSnapshot {
   const { linescore } = feed.liveData;
-  const { teams, status } = feed.gameData;
+  const { status } = feed.gameData;
+  const { homeTeamId, awayTeamId } = resolveGameDataTeamIds(feed);
 
   // linescore and team refs can be partially populated during warmup/pregame.
   return {
@@ -162,8 +187,8 @@ export function parseGameSnapshot(
     runnerOnThird: !!linescore?.offense?.third,
     homeScore: linescore?.teams?.home?.runs ?? 0,
     awayScore: linescore?.teams?.away?.runs ?? 0,
-    homeTeamId: teams?.home?.team?.id ?? 0,
-    awayTeamId: teams?.away?.team?.id ?? 0,
+    homeTeamId,
+    awayTeamId,
     batterId: linescore?.offense?.batter?.id,
     pitcherId: linescore?.defense?.pitcher?.id,
     fetchedAt,
@@ -186,8 +211,7 @@ export function parseAtBatSnapshot(
   if (!currentPlay) return null;
 
   const { linescore } = feed.liveData;
-  const homeTeamId = feed.gameData.teams?.home?.team?.id ?? 0;
-  const awayTeamId = feed.gameData.teams?.away?.team?.id ?? 0;
+  const { homeTeamId, awayTeamId } = resolveGameDataTeamIds(feed);
   const halfInning = currentPlay.about.halfInning;
 
   // matchup may be absent in very early feed snapshots
@@ -248,8 +272,7 @@ function parsePlaysInIndexRange(
 ): MlbAtBatSnapshot[] {
   if (!feed.gameData?.teams || !feed.liveData?.plays) return [];
 
-  const homeTeamId = feed.gameData.teams?.home?.team?.id ?? 0;
-  const awayTeamId = feed.gameData.teams?.away?.team?.id ?? 0;
+  const { homeTeamId, awayTeamId } = resolveGameDataTeamIds(feed);
   const snapshots: MlbAtBatSnapshot[] = [];
 
   let outsInHalfInning = 0;

@@ -89,6 +89,11 @@ export interface MlbLiveTeam {
   abbreviation?: string;
 }
 
+/** Live feed gameData.teams entries may be nested or flat depending on game state. */
+export type MlbGameDataTeamEntry =
+  | { team: MlbLiveTeam }
+  | MlbLiveTeam;
+
 export interface MlbLiveGameData {
   game: {
     pk: number;
@@ -102,10 +107,15 @@ export interface MlbLiveGameData {
   };
   status: MlbGameStatus;
   teams: {
-    home: { team: MlbLiveTeam };
-    away: { team: MlbLiveTeam };
+    home: MlbGameDataTeamEntry;
+    away: MlbGameDataTeamEntry;
   };
   players: Record<string, MlbLivePlayer>;
+  /** Present once probable starters are announced. */
+  probablePitchers?: {
+    home?: { id: number; fullName?: string };
+    away?: { id: number; fullName?: string };
+  };
 }
 
 export interface MlbCount {
@@ -256,11 +266,27 @@ export interface MlbLiveData {
   boxscore?: MlbBoxscore;
 }
 
+export interface MlbBoxscorePlayer {
+  person?: { id: number; fullName?: string };
+  position?: { abbreviation?: string; code?: string; name?: string; type?: string };
+  /** True when player is on the bench per MLB feed. */
+  isOnBench?: boolean;
+}
+
 export interface MlbBoxscoreTeam {
   team?: { id: number };
   /** Player IDs in current batting order (1–9). */
   battingOrder?: number[];
+  /** All batters who have appeared or are available pregame. */
   batters?: number[];
+  /** All pitchers who have appeared or are available pregame. */
+  pitchers?: number[];
+  /** Current bench player IDs when published by the feed. */
+  bench?: number[];
+  /** Relief corps player IDs when published by the feed. */
+  bullpen?: number[];
+  /** Player detail keyed by `ID{playerId}`. */
+  players?: Record<string, MlbBoxscorePlayer>;
 }
 
 export interface MlbBoxscore {

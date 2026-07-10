@@ -3,17 +3,26 @@ import cors from "cors";
 import { recommendationsRouter } from "./routes/recommendations";
 import { scheduleRouter } from "./routes/schedule";
 import { rankingsRouter } from "./routes/rankings";
+import { branchRouter } from "./branch/branchRoutes";
+import { getCorsOrigin } from "./branch/branchSessionConfig";
 import { prisma } from "./db/prisma";
 import { getDbGateStats } from "./db/dbGate";
 import { DB_LIMITS } from "./db/constants";
-import { httpStatusForError, publicErrorMessage } from "./utils/httpErrors";
+import { httpStatusForError, publicErrorMessage, HttpError } from "./utils/httpErrors";
 
 const app = express();
 
 // ── Middleware ──────────────────────────────────────────────────────────────
 
-app.use(cors());
-app.use(express.json());
+const corsOrigin = getCorsOrigin();
+if (corsOrigin) {
+  app.use(cors({ origin: corsOrigin, credentials: true }));
+} else {
+  app.use(cors());
+}
+
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "600kb" }));
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
@@ -50,6 +59,7 @@ app.get("/health", async (_req, res) => {
 app.use("/api/games", recommendationsRouter);
 app.use("/api/schedule", scheduleRouter);
 app.use("/api/rankings", rankingsRouter);
+app.use("/api/branches", branchRouter);
 
 // ── Catch-all error handler ─────────────────────────────────────────────────
 
@@ -61,7 +71,9 @@ app.use(
     _next: express.NextFunction
   ) => {
     const status = httpStatusForError(err);
-    console.error("[app] unhandled error:", err);
+    if (!(err instanceof HttpError) || status >= 500) {
+      console.error("[app] unhandled error:", err);
+    }
     if (!res.headersSent) {
       res.status(status).json({ error: publicErrorMessage(err, status) });
     }

@@ -12,6 +12,7 @@ import { useGameDetailData } from "../hooks/useGameDetailData";
 import { useScheduleGame } from "../hooks/useSchedule";
 import { formatInningShort, teamAbbrev } from "../utils/baseballDisplay";
 import { formatTimestamp } from "../utils/format";
+import { BranchGameButton } from "../components/BranchGameButton";
 
 const CHALLENGES_PER_TEAM = 2;
 
@@ -124,13 +125,16 @@ function GameDetailContent({
   return (
     <div className="space-y-6">
 
-      {/* Back button */}
-      <Link
-        to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
-        className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
-      >
-        <span>←</span> All games
-      </Link>
+      {/* Back button + branch entry */}
+      <div className="flex items-center justify-between">
+        <Link
+          to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
+          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
+        >
+          <span>←</span> All games
+        </Link>
+        <BranchGameButton gamePk={game.gamePk} scheduleDate={scheduleDate} />
+      </div>
 
       {/* Game header */}
       <div className="rounded-2xl border border-white/10 bg-white/4 px-5 py-4">
