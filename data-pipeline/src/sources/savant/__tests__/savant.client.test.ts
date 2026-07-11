@@ -8,6 +8,8 @@ import {
   fetchSprintSpeedCsv,
   fetchPlayerStatcastHistoryCsv,
   fetchGameStatcastCsv,
+  fetchPitchArsenalStatsCsv,
+  fetchSeasonPitcherStatcastCsv,
 } from "../savant.client";
 import {
   EXPECTED_STATS_CSV,
@@ -16,6 +18,7 @@ import {
   FIELDER_OAA_CSV,
   SPRINT_SPEED_CSV,
   PLAYER_STATCAST_HISTORY_CSV,
+  PITCH_ARSENAL_STATS_CSV,
 } from "./fixtures/savant.fixture";
 
 const mock = new MockAdapter(savantHttp);
@@ -281,5 +284,48 @@ describe("fetchGameStatcastCsv", () => {
     mock.onGet(`${BASE}/statcast_search/csv`).reply(200, "<!DOCTYPE html><html></html>");
 
     await expect(fetchGameStatcastCsv(824991)).rejects.toThrow(/HTML instead of CSV/);
+  });
+});
+
+describe("fetchPitchArsenalStatsCsv", () => {
+  it("requests the pitch arsenal stats endpoint", async () => {
+    mock
+      .onGet(`${BASE}/leaderboard/pitch-arsenal-stats`)
+      .reply(200, PITCH_ARSENAL_STATS_CSV);
+
+    await fetchPitchArsenalStatsCsv(2026);
+
+    expect(mock.history.get[0].url).toBe(`${BASE}/leaderboard/pitch-arsenal-stats`);
+    expect(mock.history.get[0].params).toMatchObject({
+      year: 2026,
+      type: "pitcher",
+      min: "50",
+      csv: "true",
+    });
+  });
+
+  it("throws when HTML is returned instead of CSV", async () => {
+    mock
+      .onGet(`${BASE}/leaderboard/pitch-arsenal-stats`)
+      .reply(200, "<!DOCTYPE html><html></html>");
+
+    await expect(fetchPitchArsenalStatsCsv(2026)).rejects.toThrow(/HTML instead of CSV/);
+  });
+});
+
+describe("fetchSeasonPitcherStatcastCsv", () => {
+  it("requests season-wide pitcher statcast rows", async () => {
+    mock.onGet(`${BASE}/statcast_search/csv`).reply(200, PLAYER_STATCAST_HISTORY_CSV);
+
+    await fetchSeasonPitcherStatcastCsv(2026);
+
+    expect(mock.history.get[0].params).toMatchObject({
+      all: "true",
+      hfGT: "R|",
+      hfSea: "2026|",
+      player_type: "pitcher",
+      type: "details",
+      csv: "true",
+    });
   });
 });

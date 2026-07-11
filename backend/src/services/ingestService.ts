@@ -11,11 +11,12 @@
  * challengeService, which the orchestrator calls separately.
  */
 
-import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, ActiveGame, GameLineupEntry, LeagueAveragesSnapshot } from "@abs/data-pipeline";
+import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, SavantPitcherPitchMix, ActiveGame, GameLineupEntry, LeagueAveragesSnapshot } from "@abs/data-pipeline";
 import { upsertGame, markGameFinal, markGameIngested, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
 import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
+import { upsertPitcherPitchMixBatch } from "../db/pitcherPitchMixRepository";
 import { upsertGameLineup } from "../db/lineupRepository";
 import { recordNamesFromPitchRow } from "../db/playerNameRepository";
 import { setLeagueAverages } from "./leagueAveragesStore";
@@ -205,6 +206,13 @@ export async function handleSprintSpeed(
   rows: SavantSprintSpeed[]
 ): Promise<void> {
   await ingestSavantBatch("sprint speed rows", rows, upsertSprintSpeed);
+}
+
+/** Persist pitcher pitch-mix rows from the SavantDailyJob. */
+export async function handlePitcherPitchMix(
+  rows: SavantPitcherPitchMix[]
+): Promise<void> {
+  await ingestSavantBatch("pitcher pitch mix rows", rows, upsertPitcherPitchMixBatch);
 }
 
 /** Cache current-season league averages computed from the daily Savant batter CSVs. */

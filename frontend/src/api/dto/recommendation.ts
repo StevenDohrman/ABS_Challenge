@@ -2,6 +2,23 @@ import type { PostgameAuditItem } from "./postgame";
 
 export type RecommendationLabel = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 
+export interface PitcherChallengeHintsPitch {
+  pitchType: string;
+  pitchTypeName: string;
+  ballRate: number;
+  usageRate: number;
+  pitchCount: number;
+  highlight: boolean;
+}
+
+export interface PitcherChallengeHints {
+  pitcherId: number;
+  pitcherName?: string;
+  season: number;
+  summary: string;
+  pitches: PitcherChallengeHintsPitch[];
+}
+
 export interface ChallengeRecommendationResponse {
   gamePk: number;
   count: string;
@@ -21,6 +38,8 @@ export interface ChallengeRecommendationResponse {
   displayMessage: string;
   reasons: string[];
   triggeredAt: string;
+
+  pitcherChallengeHints?: PitcherChallengeHints | null;
 }
 
 export interface CountStateRecommendation {
@@ -47,6 +66,7 @@ export interface AtBatRecommendationGridResponse {
   bestExpectedValue: number | null;
   summaryMessage: string;
   recommendations: CountStateRecommendation[];
+  pitcherChallengeHints?: PitcherChallengeHints | null;
 }
 
 export interface ChallengeOutcome {

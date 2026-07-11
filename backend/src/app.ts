@@ -71,7 +71,11 @@ app.use(
     _next: express.NextFunction
   ) => {
     const status = httpStatusForError(err);
-    if (!(err instanceof HttpError) || status >= 500) {
+    if (err instanceof HttpError) {
+      if (status >= 500) console.error("[app] error:", err);
+    } else if (status === 503) {
+      console.warn("[app] service unavailable:", err instanceof Error ? err.message : err);
+    } else if (status >= 500) {
       console.error("[app] unhandled error:", err);
     }
     if (!res.headersSent) {

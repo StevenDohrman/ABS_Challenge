@@ -42,3 +42,16 @@ export function publicErrorMessage(err: unknown, status: number): string {
   }
   return "Internal server error";
 }
+
+/** True for transient Prisma connectivity / pool errors (P1001, P1002, P1017, P2024). */
+export function isDbConnectivityError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    return (
+      err.code === "P1001" ||
+      err.code === "P1002" ||
+      err.code === "P1017" ||
+      err.code === "P2024"
+    );
+  }
+  return err instanceof Prisma.PrismaClientInitializationError;
+}

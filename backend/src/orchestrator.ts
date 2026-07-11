@@ -21,6 +21,7 @@
  *   SavantDailyJob.leagueAverages        → ingestService.handleLeagueAverages
  *   SavantDailyJob.sprayProfiles         → ingestService.handleSprayProfiles
  *   SavantDailyJob.fielderOaa            → ingestService.handleFielderOaa
+ *   SavantDailyJob.pitcherPitchMix       → ingestService.handlePitcherPitchMix
  *
  * SavantDailyJob is run once at startup (to load pregame data) and re-run
  * daily at a scheduled time. In production, replace the 24-hour interval with
@@ -36,6 +37,7 @@ import {
   handleSprayProfiles,
   handleFielderOaa,
   handleSprintSpeed,
+  handlePitcherPitchMix,
   handleLineupUpdate,
   handleLeagueAverages,
   reconcileChallengeCounts,
@@ -204,6 +206,10 @@ async function runSavantDailyJob(): Promise<void> {
 
   job.on("sprintSpeed", async (speeds) => {
     await handleSprintSpeed(speeds);
+  });
+
+  job.on("pitcherPitchMix", async (mix) => {
+    await handlePitcherPitchMix(mix);
   });
 
   job.on("leagueAverages", async (averages) => {

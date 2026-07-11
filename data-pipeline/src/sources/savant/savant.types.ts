@@ -183,6 +183,33 @@ export interface SavantSprintSpeed {
  * distributions — useful for estimating how often their pitches land near
  * the zone boundary.
  */
+/**
+ * Per-pitcher pitch-type mix for a season.
+ * Ingested daily from Savant pitch arsenal stats + Statcast ball/strike rates.
+ */
+export interface SavantPitcherPitchMix {
+  pitcherId: number;
+  pitcherName: string;
+  season: number;
+
+  /** Savant pitch type code, e.g. "FF", "SL". */
+  pitchType: string;
+  /** Human-readable name from Savant, e.g. "4-Seam Fastball". */
+  pitchTypeName: string;
+
+  /** Share of pitcher's arsenal (0–1). */
+  usageRate: number;
+  /** Fraction of pitches called balls (0–1). */
+  ballRate: number;
+  /** Fraction of pitches called strikes, excluding in-play (0–1). Optional. */
+  strikeRate: number | null;
+
+  pitchCount: number;
+
+  raw: Record<string, string>;
+  fetchedAt: string;
+}
+
 export interface SavantPlayerPitchHistory {
   gamePk: number;
   gameDate: string;

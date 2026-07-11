@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ScheduleGame } from "../api/types";
 import { LivePitchCard } from "../components/LivePitchCard";
+import { PitcherChallengeHintsPanel } from "../components/PitcherChallengeHintsPanel";
 import { PreAtBatBanner } from "../components/PreAtBatBanner";
 import { AtBatHistory } from "../components/AtBatHistory";
 import { PostgameAuditSummary } from "../components/PostgameAuditSummary";
@@ -119,6 +120,9 @@ function GameDetailContent({
     isFinal,
     isTracked: game.isTracked,
   });
+
+  const pitcherChallengeHints =
+    livePitch?.pitcherChallengeHints ?? preBat?.pitcherChallengeHints ?? null;
 
   const liveUpdatedStr = liveLastUpdated ? formatTimestamp(liveLastUpdated) : null;
 
@@ -241,6 +245,10 @@ function GameDetailContent({
               <span className="text-lg">⏳</span>
               <p className="text-sm text-white/50">No called strike yet this at-bat.</p>
             </div>
+          ) : null}
+
+          {pitcherChallengeHints ? (
+            <PitcherChallengeHintsPanel hints={pitcherChallengeHints} />
           ) : null}
 
           {history && history.atBats.length > 0 && (

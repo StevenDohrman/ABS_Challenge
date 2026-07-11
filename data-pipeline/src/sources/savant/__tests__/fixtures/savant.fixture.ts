@@ -107,3 +107,26 @@ export const PLAYER_STATCAST_HISTORY_CSV = [
 /** Savant returns an empty CSV when no pitches are found for the player/season. */
 export const EMPTY_PLAYER_HISTORY_CSV =
   "game_pk,game_date,game_year,batter,pitcher,at_bat_number,pitch_number,pitch_type,release_speed,balls,strikes,outs_when_up,inning,stand,p_throws,type,description,events,plate_x,plate_z,sz_top,sz_bot,zone\n";
+
+// ---------------------------------------------------------------------------
+// Pitch arsenal stats leaderboard
+// ---------------------------------------------------------------------------
+
+export const PITCH_ARSENAL_STATS_CSV = [
+  '"last_name, first_name","player_id","team_name_alt","pitch_type","pitch_name","run_value_per_100","run_value","pitches","pitch_usage","pa","ba","slg","woba","whiff_percent","k_percent","put_away","est_ba","est_slg","est_woba","hard_hit_percent"',
+  '"Gausman, Kevin",592332,"TOR","FF","4-Seam Fastball",1.3,12,"899",51.2,"251","0.272","0.425","0.331",18,21.1,21.4,"0.269","0.453","0.336",47',
+  '"Gausman, Kevin",592332,"TOR","SL","Slider",-0.5,-4,"420",23.9,"251","0.210","0.310","0.260",32,28.0,30.1,"0.220","0.320","0.270",41',
+  '"Reliever, Test",777001,"BOS","CH","Changeup",0.1,1,"20",8.0,"40","0.200","0.250","0.220",20,15.0,18.0,"0.210","0.260","0.230",35',
+].join("\n");
+
+export const PITCHER_STATCAST_BALL_RATES_CSV = [
+  "pitch_type,pitcher,type,description",
+  "FF,592332,B,ball",
+  "FF,592332,B,ball",
+  "FF,592332,S,called_strike",
+  "FF,592332,S,called_strike",
+  "FF,592332,S,called_strike",
+  "SL,592332,B,ball",
+  "SL,592332,S,called_strike",
+  "CH,777001,B,ball",
+].join("\n");
