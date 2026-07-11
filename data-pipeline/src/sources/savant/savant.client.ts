@@ -154,6 +154,59 @@ export async function fetchSprintSpeedCsv(season: number): Promise<string> {
 }
 
 /**
+ * Fetch the pitch arsenal stats leaderboard CSV for a given season.
+ *
+ * One row per (pitcher, pitch_type) with usage, pitch counts, and names.
+ */
+export async function fetchPitchArsenalStatsCsv(season: number): Promise<string> {
+  const { data } = await savantHttp.get<string>(
+    `${SAVANT_BASE}/leaderboard/pitch-arsenal-stats`,
+    {
+      params: {
+        year: season,
+        type: "pitcher",
+        min: "50",
+        csv: "true",
+      },
+      responseType: "text",
+    }
+  );
+  if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+    throw new Error(
+      `[savant.client] fetchPitchArsenalStatsCsv(${season}) received HTML instead of CSV`
+    );
+  }
+  return data;
+}
+
+/**
+ * Fetch all regular-season Statcast pitch rows for pitchers in a season.
+ * Used to compute per-pitch-type ball/strike rates for the daily mix ingest.
+ */
+export async function fetchSeasonPitcherStatcastCsv(season: number): Promise<string> {
+  const { data } = await savantHttp.get<string>(
+    `${SAVANT_BASE}/statcast_search/csv`,
+    {
+      params: {
+        all: "true",
+        hfGT: "R|",
+        hfSea: `${season}|`,
+        player_type: "pitcher",
+        type: "details",
+        csv: "true",
+      },
+      responseType: "text",
+    }
+  );
+  if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+    throw new Error(
+      `[savant.client] fetchSeasonPitcherStatcastCsv(${season}) received HTML instead of CSV`
+    );
+  }
+  return data;
+}
+
+/**
  * Fetch pitch-level Statcast history for a single player from the
  * statcast_search CSV endpoint.
  *

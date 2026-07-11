@@ -5,6 +5,7 @@ import {
   SavantSprintSpeed,
   SavantPlayerPitchHistory,
   SavantPitchRow,
+  SavantPitcherPitchMix,
 } from "./savant.types";
 
 // ---------------------------------------------------------------------------
@@ -298,6 +299,163 @@ export function parseSprintSpeed(
       raw: row,
       fetchedAt,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Pitcher pitch-mix parsers
+// ---------------------------------------------------------------------------
+
+export interface PitchMixBallRateKey {
+  pitcherId: number;
+  pitchType: string;
+}
+
+export interface PitchMixBallRateStats {
+  pitchCount: number;
+  ballCount: number;
+  strikeCount: number;
+}
+
+function pitchMixKey(pitcherId: number, pitchType: string): string {
+  return `${pitcherId}:${pitchType}`;
+}
+
+/**
+ * Aggregate per-(pitcher, pitch_type) ball and strike counts from a bulk
+ * season Statcast CSV or a single-player history CSV.
+ */
+export function aggregatePitchMixBallRates(
+  csv: string
+): Map<string, PitchMixBallRateStats> {
+  const stats = new Map<string, PitchMixBallRateStats>();
+
+  for (const row of parseCsvToRows(csv)) {
+    const pitcherId = parseInt10(col(row, "pitcher"));
+    const pitchType = col(row, "pitch_type");
+    if (pitcherId === 0 || pitchType === "") continue;
+
+    const key = pitchMixKey(pitcherId, pitchType);
+    const entry = stats.get(key) ?? { pitchCount: 0, ballCount: 0, strikeCount: 0 };
+    entry.pitchCount += 1;
+
+    const resultType = col(row, "type");
+    if (resultType === "B") entry.ballCount += 1;
+    else if (resultType === "S") entry.strikeCount += 1;
+
+    stats.set(key, entry);
+  }
+
+  return stats;
+}
+
+/**
+ * Parse pitch arsenal stats and merge ball/strike rates from Statcast aggregates.
+ */
+export function parsePitchArsenalStats(
+  arsenalCsv: string,
+  ballRates: Map<string, PitchMixBallRateStats>,
+  season: number,
+  fetchedAt: string
+): SavantPitcherPitchMix[] {
+  return parseCsvToRows(arsenalCsv)
+    .filter((row) => col(row, "player_id") !== "" && col(row, "pitch_type") !== "")
+    .map((row): SavantPitcherPitchMix => {
+      const pitcherId = parseInt10(col(row, "player_id"));
+      const pitchType = col(row, "pitch_type");
+      const combinedName = col(row, "last_name, first_name");
+      const pitcherName = combinedName || col(row, "player_name", "name");
+
+      const pitchCount = parseInt10(col(row, "pitches"));
+      const usageRaw = parseNum(col(row, "pitch_usage"));
+      const usageRate =
+        usageRaw === null ? 0 : usageRaw > 1 ? usageRaw / 100 : usageRaw;
+
+      const rateStats = ballRates.get(pitchMixKey(pitcherId, pitchType));
+      const counted = rateStats?.pitchCount ?? 0;
+      const ballRate =
+        counted > 0 ? rateStats!.ballCount / counted : 0;
+      const strikeRate =
+        counted > 0 ? rateStats!.strikeCount / counted : null;
+
+      return {
+        pitcherId,
+        pitcherName,
+        season: parseInt10(col(row, "year")) || season,
+        pitchType,
+        pitchTypeName: col(row, "pitch_name", "pitch_type_name") || pitchType,
+        usageRate,
+        ballRate,
+        strikeRate,
+        pitchCount: pitchCount > 0 ? pitchCount : counted,
+        raw: row,
+        fetchedAt,
+      };
+    });
+}
+
+/**
+ * Fallback: build pitch mix entirely from per-pitcher Statcast history.
+ */
+export function aggregatePitcherPitchMixFromStatcastHistory(
+  csv: string,
+  pitcherId: number,
+  pitcherName: string,
+  season: number,
+  fetchedAt: string
+): SavantPitcherPitchMix[] {
+  const byType = new Map<
+    string,
+    {
+      pitchTypeName: string;
+      pitchCount: number;
+      ballCount: number;
+      strikeCount: number;
+      sampleRow: Record<string, string>;
+    }
+  >();
+
+  let totalPitches = 0;
+
+  for (const row of parseCsvToRows(csv)) {
+    const rowPitcherId = parseInt10(col(row, "pitcher"));
+    if (rowPitcherId !== pitcherId) continue;
+
+    const pitchType = col(row, "pitch_type");
+    if (pitchType === "") continue;
+
+    totalPitches += 1;
+    const entry = byType.get(pitchType) ?? {
+      pitchTypeName: col(row, "pitch_name") || pitchType,
+      pitchCount: 0,
+      ballCount: 0,
+      strikeCount: 0,
+      sampleRow: row,
+    };
+    entry.pitchCount += 1;
+
+    const resultType = col(row, "type");
+    if (resultType === "B") entry.ballCount += 1;
+    else if (resultType === "S") entry.strikeCount += 1;
+
+    byType.set(pitchType, entry);
+  }
+
+  if (totalPitches === 0) return [];
+
+  return [...byType.entries()].map(([pitchType, stats]): SavantPitcherPitchMix => ({
+    pitcherId,
+    pitcherName,
+    season,
+    pitchType,
+    pitchTypeName: stats.pitchTypeName,
+    usageRate: stats.pitchCount / totalPitches,
+    ballRate: stats.pitchCount > 0 ? stats.ballCount / stats.pitchCount : 0,
+    strikeRate:
+      stats.pitchCount > 0 ? stats.strikeCount / stats.pitchCount : null,
+    pitchCount: stats.pitchCount,
+    raw: stats.sampleRow,
+    fetchedAt,
+  }));
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,8 @@ export type { GameAbstractState, ScheduleGame, ScheduleResponse } from "./dto/sc
 
 export type {
   RecommendationLabel,
+  PitcherChallengeHints,
+  PitcherChallengeHintsPitch,
   ChallengeRecommendationResponse,
   CountStateRecommendation,
   AtBatRecommendationGridResponse,

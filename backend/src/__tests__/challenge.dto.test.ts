@@ -28,6 +28,36 @@ describe("toRecommendationDto — field mapping", () => {
   });
   const dto = toRecommendationDto(rec, snapshot);
 
+  it("defaults pitcherChallengeHints to null when omitted", () => {
+    expect(dto.pitcherChallengeHints).toBeNull();
+  });
+
+  it("does not change recommendation fields when hints are attached", () => {
+    const hints = {
+      pitcherId: 656731,
+      pitcherName: "Test Pitcher",
+      season: 2026,
+      summary: "If you recognize one of these pitches on a close call, consider challenging more often.",
+      pitches: [
+        {
+          pitchType: "SL",
+          pitchTypeName: "Slider",
+          ballRate: 0.45,
+          usageRate: 0.2,
+          pitchCount: 100,
+          highlight: true,
+        },
+      ],
+    };
+    const withHints = toRecommendationDto(rec, snapshot, hints);
+    expect(withHints.recommendation).toBe(dto.recommendation);
+    expect(withHints.displayMessage).toBe(dto.displayMessage);
+    expect(withHints.minimumConfidenceThreshold).toBe(dto.minimumConfidenceThreshold);
+    expect(withHints.expectedValue).toBe(dto.expectedValue);
+    expect(withHints.score).toBe(dto.score);
+    expect(withHints.pitcherChallengeHints).toEqual(hints);
+  });
+
   it("copies gamePk", () => {
     expect(dto.gamePk).toBe(824991);
   });

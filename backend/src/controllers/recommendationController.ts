@@ -1,9 +1,28 @@
 import type { Request, Response } from "express";
 import { getLatestRecommendationForGame } from "../services/challengeService";
+import { buildPitcherChallengeHints } from "../services/pitcherChallengeHintsService";
 import { toRecommendationDto, toAtBatGridDto, toGameAtBatHistoryDto } from "../challenge.dto";
 import { prisma } from "../db/prisma";
 import { findAllForAtBat, findAllForGame } from "../db/recommendationRepository";
 import { parseGamePkParam } from "../utils/requestParams";
+import { isDbConnectivityError } from "../utils/httpErrors";
+import type { PitcherChallengeHintsDto } from "../services/pitcherChallengeHintsService";
+
+async function loadPitcherChallengeHintsSafe(
+  pitcherId: number
+): Promise<PitcherChallengeHintsDto | null> {
+  try {
+    return await buildPitcherChallengeHints(pitcherId);
+  } catch (err) {
+    if (isDbConnectivityError(err)) {
+      console.warn(
+        `[recommendationController] pitcher hints skipped — DB unavailable for pitcher ${pitcherId}`
+      );
+      return null;
+    }
+    throw err;
+  }
+}
 
 /**
  * GET /api/games/:gamePk/recommendation
@@ -26,7 +45,17 @@ export async function getLatestRecommendation(
     return;
   }
 
-  res.json(toRecommendationDto(context.recommendation, context.snapshot));
+  const pitcherChallengeHints = await loadPitcherChallengeHintsSafe(
+    context.snapshot.pitcherId
+  );
+
+  res.json(
+    toRecommendationDto(
+      context.recommendation,
+      context.snapshot,
+      pitcherChallengeHints
+    )
+  );
 }
 
 /**
@@ -61,6 +90,9 @@ export async function getCurrentAtBatRecommendations(
 
   const rows = await findAllForAtBat(gamePk, latestSnapshot.atBatIndex);
   const halfInningLabel = latestSnapshot.halfInning === "top" ? "Top" : "Bot";
+  const pitcherChallengeHints = await loadPitcherChallengeHintsSafe(
+    latestSnapshot.pitcherId
+  );
 
   res.json(
     toAtBatGridDto(
@@ -68,7 +100,8 @@ export async function getCurrentAtBatRecommendations(
       latestSnapshot.atBatIndex,
       rows,
       latestSnapshot.inning,
-      halfInningLabel
+      halfInningLabel,
+      pitcherChallengeHints
     )
   );
 }

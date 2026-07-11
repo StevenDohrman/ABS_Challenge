@@ -7,6 +7,9 @@ import {
   parseSprintSpeed,
   parsePlayerStatcastHistory,
   parseGameStatcastCsv,
+  parsePitchArsenalStats,
+  aggregatePitchMixBallRates,
+  aggregatePitcherPitchMixFromStatcastHistory,
 } from "../savant.parser";
 import {
   EXPECTED_STATS_CSV,
@@ -16,6 +19,8 @@ import {
   SPRINT_SPEED_CSV,
   PLAYER_STATCAST_HISTORY_CSV,
   EMPTY_PLAYER_HISTORY_CSV,
+  PITCH_ARSENAL_STATS_CSV,
+  PITCHER_STATCAST_BALL_RATES_CSV,
   BOM_CSV,
   QUOTED_FIELD_CSV,
   HEADER_ONLY_CSV,
@@ -405,5 +410,74 @@ describe("parseGameStatcastCsv", () => {
 
   it("returns empty array for header-only CSV", () => {
     expect(parseGameStatcastCsv(EMPTY_PLAYER_HISTORY_CSV, FETCHED_AT)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pitcher pitch-mix parsers
+// ---------------------------------------------------------------------------
+
+describe("aggregatePitchMixBallRates", () => {
+  it("counts balls and strikes per pitcher and pitch type", () => {
+    const rates = aggregatePitchMixBallRates(PITCHER_STATCAST_BALL_RATES_CSV);
+    const ff = rates.get("592332:FF");
+    expect(ff).toMatchObject({ pitchCount: 5, ballCount: 2, strikeCount: 3 });
+    const sl = rates.get("592332:SL");
+    expect(sl).toMatchObject({ pitchCount: 2, ballCount: 1, strikeCount: 1 });
+  });
+});
+
+describe("parsePitchArsenalStats", () => {
+  it("merges arsenal usage with Statcast ball rates", () => {
+    const ballRates = aggregatePitchMixBallRates(PITCHER_STATCAST_BALL_RATES_CSV);
+    const mix = parsePitchArsenalStats(
+      PITCH_ARSENAL_STATS_CSV,
+      ballRates,
+      2026,
+      FETCHED_AT
+    );
+
+    const gausmanFf = mix.find(
+      (row) => row.pitcherId === 592332 && row.pitchType === "FF"
+    );
+    expect(gausmanFf).toMatchObject({
+      pitcherName: "Gausman, Kevin",
+      pitchTypeName: "4-Seam Fastball",
+      pitchCount: 899,
+      usageRate: 0.512,
+      ballRate: 0.4,
+      strikeRate: 0.6,
+      season: 2026,
+    });
+  });
+
+  it("skips low-sample rows in downstream filters but still parses them", () => {
+    const ballRates = aggregatePitchMixBallRates(PITCHER_STATCAST_BALL_RATES_CSV);
+    const mix = parsePitchArsenalStats(
+      PITCH_ARSENAL_STATS_CSV,
+      ballRates,
+      2026,
+      FETCHED_AT
+    );
+    const changeup = mix.find((row) => row.pitcherId === 777001);
+    expect(changeup?.pitchCount).toBe(20);
+    expect(changeup?.usageRate).toBe(0.08);
+  });
+});
+
+describe("aggregatePitcherPitchMixFromStatcastHistory", () => {
+  it("builds mix rows from a single-player history CSV", () => {
+    const mix = aggregatePitcherPitchMixFromStatcastHistory(
+      PLAYER_STATCAST_HISTORY_CSV,
+      656731,
+      "Test Pitcher",
+      2026,
+      FETCHED_AT
+    );
+
+    expect(mix.length).toBeGreaterThan(0);
+    const ff = mix.find((row) => row.pitchType === "FF");
+    expect(ff?.pitchCount).toBe(1);
+    expect(ff?.usageRate).toBeGreaterThan(0);
   });
 });

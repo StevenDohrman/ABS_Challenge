@@ -4,6 +4,7 @@ import type {
   LivePitchEvent,
   PostgameChallengeAudit,
 } from "@prisma/client";
+import type { PitcherChallengeHintsDto } from "../services/pitcherChallengeHintsService";
 import {
   buildDisplayMessage,
   formatBaseState,
@@ -50,11 +51,15 @@ export interface ChallengeRecommendationResponseDto {
 
   /** ISO timestamp when this recommendation was triggered by a pitch event */
   triggeredAt: string;
+
+  /** Read-only coaching context — not used by the engine. */
+  pitcherChallengeHints?: PitcherChallengeHintsDto | null;
 }
 
 export function toRecommendationDto(
   rec: DbRecommendation,
-  snapshot: LiveGameSnapshot
+  snapshot: LiveGameSnapshot,
+  pitcherChallengeHints?: PitcherChallengeHintsDto | null
 ): ChallengeRecommendationResponseDto {
   const explanations = Array.isArray(rec.explanationJson)
     ? (rec.explanationJson as string[])
@@ -79,6 +84,7 @@ export function toRecommendationDto(
     displayMessage: buildDisplayMessage(rec.recommendation, rec.challengeAvailable),
     reasons: explanations,
     triggeredAt: rec.triggeredAt?.toISOString() ?? new Date().toISOString(),
+    pitcherChallengeHints: pitcherChallengeHints ?? null,
   };
 }
 
@@ -154,6 +160,9 @@ export interface AtBatRecommendationGridResponseDto {
   bestExpectedValue: number | null;
   summaryMessage: string;
   recommendations: CountStateRecommendationDto[];
+
+  /** Read-only coaching context — not used by the engine. */
+  pitcherChallengeHints?: PitcherChallengeHintsDto | null;
 }
 
 export function toGameAtBatHistoryDto(
@@ -244,7 +253,8 @@ export function toAtBatGridDto(
   atBatIndex: number,
   rows: DbRecommendation[],
   inning?: number,
-  halfInning?: string
+  halfInning?: string,
+  pitcherChallengeHints?: PitcherChallengeHintsDto | null
 ): AtBatRecommendationGridResponseDto {
   const sorted = [...rows].sort(
     (a, b) => a.balls - b.balls || a.strikes - b.strikes
@@ -294,6 +304,7 @@ export function toAtBatGridDto(
     bestExpectedValue: best ? best.expectedValue : null,
     summaryMessage,
     recommendations,
+    pitcherChallengeHints: pitcherChallengeHints ?? null,
   };
 }
 

@@ -441,6 +441,33 @@ model PlayerSprintSpeed {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// pitcher_pitch_mix
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Per-pitcher pitch-type usage and ball rates. Ingested by SavantDailyJob.
+// One row per (pitcherId, season, pitchType); upserted on each daily run.
+model PitcherPitchMix {
+  id            Int    @id @default(autoincrement())
+  pitcherId     Int
+  pitcherName   String
+  season        Int
+  pitchType     String
+  pitchTypeName String
+
+  usageRate  Float
+  ballRate   Float
+  strikeRate Float?
+  pitchCount Int
+
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([pitcherId, season, pitchType])
+  @@index([pitcherId, season])
+  @@map("pitcher_pitch_mix")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // game_lineups
 // ─────────────────────────────────────────────────────────────────────────────
 

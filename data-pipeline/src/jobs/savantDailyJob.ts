@@ -5,6 +5,8 @@ import {
   fetchSprayProfileCsv,
   fetchFielderOaaCsv,
   fetchSprintSpeedCsv,
+  fetchPitchArsenalStatsCsv,
+  fetchSeasonPitcherStatcastCsv,
 } from "../sources/savant/savant.client";
 import {
   parseExpectedStats,
@@ -12,6 +14,8 @@ import {
   parseSprayProfiles,
   parseFielderOaa,
   parseSprintSpeed,
+  parsePitchArsenalStats,
+  aggregatePitchMixBallRates,
 } from "../sources/savant/savant.parser";
 import {
   computeLeagueAveragesFromCsvs,
@@ -23,6 +27,7 @@ import {
   SavantBatterSprayProfile,
   SavantFielderOaa,
   SavantSprintSpeed,
+  SavantPitcherPitchMix,
 } from "../sources/savant/savant.types";
 
 /**
@@ -61,17 +66,22 @@ export interface SavantDailyJob {
     event: "leagueAverages",
     listener: (averages: LeagueAveragesSnapshot) => void
   ): this;
+  on(
+    event: "pitcherPitchMix",
+    listener: (mix: SavantPitcherPitchMix[]) => void
+  ): this;
   on(event: "error", listener: (err: Error) => void): this;
 }
 
 /**
  * Fetches all Savant pregame context data for a given season.
  *
- * Runs four independent pipelines in parallel:
+ * Runs five independent pipelines in parallel:
  *   1. Batter statlines   (expected-statistics + plate-discipline merge)
  *   2. Batter spray profiles
  *   3. Fielder OAA        (all positions)
  *   4. Sprint speed       (all positions)
+ *   5. Pitcher pitch mix  (pitch arsenal + Statcast ball rates)
  *
  * Errors from individual pipelines are emitted on `error` with a
  * descriptive message; remaining pipelines continue unaffected.
@@ -85,6 +95,7 @@ export class SavantDailyJob extends EventEmitter {
       this.runSprayProfiles(season, fetchedAt),
       this.runFielderOaa(season, fetchedAt),
       this.runSprintSpeed(season, fetchedAt),
+      this.runPitcherPitchMix(season, fetchedAt),
     ]);
   }
 
@@ -149,6 +160,25 @@ export class SavantDailyJob extends EventEmitter {
       this.emit("sprintSpeed", parseSprintSpeed(csv, fetchedAt));
     } catch (err) {
       this.emitError("sprint speed", err);
+    }
+  }
+
+  private async runPitcherPitchMix(
+    season: number,
+    fetchedAt: string
+  ): Promise<void> {
+    try {
+      const [arsenalCsv, statcastCsv] = await Promise.all([
+        fetchPitchArsenalStatsCsv(season),
+        fetchSeasonPitcherStatcastCsv(season),
+      ]);
+      const ballRates = aggregatePitchMixBallRates(statcastCsv);
+      this.emit(
+        "pitcherPitchMix",
+        parsePitchArsenalStats(arsenalCsv, ballRates, season, fetchedAt)
+      );
+    } catch (err) {
+      this.emitError("pitcher pitch mix", err);
     }
   }
 
