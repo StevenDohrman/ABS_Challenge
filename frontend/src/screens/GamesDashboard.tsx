@@ -102,8 +102,7 @@ export function GamesDashboard() {
 
       {/* Server offline warning */}
       {!serverOnline && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 flex items-center gap-3">
-          <span>⚠️</span>
+        <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3">
           <p className="text-sm text-red-300">
             Backend at <span className="font-mono">localhost:3001</span> is unreachable.
             Run <span className="font-mono">npm run backend:dev</span> to start it.
@@ -113,8 +112,7 @@ export function GamesDashboard() {
 
       {/* DB disconnected warning */}
       {serverOnline && !dbOnline && (
-        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-center gap-3">
-          <span>⚠️</span>
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3">
           <div className="text-sm text-amber-300 space-y-0.5">
             <p className="font-semibold">Database not connected — recommendations unavailable</p>
             <p className="text-amber-400/70 text-xs">
@@ -145,7 +143,6 @@ export function GamesDashboard() {
       {!loading && !error && games.length === 0 && (
         <EmptyState
           size="md"
-          icon="🏟"
           title="No MLB games scheduled for this date."
           className="py-12"
         />

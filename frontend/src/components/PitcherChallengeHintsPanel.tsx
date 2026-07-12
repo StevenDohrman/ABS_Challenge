@@ -17,9 +17,6 @@ export function PitcherChallengeHintsPanel({ hints }: Props) {
   return (
     <div className="rounded-2xl overflow-hidden border border-sky-500/20 bg-slate-900/80 shadow-lg">
       <div className="px-5 py-2.5 bg-sky-950/50 border-b border-sky-500/15 flex items-center gap-2">
-        <span className="text-base" aria-hidden>
-          💡
-        </span>
         <span className="text-xs font-mono uppercase tracking-widest text-sky-200/70">
           Pitcher challenge hints
         </span>

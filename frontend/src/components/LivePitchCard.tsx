@@ -94,16 +94,13 @@ export function LivePitchCard({ data }: Props) {
         </div>
 
         {/* Confidence note */}
-        <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-3 flex items-center gap-3">
-          <span className="text-2xl">🎯</span>
-          <div>
-            <p className="text-xs text-white/50 uppercase tracking-wide font-mono">
-              Minimum confidence threshold
-            </p>
-            <p className="text-white font-semibold">
-              {minimumConfidenceThreshold}% confidence required
-            </p>
-          </div>
+        <div className="rounded-lg bg-white/5 border border-white/10 border-l-2 border-l-emerald-500/35 px-4 py-3">
+          <p className="text-xs text-white/50 uppercase tracking-wide font-mono">
+            Minimum confidence threshold
+          </p>
+          <p className="text-white font-semibold mt-0.5">
+            {minimumConfidenceThreshold}% confidence required
+          </p>
         </div>
 
         {/* Engine reasons */}
@@ -112,13 +109,9 @@ export function LivePitchCard({ data }: Props) {
             <p className="text-xs text-white/40 uppercase tracking-wide font-mono">
               Why
             </p>
-            <ul className="space-y-1.5">
+            <ul className="list-disc list-inside space-y-1.5 pl-0.5">
               {reasons.map((reason, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-sm text-white/75"
-                >
-                  <span className="mt-0.5 text-white/25">›</span>
+                <li key={i} className="text-sm text-white/75">
                   {reason}
                 </li>
               ))}

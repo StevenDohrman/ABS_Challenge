@@ -48,7 +48,7 @@ Live inputs include:
 - Game status
 - Remaining challenge count
 
-The live engine should not depend on Baseball Savant pitch-location data because Savant is not treated as the real-time source for this system. However it can be used for postgame analysis such as missed challenge opportunities based on pitch locations.
+The live engine does not depend on Baseball Savant pitch-location data because Savant is not a real-time source. Postgame zone audit also uses MLB live feed pitch location stored at ingest time — not Savant CSVs.
 
 ### Pregame / Daily Data
 
@@ -68,30 +68,24 @@ Examples:
 - Historical player challenge success rate
 - Batter spray profile (pull%, straightaway%, oppo%, GB/FB/LD mix)
 - Fielder Outs Above Average (OAA) by position and by batter handedness
-- Run expectancy tables
-- Win probability inputs, if available
+- Sprint speed (base-running context)
+- Daily league-average baselines (chase, walk, K, whiff, OPS, wOBA, batted-ball mix)
+- Pitcher season pitch mix (challenge hints — display only)
 
-All of the above defensive and spray metrics are already fetched daily by `SavantDailyJob`. They are pregame computations keyed to the players confirmed in the lineup, so no additional API calls are required at decision time — the data simply needs to be stored and wired into the engine.
+Defensive, spray, sprint, league-average, and pitcher pitch-mix data are fetched daily by `SavantDailyJob`, stored in the database, and wired into live engine decisions. Pregame computations are keyed to players in the confirmed lineup — no additional Savant API calls at decision time.
 
 ### Postgame Data
 
-Baseball Savant should be used for postgame enrichment and analysis.
+Postgame audit uses **pitch location already ingested from the MLB live feed** (`live_pitch_events.plateX`, `plateZ`, `mlbZone`, strike-zone height). It does not wait on Baseball Savant CSV enrichment.
 
-Postgame analysis can answer:
+Postgame analysis answers:
 
-- Which pitches should have been challenged?
-- Which allowed challenges were bad decisions?
-- Which game states produced missed challenge opportunities?
-- How should thresholds be adjusted in the future?
+- Which batting calls (called strikes) and fielding calls (called balls) were zone-wrong?
+- Which wrong calls had positive run-expectancy value if overturned but were not challenged successfully?
+- Which challenges were used despite low-value live recommendations?
+- How do missed and gained run expectancy aggregate across players and teams?
 
-Postgame Savant data may include:
-
-- Pitch location
-- Strike zone boundaries
-- Final pitch result
-- Statcast pitch data
-- Batted-ball data
-- Expected batting metrics
+Zone labels come from MLB zone metadata and plate coordinates stored at live ingest time.
 
 ---
 
@@ -166,35 +160,21 @@ project-root/
       ingestors/
       mappers/
       jobs/
-
-  shared/
-    src/
-      types/
-      constants/
-      schemas/
 ```
+
+> **Note:** There is no separate `shared` workspace — common types live in `@abs/engine` and `@abs/data-pipeline` package exports.
 
 ---
 
 ## Package Responsibilities
 
-### `shared`
+### Cross-package types
 
-The `shared` package contains stable types, constants, and schemas used across multiple parts of the project.
+Stable baseball primitives (player IDs, game state, etc.) are defined in `@abs/engine` domain types and `@abs/data-pipeline` source types. Import through each package’s public `index.ts` rather than a shared workspace.
 
-Use `shared` for general baseball primitives such as:
+Use engine/domain types for challenge decisions; use data-pipeline types for ingest and MLB/Savant parsing.
 
-- Player IDs
-- Team IDs
-- Game IDs
-- Base occupancy
-- Handedness
-- Half inning
-- Pitch call categories
-- Challenge recommendation labels
-
-
-Avoid putting everything in `shared`. Only place a type in `shared` if more than one major package needs it.
+**Previously planned `shared/` package** — removed as unused; add a workspace only when two or more packages need the same schema.
 
 ---
 
@@ -354,12 +334,10 @@ Dependencies should flow in one direction.
 Recommended dependency flow:
 
 ```txt
-shared
-  -> engine
+engine
   -> backend
 
-shared
-  -> data-pipeline
+data-pipeline
   -> backend
 
 backend
@@ -386,7 +364,6 @@ data-pipeline = how data enters the system
 engine = how decisions are made
 backend = how decisions are served
 frontend = how decisions are displayed
-shared = common language
 ```
 
 ---
@@ -604,12 +581,20 @@ Initial tables:
 games
 live_game_snapshots
 live_pitch_events
+mlb_at_bat_snapshots
 player_stat_snapshots
+spray_profiles
+fielder_oaa
+sprint_speed_snapshots
+league_averages_snapshots
 challenge_recommendations
-savant_pitch_events
 postgame_challenge_audits
+player_ranking_totals
+team_ranking_totals
 ingestion_runs
 ```
+
+**Removed:** `savant_pitch_events` (legacy; postgame audit uses `live_pitch_events` pitch location).
 
 ### `games`
 
@@ -695,27 +680,6 @@ expected_value
 score
 explanation_json
 created_at
-```
-
-### `savant_pitch_events`
-
-Stores postgame Savant pitch data.
-
-Useful fields:
-
-```txt
-game_pk
-at_bat_number
-pitch_number
-batter_id
-pitcher_id
-plate_x
-plate_z
-sz_top
-sz_bot
-description
-zone
-fetched_at
 ```
 
 ### `postgame_challenge_audits`
@@ -834,16 +798,9 @@ Focus on:
 - Defensive context
 - Run expectancy tables
 
-**Defensive and spray data — already fetched, not yet wired:**
+**Defensive, spray, sprint, and league averages — wired end-to-end:**
 
-`SavantDailyJob` already fetches and emits batter spray profiles, fielder OAA, and sprint speed. The data pipeline does its job. What is missing is:
-
-1. Storage — `player_stat_snapshots` does not have OAA or spray columns. A new table or additional columns are needed.
-2. Orchestrator handlers — `batterStatlines`, `sprayProfiles`, and `fielderOaa` are wired; sprint speed is fetched but not yet stored.
-3. Engine input — `PlayerChallengeContext` has no OAA or spray fields. New fields and a new feature computation module are needed.
-4. RE delta adjustment — the current RE table uses league-average defensive conversion rates. OAA and spray data would allow a small multiplier correction: a pull-heavy batter facing an elite fielder in the pull zone is worth less to keep at the plate than the raw RE table implies.
-
-This is low-cost incremental work because all the data is already available at decision time.
+`SavantDailyJob` fetches batter stat lines, spray profiles, fielder OAA, sprint speed, league averages, and pitcher pitch mix. The orchestrator persists these to dedicated tables (`spray_profiles`, `fielder_oaa`, `sprint_speed_snapshots`, `league_averages_snapshots`, etc.). `challengeInputBuilder` loads them into `ChallengeDecisionInput`, and the engine applies `defensiveContext`, `baserunningContext`, `lineupContext`, and injected `leagueAverages` multipliers in `decideChallenge`.
 
 ### Phase 3: Basic Recommendation Engine
 
@@ -870,31 +827,19 @@ Focus on:
 - Explanation display
 - Game situation display
 
-**Wire OAA and spray profiles into the live engine (Phase 4 scope):**
+**OAA, spray, lineup, baserunning, and league averages (complete):** see Phase 2 note above and `engine/src/features/`.
 
-This belongs in Phase 4 rather than Phase 7 because the data is already ingested by the pipeline — it is a wiring task, not a modelling task.
+### Phase 5: Postgame Challenge Audit (complete)
 
-Steps:
+Audit missed opportunities and bad challenges using MLB live feed pitch location — no Savant CSV wait.
 
-1. Add `spray_profiles` and `fielder_oaa` tables (or extend `player_stat_snapshots`) in the Prisma schema.
-2. Register `sprayProfiles` and `fielderOaa` handlers in `orchestrator.ts` to write the emitted data to those tables.
-3. Add `sprayProfile` and `defensiveOaa` fields to `PlayerChallengeContext` in the engine.
-4. Create a `defensiveContext.ts` feature module in the engine that computes a small RE delta multiplier from the batter's spray tendencies and the relevant fielder's OAA.
-5. Apply the multiplier inside `decideChallenge` after the offensive value step.
+Focus (implemented):
 
-The expected effect is small — a ±5–10% correction to the RE delta — but it moves the system toward a more accurate expected value in situations where the defense is clearly elite or clearly poor in the batter's spray zone.
-
-### Phase 5: Postgame Savant Analysis
-
-Add Baseball Savant postgame enrichment.
-
-Focus on:
-
-- Pulling Savant pitch rows
-- Joining to live pitch events
-- Detecting missed challenge opportunities
-- Detecting bad allowed challenges
-- Building audit reports
+- Join `live_pitch_events` pitch location to at-bat snapshots
+- Audit **batting** (called strikes) and **fielding** (called balls) for zone disagreements
+- Compute missed value from **zone-calculated raw RE swing** (not gated on ALLOW/DENY)
+- Flag bad challenges when DENY/WARN was shown live
+- Increment player/team rankings; serve `GET /api/games/:gamePk/postgame-audit`
 
 **Phase 6 status (complete):** 7-day schedule slider, About, How it works, postgame per-team splits, and **rolling 7-day + season challenge rankings** at `/rankings` (Players | Teams, Last 7 days | Season).
 
@@ -924,43 +869,69 @@ Focus on:
 - Feature importance
 - Optional machine learning model
 
-See **Future Engine Calculation Features (Phase 7+)** below for planned engine inputs (lineup window, count splits, sprint speed) that belong in this phase.
+See **Future Engine Calculation Features (Phase 7+)** below for remaining modelling gaps (batter count-state splits, optional RE table refresh).
 
-### Phase 8: Forked Game Branches (Client-Only)
+### Phase 8: Game Branches (Client-Only) — complete
 
-Let users **fork** a live or final game into a personal **branch** they can edit locally — alternate challenge counts, at-bat outcomes, or “what if” recommendation paths — without writing to the server DB or re-running the engine on the backend.
+Users **branch** a live or final game into a personal sandbox stored only in the browser.
 
-**Design constraints:**
+**Implemented:**
 
-- **Local storage only** — forked games live in the browser (`localStorage` and/or `IndexedDB` for larger payloads). No new Prisma tables, no fork persistence on Supabase.
-- **Fork from canonical game** — snapshot the current API payload for a `gamePk` (schedule header, at-bat snapshots, pitch events, 12-count recommendation grids, optional postgame audit rows) into a versioned JSON document with a new `forkId` and `parentGamePk`.
-- **Editable branch state** — user adjusts challenge counts remaining, marks pitches as challenged/overturned, or toggles which count was “triggered” on an at-bat; UI recomputes display-only summaries (e.g. hypothetical missed value) in the client without calling `decideChallenge` on the server.
-- **Import / export** — download fork as `.json`; import restores into local storage (validate schema version, merge or replace by `forkId`).
-- **Clear separation in UI** — forked games show a “LOCAL FORK” badge; canonical DB games remain read-only except for live polling.
-
-**Suggested scope:**
-
-1. **Export API (read-only)** — optional `GET /api/games/:gamePk/export` returning a single bundle for forking (or reuse existing history + audit endpoints from the client).
-2. **Frontend fork store** — `forkStorage.ts` with CRUD, quota handling, and schema version.
-3. **Fork detail view** — reuse `GameDetailScreen` / `AtBatHistory` / `CountGrid` with a `mode: "canonical" | "fork"` prop; edits write to local fork only.
-4. **Fork list** — `/forks` route showing saved local branches with link back to parent `gamePk`.
-
-Defer heavy client-side engine recompute until Phase 7; Phase 8 can start with manual edits + static grids from the fork snapshot.
+- **Export API** — `GET /api/games/:gamePk/export` and `GET /api/games/:gamePk/branch-eligibility`
+- **Local storage** — `frontend/src/gameBranch/storage/` with quota, import/export JSON, max branch slots
+- **Branch editor** — `/games/:gamePk/branch/:branchId` with lineup, defense, runners, plays, and real-time engine preview
+- **Live decision-making** — when the user enters or updates game state (count, bases, outs, score, matchups, challenges), `POST /api/branch/:branchId/preview-grid` runs the same `decideChallenge` pipeline and returns a fresh 12-count grid; useful for manual pitch-by-pitch tracking without MLB live polling
+- **Branch list** — `/branches` route for saved local branches
+- **Canonical games** remain read-only on the server; branch edits never write to the DB
 
 ---
 
-## Current Status (as of June 2026)
+## Current Status (as of July 2026)
 
-Phase 6 is complete. The full stack runs end-to-end including postgame challenge audits and challenge rankings:
+The full stack runs end-to-end for live ABS challenge guidance, postgame audit, rankings, and local game branches.
 
-- **Data pipeline**: `LivePollJob` polls active games and ingests `pitchData` (plate location + strike zone height) into `live_pitch_events`. Postgame audit runs shortly after Final — no Savant CSV wait. `SavantDailyJob` still supplies pregame batter stats only.
-- **Backend**: pre-computes 12-count grids, triggers called-strike recommendations, runs `postgameAuditService` on Final/backfill, serves `GET /api/games/:gamePk/postgame-audit`.
-- **Engine**: unchanged — audit logic lives in `postgameAuditService` (not the engine).
-- **Frontend**: React Router (`/`, `/games/:gamePk`, `/about`, `/how-it-works`, `/rankings`). Final games show postgame audit summary (total value missed, top 3 missed, expandable full list) plus at-bat history with zone missed badges. Rankings page: weekly + season, players + teams.
+### Data pipeline
 
-**Missed value definition:** sum of `runExpectancySwing` for all `missedChallenge` rows — includes cases where the team was out of challenges (strategic miss from earlier bad challenges).
+- **`LivePollJob`** — polls active MLB games; ingests pitch events with plate location, zone metadata, and ABS `reviewDetails` when present.
+- **`SavantDailyJob`** — daily ingest of batter stat lines, spray profiles, fielder OAA, sprint speed, **league averages** (persisted + hydrated on backend startup), and pitcher pitch mix.
+- **Postgame audit** — runs shortly after Final using stored MLB live feed location data (no Savant CSV wait).
 
-**Next up:** Phase 7 (engine tuning), then Phase 8 (client-only forked game branches). Phase 6 rankings ship at `/rankings` (weekly + season, players + teams).
+### Backend
+
+- Pre-computes 12-count recommendation grids per at-bat; triggers on called strikes.
+- Builds full `ChallengeDecisionInput` (lineup due-up, spray/OAA defense, baserunning sprint, daily league baselines, live handedness).
+- **`postgameAuditService`** — batting + fielding zone audits; missed value from zone-calculated RE (not ALLOW-gated).
+- **Pitcher challenge hints** — display-only season pitch-mix context on live/pre-at-bat responses.
+- **Rankings** — incremental player/team aggregates (missed RE, batting/fielding gained RE, challenge success %).
+- **Branch export** — read-only game bundles for client-side forks.
+
+### Engine (`@abs/engine`)
+
+- `decideChallenge` with credibility, offensive value, lineup context, defensive context, baserunning context, scarcity, and optional injected league averages.
+- Postgame audit logic lives in the backend (`postgameAuditService`), not the engine package.
+
+### Frontend routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | 7-day schedule browser + tracked game cards |
+| `/games/:gamePk` | Live card, count grid, history, hints, postgame audit |
+| `/games/:gamePk/branch/:branchId` | Local branch editor |
+| `/branches` | Saved local branches (import/export) |
+| `/rankings` | Player & team leaderboards (7-day + season) |
+| `/about`, `/how-it-works` | Product documentation |
+
+### Missed value definition
+
+Sum of `runExpectancySwing` for all `missedChallenge` rows where the zone disagreed with the live call and overturning would add positive RE. Includes cases where the team was out of challenges. Live ALLOW/DENY labels are stored for context but **do not gate** whether a miss is counted.
+
+### Deploy checklist
+
+1. Run Prisma migrations (`league_averages_snapshots`, fielding postgame audit columns, etc.).
+2. `npm run pipeline:build` and rebuild engine before restarting backend.
+3. Set `DATA_RETENTION_DAYS` (e.g. `120`) and `TRACKING_START_DATE` for season rankings after a DB reset.
+
+**Next up:** Phase 7 (engine tuning / batter count-state splits / optional ML). Static RE24 and count-delta tables still use compile-time constants.
 
 ---
 
@@ -976,10 +947,11 @@ Optional `sort` / `order` query params still work on the API for external client
 
 | Param | Values | Default |
 |-------|--------|---------|
-| `sort` | `missedRe`, `challengeSuccess` | `missedRe` |
+| `sort` | `missedRe`, `gainedRe`, `challengeSuccess` | `missedRe` |
 | `order` | `desc`, `asc` | `desc` |
 
-- **Missed RE:** batting-side run expectancy left on the table (postgame audit).
+- **Missed RE:** batting-side run expectancy left on the table (postgame audit). Team leaderboard uses batting missed only.
+- **Gained RE:** run expectancy captured on successful overturns — split into batting and fielding columns.
 - **Challenge success %:** overturned ÷ challenges used; no challenges = — (sorted last).
 - **Deploy:** set `DATA_RETENTION_DAYS` high enough to keep all season games (e.g. `120` through All-Star break); set `TRACKING_START_DATE` to your program start.
 
@@ -987,131 +959,96 @@ Optional `sort` / `order` query params still work on the API for external client
 
 ## Next Features for the Next Agent
 
-### 1. ABS Challenge Outcome Display
+### 1. ~~ABS Challenge Outcome Display~~ (done)
 
-The MLB Stats API already records ABS challenge results on pitch events. No new API calls are needed — the data is already stored in `live_pitch_events.rawPayload`.
-
-**What the API gives you (confirmed from real game data):**
-
-Each challenged pitch has `details.hasReview: true` and a `reviewDetails` object:
-
-```json
-{
-  "isOverturned": true,
-  "inProgress": false,
-  "reviewType": "MJ",
-  "challengeTeamId": 111,
-  "player": {
-    "id": 678882,
-    "fullName": "Ceddanne Rafaela"
-  }
-}
-```
-
-- `hasReview` — the pitch was challenged
-- `isOverturned` — whether the original call was reversed
-- `challengeTeamId` — which team challenged (compare to `battingTeamId` / `fieldingTeamId` to determine batter-side vs pitcher-side)
-- `player` — the exact player who triggered the challenge
-
-**Implementation steps:**
-
-1. **Type**: Add `reviewDetails` to `MlbPlayEvent` in `data-pipeline/src/sources/mlb-live/mlbLive.api.types.ts`:
-   ```ts
-   reviewDetails?: {
-     isOverturned: boolean;
-     inProgress: boolean;
-     reviewType: string;
-     challengeTeamId: number;
-     player: { id: number; fullName: string; link: string };
-   };
-   ```
-
-2. **Internal type**: Add `hasReview`, `isOverturned`, `challengerName`, `challengerTeamId` to `MlbLivePitchEvent` in `mlbLive.types.ts`.
-
-3. **Parser**: Propagate from `MlbPlayEvent.reviewDetails` in `parsePitchEventsFromPlay` inside `mlbLive.parser.ts`.
-
-4. **DB schema**: Add `hasReview Boolean @default(false)`, `isOverturned Boolean?`, `challengerName String?`, `challengerTeamId Int?` columns to `LivePitchEvent` in `prisma/schema.prisma` and run `prisma migrate dev`.
-
-5. **DTO**: Extend `AtBatHistoryItemDto` in `challenge.dto.ts` to include challenge outcome per at-bat.
-
-6. **Frontend**: In the at-bat history view (`AtBatHistory.tsx`), show a challenge badge on rows where `hasReview` is true — display the challenger's name, which side challenged, and whether it was overturned. This is already a requested feature.
+`live_pitch_events` stores `hasReview`, `isOverturned`, `challengerName`, and `challengerTeamId` from MLB `reviewDetails`. At-bat history shows challenge badges with challenger and overturn status.
 
 ### 2. ~~Wire OAA + Spray Profiles into the Engine~~ (done)
 
-Spray profiles, fielder OAA, and per-fielder defensive context are wired end-to-end. See **Future Engine Calculation Features** below for the next modelling gaps (lineup window, count splits, sprint speed).
+Spray profiles, fielder OAA, defensive context, lineup due-up window, baserunning sprint speed, and daily league averages are wired end-to-end.
 
-### 3. Phase 5: Postgame Savant Enrichment
+### 3. ~~Phase 5: Postgame challenge audit~~ (done)
 
-Pull Savant pitch-location data after game completion, join to `live_pitch_events`, and populate `postgame_challenge_audits` to audit missed challenges and bad allowed challenges.
+Postgame audit uses MLB live feed pitch location. Audits batting (called strikes) and fielding (called balls). Missed value uses zone-calculated RE, not ALLOW gating.
 
 ### 4. ~~Phase 6: Product quality of life~~ (done)
 
-7-day game browser, About, How it works, postgame per-team splits, and `/rankings` (weekly + season, players + teams).
+7-day schedule browser, About, How it works, postgame per-team splits, pitcher challenge hints, and `/rankings` (7-day + season, players + teams).
 
-### 5. Phase 8: Forked game branches (client-only)
+### 5. ~~Phase 8: Game branches (client-only)~~ (done)
 
-See **Phase 8** under Development Phases. Local-storage forks with import/export; no DB persistence.
+Local-storage branches with import/export, branch editor, preview grids, and `/branches` list. See Phase 8 under Development Phases.
+
+### 6. Phase 7: Engine tuning (remaining)
+
+**Priority — wire `SavantLineupJob` for batter count-state splits.**
+
+**Full implementation prompt:** [`docs/PHASE7_SAVANT_LINEUP_JOB.md`](docs/PHASE7_SAVANT_LINEUP_JOB.md)
+
+Also on the backlog:
+
+- Threshold tuning and backtesting against accumulated audit data
+- Optional: refresh static RE24 / count-delta tables from daily data
+- Optional machine learning model
+
+---
+
+### Phase 7 plan: Wire SavantLineupJob (batter count-state splits)
+
+See **[docs/PHASE7_SAVANT_LINEUP_JOB.md](docs/PHASE7_SAVANT_LINEUP_JOB.md)** for the full agent handoff (schema, orchestrator hook, engine changes, tests, checklist).
+
+**Goal:** Replace the engine’s fixed count modifier with batter-specific performance by count state.
+
+**Not the same as lineup due-up context** — `lineupContext.ts` already uses batting order + daily OPS/wOBA for upcoming batters. `SavantLineupJob` supplies pitch-by-pitch history for “how does *this* batter hit at *this* count?”
+
+**Defer:** `SavantPostgameJob` — postgame audit uses MLB live feed only.
 
 ---
 
 ## Future Engine Calculation Features (Phase 7+)
 
-These are **not implemented yet** (except where noted). They extend the challenge engine beyond the current batter-only, league-average count heuristics. Do not build them until Phase 5 audit data is in place and Phase 6 product surfaces exist unless explicitly prioritized.
+Most pregame context is wired. Remaining gaps extend beyond league-average count heuristics.
 
 ### Upcoming batters window (lineup context)
 
-**Status:** Planned — not in engine or live feed parsing today.
+**Status:** Implemented — `lineupContext.ts` + batting order from live feed / DB.
 
-**Goal:** When deciding whether the current batter should challenge, account for who is likely to bat later this half-inning. Use a sliding window keyed to outs remaining:
-
-- Example: 2 outs left → consider the current batter plus the next 2 batters due up.
-- If the current batter reaches base safely, the window slides forward (same outs, new batter at the plate, next batters still in the queue).
-- Weight upcoming batters' offensive profiles (OPS, wOBA, etc.) to adjust how valuable it is for the **current** batter to stay alive or reach base via a successful challenge — extending the inning for a strong on-deck hitter is worth more than doing so for a weak tail of the order.
-
-**Current system:** `offensiveValue.ts` only scales the run-expectancy delta for the **current** batter. No batting order, on-deck, or “due up this inning” context exists in `GameStateContext` or `PlayerChallengeContext`.
-
-**Dependencies (future work):**
-
-- Parse batting order and current spot from the MLB live feed (or a pregame lineup snapshot).
-- Pregame stats for every active lineup player (already available via daily ingest; needs per-game lineup binding).
-- New engine feature module (e.g. `lineupContext.ts`) and fields on `ChallengeDecisionInput`.
+**Behavior:** When deciding whether the current batter should challenge, the engine accounts for batters due up later this half-inning (window keyed to outs remaining). Strong hitters on deck increase the value of keeping the current batter alive via a successful challenge.
 
 ---
 
 ### Batter performance by count state
 
-**Status:** Partial — league-average count heuristics only; batter-specific splits planned.
+**Status:** Planned — `SavantLineupJob` built and tested; not wired. **Agent handoff:** [`docs/PHASE7_SAVANT_LINEUP_JOB.md`](docs/PHASE7_SAVANT_LINEUP_JOB.md).
 
-**Goal:** Batters perform very differently by count (0-1, 0-2, 1-2, etc.). Being down in the count is generally bad for the hitter; some batters collapse in 0-2 while others remain dangerous. Use **historical count splits** (wOBA, K%, chase%, whiff%, etc.) to adjust challenge value and credibility for the specific batter at the specific count.
+**Goal:** Batters perform very differently by count (0-1, 0-2, 1-2, etc.). Use **historical count splits** (wOBA, K%, chase%, whiff%, etc.) to adjust challenge value and credibility for the specific batter at the specific count.
 
 **What exists today:**
 
-- `playerCredibility.ts` applies a **fixed** count modifier for all batters (e.g. 0-2 → slightly higher P(call wrong) because pitchers work the edges; 3-0 → lower because grooved strikes are more likely correct). This is pitcher-behavior logic, not batter skill by count.
-- The run-expectancy table includes generic count-based RE adjustments (e.g. 0-2 subtracts ~0.106 runs vs 0-0).
-- `SavantLineupJob` can fetch per-player Statcast pitch history at lineup confirmation (includes balls/strikes per pitch) but is **not wired** to the backend or engine.
+- `playerCredibility.ts` applies a **fixed** count modifier for all batters (pitcher-behavior logic, not batter skill by count).
+- The run-expectancy table includes generic count-based RE adjustments.
+- `lineupContext.ts` handles **upcoming batters’ season quality** — separate from count splits.
 
-**Planned:**
+**Planned (SavantLineupJob):**
 
-- Ingest or compute batter count-state splits (Savant daily aggregates or lineup-time pitch history rollups).
-- Replace or blend the fixed count modifier with batter-specific “performance when behind/ahead in the count” signals in credibility and/or offensive value.
+- Run at lineup confirmation; rollup pitch history into per-batter count buckets.
+- Replace or blend the fixed count modifier with batter-specific signals in credibility and/or offensive value.
 
 ---
 
 ### Runner speed and base-path value
 
-**Status:** Partial — pipeline fetch only; not stored or used in decisions.
+**Status:** Implemented — `baserunningContext.ts` + `sprint_speed_snapshots` from daily ingest.
 
-**Goal:** When runners are on base, factor in **sprint speed** (and related base-running value) when estimating how much a successful challenge helps the offense — a fast runner on first increases the value of the batter reaching or staying alive; a slow runner less so.
+**Behavior:** When runners are on base (especially on a 3-ball count where a walk is possible), sprint speed vs league average adjusts the run-expectancy multiplier.
 
-**What exists today:**
+---
 
-- `SavantDailyJob` fetches the sprint speed leaderboard (`sprintSpeed`, `homeTo1b`, `competitiveRuns`) and emits a `sprintSpeed` event.
-- The orchestrator does **not** persist sprint speed; the engine has no runner-quality fields. Run expectancy uses generic base/out states only.
+### Static RE tables and league baselines
 
-**Planned:**
+**Status:** Partial — daily `leagueAverages` injection covers chase, walk, K, whiff, OPS, wOBA, batted-ball mix, and sprint baselines. RE24 matrix and count-delta tables remain compile-time constants in the engine.
 
-- Store sprint speed per player (new table or column on `player_stat_snapshots`).
-- When `runnerOnFirst` / `runnerOnSecond` / `runnerOnThird` is true, apply a small RE-delta or situation multiplier based on the occupying runner(s)' speed vs league average (~27 ft/s).
+**Planned:** Optionally refresh RE24 / count deltas from rolling season data.
 
 ---
 
@@ -1119,9 +1056,11 @@ These are **not implemented yet** (except where noted). They extend the challeng
 
 | Feature | In pipeline? | In engine? | Notes |
 |--------|--------------|------------|-------|
-| Upcoming batters window | No | No | Needs lineup order + sliding window logic |
-| Batter count-state splits | Partial (`SavantLineupJob` exists, unwired) | Partial (fixed count modifier only) | Batter-specific splits are the gap |
-| Runner sprint speed | Yes (daily fetch) | No | Needs storage + RE multiplier when runners on |
+| Upcoming batters window | Yes | Yes | `lineupContext.ts` + batting order |
+| Batter count-state splits | Yes (`SavantLineupJob`, unwired) | Partial (fixed count modifier only) | Phase 7 — see README plan |
+| Runner sprint speed | Yes | Yes | `baserunningContext.ts` |
+| Daily league averages | Yes | Yes | Injected via `leagueAveragesStore` |
+| RE24 / count-delta tables | N/A | Static constants | Optional daily refresh |
 
 ---
 

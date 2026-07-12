@@ -37,9 +37,9 @@ export function BranchHeader({ doc, scheduleDate }: Props) {
     <div className="space-y-4">
       <Link
         to="/branches"
-        className="flex items-center gap-2 text-sm text-white/40 transition-colors hover:text-white/80"
+        className="text-sm text-white/40 transition-colors hover:text-white/80"
       >
-        <span>←</span> All branches
+        All branches
       </Link>
 
       <Link

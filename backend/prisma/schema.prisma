@@ -60,7 +60,6 @@ model Game {
   snapshots       LiveGameSnapshot[]
   pitchEvents     LivePitchEvent[]
   recommendations ChallengeRecommendation[]
-  savantPitches   SavantPitchEvent[]
   postgameAudits  PostgameChallengeAudit[]
   lineups         GameLineup[]
 
@@ -268,39 +267,6 @@ model ChallengeRecommendation {
   @@unique([gamePk, atBatIndex, balls, strikes])
   @@index([gamePk, triggeredAt])
   @@map("challenge_recommendations")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// savant_pitch_events
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Postgame Statcast pitch rows keyed by Savant's at_bat_number (1-based).
-model SavantPitchEvent {
-  id          Int @id @default(autoincrement())
-  gamePk      Int
-  atBatNumber Int
-  atBatIndex  Int
-  pitchNumber Int
-
-  batterId  Int
-  pitcherId Int
-
-  plateX  Float?
-  plateZ  Float?
-  szTop   Float?
-  szBot   Float?
-  zone    Int?
-  description String?
-
-  fetchedAt DateTime
-
-  rawPayload Json
-
-  game         Game @relation(fields: [gamePk], references: [gamePk])
-
-  @@unique([gamePk, atBatNumber, pitchNumber])
-  @@index([gamePk, atBatIndex, pitchNumber])
-  @@map("savant_pitch_events")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

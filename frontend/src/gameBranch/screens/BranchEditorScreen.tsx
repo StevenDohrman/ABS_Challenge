@@ -235,7 +235,7 @@ export function BranchEditorScreen() {
       <div className="space-y-4">
         <EmptyState title={error} />
         <Link to="/" className="text-sm text-white/40 hover:text-white/80">
-          ← All games
+          All games
         </Link>
       </div>
     );
@@ -309,7 +309,7 @@ export function BranchEditorScreen() {
       {runnerWarnings.length > 0 && (
         <ul className="text-xs text-amber-300/90 space-y-1">
           {runnerWarnings.map((w) => (
-            <li key={w}>⚠ {w}</li>
+            <li key={w}>{w}</li>
           ))}
         </ul>
       )}

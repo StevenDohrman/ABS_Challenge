@@ -74,7 +74,7 @@ export function GameDetailScreen() {
           to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
           className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
         >
-          <span>←</span> All games
+          All games
         </Link>
         <EmptyState title="Game not found." />
       </div>
@@ -135,7 +135,7 @@ function GameDetailContent({
           to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
           className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
         >
-          <span>←</span> All games
+          All games
         </Link>
         <BranchGameButton gamePk={game.gamePk} scheduleDate={scheduleDate} />
       </div>
@@ -241,8 +241,7 @@ function GameDetailContent({
               <LivePitchCard data={livePitch} />
             </section>
           ) : preBat ? (
-            <div className="rounded-xl border border-white/10 bg-white/3 px-5 py-4 flex items-center gap-3">
-              <span className="text-lg">⏳</span>
+            <div className="rounded-xl border border-white/10 bg-white/3 px-5 py-4">
               <p className="text-sm text-white/50">No called strike yet this at-bat.</p>
             </div>
           ) : null}
@@ -267,7 +266,6 @@ function GameDetailContent({
       {isPre && (
         <EmptyState
           size="md"
-          icon="⏰"
           title="Game hasn't started yet"
           description="Recommendations will appear once the pipeline begins tracking this game."
         />
@@ -294,7 +292,6 @@ function GameDetailContent({
 
           {!historyLoading && !history && !game.isTracked && (
             <EmptyState
-              icon="⏳"
               title="Ingesting game data from the MLB archive…"
               description="Final games are backfilled automatically; refresh in a few minutes."
             />

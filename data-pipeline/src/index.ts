@@ -10,9 +10,8 @@ export { LivePollJob } from "./jobs/livePollJob";
 export { SavantDailyJob } from "./jobs/savantDailyJob";
 
 // Optional jobs — not wired by the backend orchestrator today.
-// SavantPostgameJob: Statcast CSV enrichment after a game ends (backend postgame
-// audit uses the MLB live feed instead). SavantLineupJob: per-player pitch
-// history at lineup confirmation.
+// SavantPostgameJob: superseded by MLB live feed postgame audit (no engine impact).
+// SavantLineupJob: Phase 7 — batter count-state splits; see README "Phase 7 plan".
 export { SavantPostgameJob } from "./jobs/savantPostgameJob";
 export { SavantLineupJob } from "./jobs/savantLineupJob";
 export type {
@@ -36,7 +35,6 @@ export {
   parseGameSnapshot,
   parseGameBench,
   parseGameBullpen,
-  parseLiveDefense,
   parsePlayerNamesFromFeed,
   assessBranchRosterFromFeed,
   parseDefenseFromBoxscore,

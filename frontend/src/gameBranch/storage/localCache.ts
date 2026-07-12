@@ -165,10 +165,6 @@ export function removeLocalBranch(branchId: string): void {
   writeIndexRaw(readIndexRaw().filter((e) => e.branchId !== branchId));
 }
 
-export function clearLocalBranch(branchId: string): void {
-  removeLocalBranch(branchId);
-}
-
 export function localBranchCount(): number {
   return listLocalBranches().length;
 }

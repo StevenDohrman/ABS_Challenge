@@ -5,7 +5,6 @@
     "engine",
     "data-pipeline",
     "backend",
-    "shared",
     "frontend"
   ],
   "scripts": {

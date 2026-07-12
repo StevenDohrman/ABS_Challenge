@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GameAtBatHistoryResponse } from "../../api/types";
 import { AtBatHistory } from "../../components/AtBatHistory";
+import { DisclosureChevron } from "../../components/ui/DisclosureChevron";
 
 interface Props {
   history?: GameAtBatHistoryResponse;
@@ -23,7 +24,7 @@ export function BranchHistoryPanel({ history }: Props) {
             — includes canonical RE per count
           </span>
         </span>
-        <span className="text-white/40">{open ? "▼" : "▶"}</span>
+        <DisclosureChevron open={open} />
       </button>
       {open && (
         <div className="mt-3 opacity-80 pointer-events-none">

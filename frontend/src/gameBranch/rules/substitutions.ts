@@ -217,11 +217,3 @@ export function listReplacementOptions(
     };
   });
 }
-
-export function assignDefenseSlot(
-  defense: DefensiveLineup,
-  slot: keyof DefensiveLineup,
-  playerId: number
-): DefensiveLineup {
-  return { ...defense, [slot]: playerId };
-}
