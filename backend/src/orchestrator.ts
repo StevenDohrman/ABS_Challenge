@@ -282,7 +282,7 @@ async function runCleanupJob(): Promise<void> {
         `[orchestrator] cleanup removed ${result.games} games, ` +
         `${result.snapshots} snapshots, ${result.pitchEvents} pitch events, ` +
         `${result.recommendations} recommendations, ` +
-        `${result.savantPitches} savant pitches, ${result.postgameAudits} audits, ` +
+        `${result.postgameAudits} audits, ` +
         `${result.rankingsContributions} rankings contributions`
       );
     } else {

@@ -165,15 +165,6 @@ export {
 export type { BranchRosterAssessment, TeamRosterCounts } from "./branchRoster";
 
 /**
- * Current defensive alignment from the live feed linescore.
- */
-export function parseLiveDefense(
-  feed: MlbLiveFeedResponse
-): DefensiveLineup | undefined {
-  return parseDefensiveLineup(feed.liveData?.linescore?.defense);
-}
-
-/**
  * Batting order (player IDs) for the team currently batting.
  */
 function parseBattingOrderForTeam(

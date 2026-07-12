@@ -3,6 +3,7 @@ import { inningHalfArrow } from "../utils/baseballDisplay";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
 import { CountGrid } from "./CountGrid";
+import { DisclosureChevron } from "./ui/DisclosureChevron";
 
 interface Props {
   data: AtBatRecommendationGridResponse;
@@ -18,8 +19,6 @@ export function PreAtBatBanner({ data, showGrid, onToggleGrid }: Props) {
     ? "from-emerald-900/60 to-slate-900 border-emerald-700/40"
     : "from-slate-800/80 to-slate-900 border-slate-700/40";
 
-  const headerIcon = hasHighValueOpportunity ? "⚡" : "🛡";
-
   const inningLabel = data.inning
     ? `${inningHalfArrow(data.halfInning, true)} ${data.inning}`.trim()
     : null;
@@ -30,7 +29,6 @@ export function PreAtBatBanner({ data, showGrid, onToggleGrid }: Props) {
       <div
         className={`px-5 py-2 bg-gradient-to-r ${headerBg} border-b border-white/10 flex items-center gap-2`}
       >
-        <span className="text-base">{headerIcon}</span>
         <span className="text-xs font-mono uppercase tracking-widest text-white/50">
           Pre At-Bat Assessment
         </span>
@@ -66,11 +64,7 @@ export function PreAtBatBanner({ data, showGrid, onToggleGrid }: Props) {
           onClick={onToggleGrid}
           className="text-xs text-white/40 hover:text-white/70 transition-colors font-mono flex items-center gap-1.5"
         >
-          <span
-            className={`inline-block transition-transform duration-200 ${showGrid ? "rotate-90" : ""}`}
-          >
-            ▶
-          </span>
+          <DisclosureChevron open={!!showGrid} />
           {showGrid ? "Hide" : "Show"} full count grid
         </button>
 

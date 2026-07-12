@@ -27,12 +27,9 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="space-y-2 text-sm text-white/60 leading-relaxed">
+    <ul className="list-disc list-inside space-y-2 text-sm text-white/60 leading-relaxed pl-0.5">
       {items.map((item) => (
-        <li key={item} className="flex gap-2">
-          <span className="text-white/25 shrink-0">›</span>
-          <span>{item}</span>
-        </li>
+        <li key={item}>{item}</li>
       ))}
     </ul>
   );
@@ -69,11 +66,42 @@ export function AboutPage() {
         <Card>
           <p className="text-sm text-white/60 leading-relaxed">
             For tracked games, the system pre-computes challenge value across all
-            count states, surfaces a recommendation when a called strike occurs,
-            and after the game finishes compares those calls against pitch location
-            to find missed opportunities. Everything shown here is decision
+            12 count states, surfaces a recommendation when a called strike
+            occurs, and after the game finishes audits both batting and fielding
+            calls against pitch location. Everything shown here is decision
             support — not an official zone call or replay ruling.
           </p>
+        </Card>
+      </Section>
+
+      <Section title="Schedule &amp; game browser">
+        <Card>
+          <BulletList
+            items={[
+              "Home dashboard lists tracked MLB games for today and the prior six days (7-day window).",
+              "Each game card shows status, score, inning, and remaining ABS challenges per team.",
+              "Open any tracked game for live detail, postgame audit, or to branch into a local sandbox.",
+            ]}
+          />
+        </Card>
+      </Section>
+
+      <Section title="Daily pregame context">
+        <Card>
+          <p className="text-sm text-white/50 leading-relaxed">
+            Before first pitch, Baseball Savant season data is ingested once per
+            day and reused for every live decision that day.
+          </p>
+          <BulletList
+            items={[
+              "Batter stat lines — AVG, OBP, OPS, wOBA, chase rate, whiff rate, and plate discipline.",
+              "Spray profiles — pull, straightaway, and opposite-field tendencies plus GB/FB/LD mix.",
+              "Fielder OAA — outs above average by position and batter handedness.",
+              "Sprint speed — base-running speed for runners on base.",
+              "League averages — daily season baselines (chase, walk, K, whiff, OPS, wOBA, batted-ball mix, sprint) injected into the engine.",
+              "Pitcher pitch mix — season Statcast usage and ball rates for coaching hints (display only).",
+            ]}
+          />
         </Card>
       </Section>
 
@@ -86,13 +114,17 @@ export function AboutPage() {
             items={[
               "Pre-at-bat grid — recommendations for all 12 balls-strikes states before the at-bat plays out.",
               "Called-strike card — the triggered recommendation for the latest called strike (ALLOW, WARN, DENY, or AUTO_ALLOW) with expected run value and engine reasons.",
-              "At-bat history — in-game log of triggered counts, recommendations, and recorded challenge outcomes.",
+              "Pitcher challenge hints — season pitch-mix context highlighting high ball-rate offerings (does not change recommendations).",
+              "At-bat history — in-game log of triggered counts, recommendations, and recorded ABS challenge outcomes (challenger, side, overturned).",
               "Challenge counts — remaining challenges per team (two per team under ABS rules).",
             ]}
           />
           <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
-            Live recommendations use the MLB live feed and a run-expectancy engine.
-            They do not wait on postgame pitch-location enrichment — speed over
+            Live recommendations use the MLB live feed plus daily Savant context.
+            The engine factors in run expectancy, player credibility, offensive
+            value, lineup due-up window, defensive spray/OAA context, baserunning
+            speed, challenge scarcity, and daily league baselines. Live guidance
+            does not wait on postgame pitch-location audit — speed over
             retrospective accuracy.
           </p>
         </Card>
@@ -101,22 +133,23 @@ export function AboutPage() {
       <Section title="Postgame analysis">
         <Card>
           <p className="text-sm text-white/50 leading-relaxed">
-            Runs after a game goes Final. May show as pending while pitch data
-            backfills from the archive.
+            Runs shortly after a game goes Final using pitch location already
+            stored from the MLB live feed — no Baseball Savant CSV wait.
           </p>
           <BulletList
             items={[
-              "Each audited called strike is checked against plate-crossing coordinates from the MLB live feed.",
-              "Missed opportunities — high-value cases where a challenge was recommended but not used, and the pitch was likely out of zone.",
-              "Bad challenges — cases where a challenge was used despite a low-value recommendation.",
-              "Total missed value — sum of run expectancy (RE) left on the table across missed high-value chances, including when a team was out of challenges.",
-              "Team splits — missed value attributed to the batting team (Top inning = away, Bot = home).",
+              "Batting audits — called strikes checked against plate-crossing coordinates and MLB zone labels.",
+              "Fielding audits — called balls checked the same way (zone says strike, live call was ball).",
+              "Missed opportunities — zone disagrees with the live call and overturning would add positive run expectancy, but no successful challenge occurred.",
+              "Bad challenges — a challenge was used despite a low-value live recommendation (DENY or WARN).",
+              "Total missed value — sum of calculated run-expectancy swing across all missed opportunities, including when a team was out of challenges.",
+              "Team splits — missed value attributed by challenging side (batting team for strike misses, fielding team for ball misses).",
             ]}
           />
           <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
-            Postgame audit is retrospective truth-checking. It does not change what
-            was shown live; it evaluates how good the live guidance looks in
-            hindsight.
+            Missed value uses zone-calculated run expectancy, not whether the live
+            card said ALLOW. Postgame audit is retrospective truth-checking; it
+            does not change what was shown live.
           </p>
         </Card>
       </Section>
@@ -130,8 +163,8 @@ export function AboutPage() {
             <ul className="text-sm text-white/60 space-y-1.5 leading-relaxed">
               <li>Real-time during the game</li>
               <li>Pre-bat grid + called-strike trigger</li>
-              <li>Run expectancy from game state</li>
-              <li>No pitch-location audit yet</li>
+              <li>Full engine with daily Savant context</li>
+              <li>Strategic guidance, not zone audit</li>
             </ul>
           </Card>
           <Card>
@@ -139,9 +172,9 @@ export function AboutPage() {
               Postgame
             </p>
             <ul className="text-sm text-white/60 space-y-1.5 leading-relaxed">
-              <li>After Final, often a short delay</li>
-              <li>Zone check on called strikes</li>
-              <li>Missed value and top misses</li>
+              <li>After Final, usually within minutes</li>
+              <li>Zone check on batting and fielding calls</li>
+              <li>Missed value, bad challenges, top misses</li>
               <li>Feeds rankings aggregates</li>
             </ul>
           </Card>
@@ -161,12 +194,13 @@ export function AboutPage() {
           </p>
           <div className="space-y-4 pt-1">
             <Term name="Missed RE">
-              Run expectancy left on the table from missed high-value challenges
-              (batting side), from postgame audit.
+              Run expectancy left on the table from missed opportunities. For
+              players this is batting-side misses; for teams it is batting-side
+              missed value only.
             </Term>
             <Term name="Gained RE">
               Run expectancy captured on successful overturns — split into batting
-              and fielding contributions.
+              and fielding contributions on both player and team leaderboards.
             </Term>
             <Term name="Challenge success %">
               Overturned challenges divided by challenges used. Players or teams
@@ -181,13 +215,43 @@ export function AboutPage() {
         </Card>
       </Section>
 
+      <Section title="Game branches">
+        <Card>
+          <p className="text-sm text-white/60 leading-relaxed">
+            From any game detail page you can{" "}
+            <Link to="/branches" className="text-violet-300/90 hover:text-violet-200 underline">
+              branch
+            </Link>{" "}
+            a personal sandbox saved only in your browser — not on the server.
+          </p>
+          <BulletList
+            items={[
+              "Fork a live or final game into an editable local copy, or import a branch JSON to build a scenario from scratch.",
+              "Enter game state yourself — count, outs, runners, score, inning, batter, pitcher, lineups, defense, and challenge counts.",
+              "As you edit the situation, the same recommendation engine runs in real time and returns a fresh 12-count grid for your inputs.",
+              "Step through plays (walks, strikeouts, hits, outs) to advance the scenario and see updated challenge guidance.",
+              "Export or import branch JSON to share or restore on another session.",
+            ]}
+          />
+          <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
+            When you are driving the game state, branches provide real-time decision
+            support — not a replay of a tracked MLB feed. Recommendations recompute
+            automatically from your edits (cached locally, never written to the database).
+            Canonical tracked games on the main game page remain read-only except for live
+            polling updates.
+          </p>
+        </Card>
+      </Section>
+
       <Section title="Limitations">
         <Card>
           <BulletList
             items={[
               "Recommendations are guidance for analysts and fans — not real-time ABS zone rulings.",
-              "Only tracked games appear with full live and postgame detail; untracked or backfill-pending games may show partial data.",
-              "Postgame zone labels depend on archived pitch location data and the audit rules in use at ingest time.",
+              "Only tracked games appear with full live and postgame detail; untracked games may show schedule info only.",
+              "Postgame zone labels depend on MLB live feed pitch location and zone metadata at ingest time.",
+              "Some engine inputs still use static tables (run-expectancy matrix, count deltas) rather than daily refresh.",
+              "Game branches are local to one browser and are not synced across devices.",
             ]}
           />
         </Card>
@@ -195,8 +259,8 @@ export function AboutPage() {
 
       <footer className="text-xs text-white/30 font-mono leading-relaxed">
         Data sources: MLB Stats API (schedule, live feed, pitch locations for
-        postgame audit). Pregame batter context from Baseball Savant where
-        available.
+        postgame audit). Daily batter, fielder, league, and pitcher context from
+        Baseball Savant.
       </footer>
     </div>
   );

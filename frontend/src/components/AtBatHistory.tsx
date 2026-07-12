@@ -5,6 +5,7 @@ import { EmptyState } from "./ui/EmptyState";
 import { CountGrid } from "./CountGrid";
 import { RecommendationBadge } from "./RecommendationBadge";
 import { ExpectedValuePill } from "./ExpectedValuePill";
+import { DisclosureChevron } from "./ui/DisclosureChevron";
 
 interface Props {
   atBats: AtBatHistoryItem[];
@@ -120,11 +121,7 @@ function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
         )}
 
         {/* Expand chevron */}
-        <span
-          className={`text-white/25 text-xs transition-transform duration-200 ml-1 ${expanded ? "rotate-90" : ""}`}
-        >
-          ▶
-        </span>
+        <DisclosureChevron open={expanded} className="ml-1" />
       </button>
 
       {/* Expanded count grid */}
@@ -182,9 +179,7 @@ function InningSection({ group, defaultOpen }: { group: InningGroup; defaultOpen
 
         <div className="flex-1 h-px bg-white/10" />
 
-        <span className={`text-white/20 text-xs transition-transform duration-200 ${open ? "rotate-90" : ""}`}>
-          ▶
-        </span>
+        <DisclosureChevron open={open} />
       </button>
 
       {open && (

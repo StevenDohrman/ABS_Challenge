@@ -199,8 +199,8 @@ export interface SavantPitcherPitchMix {
 
   /** Share of pitcher's arsenal (0–1). */
   usageRate: number;
-  /** Fraction of pitches called balls (0–1). */
-  ballRate: number;
+  /** Fraction of pitches called balls (0–1). Null when Statcast sample missing. */
+  ballRate: number | null;
   /** Fraction of pitches called strikes, excluding in-play (0–1). Optional. */
   strikeRate: number | null;
 

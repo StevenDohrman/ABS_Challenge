@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 interface Props {
   title: string;
   description?: string;
-  icon?: ReactNode;
   children?: ReactNode;
   className?: string;
   /** sm = compact inline panel; md = larger centered block */
@@ -20,7 +19,6 @@ const SIZE_CLASSES = {
 export function EmptyState({
   title,
   description,
-  icon,
   children,
   className = "",
   size = "sm",
@@ -30,7 +28,6 @@ export function EmptyState({
     <div
       className={`border border-white/10 ${elevated ? "bg-white/3" : ""} ${SIZE_CLASSES[size]} ${className}`}
     >
-      {icon && <div className={size === "md" ? "text-3xl" : "text-2xl"}>{icon}</div>}
       <p className={size === "md" ? "text-white/60 font-medium" : "text-sm text-white/40"}>
         {title}
       </p>

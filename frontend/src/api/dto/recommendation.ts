@@ -5,7 +5,7 @@ export type RecommendationLabel = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 export interface PitcherChallengeHintsPitch {
   pitchType: string;
   pitchTypeName: string;
-  ballRate: number;
+  ballRate: number | null;
   usageRate: number;
   pitchCount: number;
   highlight: boolean;

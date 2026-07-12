@@ -8,7 +8,6 @@ export type { GameAbstractState, ScheduleGame, ScheduleResponse } from "./dto/sc
 export type {
   RecommendationLabel,
   PitcherChallengeHints,
-  PitcherChallengeHintsPitch,
   ChallengeRecommendationResponse,
   CountStateRecommendation,
   AtBatRecommendationGridResponse,
@@ -18,11 +17,7 @@ export type {
 } from "./dto/recommendation";
 
 export type {
-  PostgameAuditStatus,
-  PostgameBattingSide,
   PostgameAuditItem,
-  PostgameAuditTeamSummary,
-  PostgameAuditSummary,
   PostgameAuditResponse,
 } from "./dto/postgame";
 
@@ -32,8 +27,5 @@ export type {
   TeamRankingRow,
   RankingsLeaderboardSort,
   RankingsSortOrder,
-  RankingsResponse,
-  PlayerRankingsResponse,
-  TeamRankingsResponse,
   RankingsBundleResponse,
 } from "./dto/rankings";

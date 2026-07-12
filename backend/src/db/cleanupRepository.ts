@@ -18,7 +18,6 @@ export async function purgeOldGames(retentionDays: number): Promise<{
   snapshots: number;
   pitchEvents: number;
   recommendations: number;
-  savantPitches: number;
   postgameAudits: number;
   rankingsContributions: number;
 }> {
@@ -37,7 +36,6 @@ export async function purgeOldGames(retentionDays: number): Promise<{
       snapshots: 0,
       pitchEvents: 0,
       recommendations: 0,
-      savantPitches: 0,
       postgameAudits: 0,
       rankingsContributions: 0,
     };
@@ -49,7 +47,6 @@ export async function purgeOldGames(retentionDays: number): Promise<{
 
   // Sequential: child tables before games.
   const auditResult   = await prisma.postgameChallengeAudit.deleteMany({ where: { gamePk: { in: gamePks } } });
-  const savantResult  = await prisma.savantPitchEvent.deleteMany({ where: { gamePk: { in: gamePks } } });
   const recResult     = await prisma.challengeRecommendation.deleteMany({ where: { gamePk: { in: gamePks } } });
   const snapResult    = await prisma.liveGameSnapshot.deleteMany({ where: { gamePk: { in: gamePks } } });
   const pitchResult   = await prisma.livePitchEvent.deleteMany({ where: { gamePk: { in: gamePks } } });
@@ -60,7 +57,6 @@ export async function purgeOldGames(retentionDays: number): Promise<{
     snapshots: snapResult.count,
     pitchEvents: pitchResult.count,
     recommendations: recResult.count,
-    savantPitches: savantResult.count,
     postgameAudits: auditResult.count,
     rankingsContributions,
   };

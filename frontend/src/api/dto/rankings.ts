@@ -49,10 +49,7 @@ export interface RankingsResponse {
   rows: PlayerRankingRow[] | TeamRankingRow[];
 }
 
-export type PlayerRankingsResponse = RankingsResponse & { rows: PlayerRankingRow[] };
-export type TeamRankingsResponse = RankingsResponse & { rows: TeamRankingRow[] };
-
-export interface RankingsBundleResponse extends RankingsResponse {
+export interface RankingsBundleResponse extends Omit<RankingsResponse, "rows"> {
   players: PlayerRankingRow[];
   teams: TeamRankingRow[];
 }
