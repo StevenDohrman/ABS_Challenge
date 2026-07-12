@@ -4,6 +4,7 @@ import { mapSettledWithConcurrency } from "../utils/concurrency";
 import { recordPlayerName } from "./playerNameRepository";
 import type { SavantBatterStatline } from "@abs/data-pipeline";
 import type { PlayerStatSnapshot } from "@prisma/client";
+import { deriveObpOpsFromSavant } from "../utils/savantStats";
 
 export type { PlayerStatSnapshot };
 
@@ -23,11 +24,20 @@ export type { PlayerStatSnapshot };
 export async function upsertBatterStatline(
   statline: SavantBatterStatline
 ): Promise<PlayerStatSnapshot> {
+  const { obp, ops } = deriveObpOpsFromSavant(
+    statline.ba,
+    statline.slg,
+    statline.woba,
+    statline.bbPercent
+  );
+
   const sharedFields = {
     playerName: statline.playerName,
     pa: statline.pa,
     ba: statline.ba,
+    obp,
     slg: statline.slg,
+    ops,
     woba: statline.woba,
     kPercent: statline.kPercent,
     bbPercent: statline.bbPercent,
@@ -109,5 +119,17 @@ export async function findPlayerStatSnapshotBatch(
 
   return prisma.playerStatSnapshot.findMany({
     where: { season, playerId: { in: playerIds } },
+  });
+}
+
+/** Patch batting hand from live feed when Savant ingest has not set it yet. */
+export async function patchPlayerBattingHand(
+  playerId: number,
+  season: number,
+  battingHand: "L" | "R" | "S"
+): Promise<void> {
+  await prisma.playerStatSnapshot.updateMany({
+    where: { playerId, season },
+    data: { battingHand },
   });
 }

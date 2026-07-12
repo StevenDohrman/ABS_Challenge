@@ -3,6 +3,7 @@ import type { PostgameChallengeAudit } from "@prisma/client";
 export type PostgameAuditStatus = "pending" | "ready" | "unavailable";
 
 export type PostgameBattingSide = "home" | "away";
+export type PostgameChallengeSide = "batting" | "fielding";
 
 export interface PostgameAuditItemDto {
   atBatIndex: number;
@@ -11,11 +12,13 @@ export interface PostgameAuditItemDto {
   halfInning: string;
   /** Team at bat for this pitch (Top → away, Bot → home). */
   battingSide: PostgameBattingSide;
+  /** Which side should have challenged on this pitch. */
+  challengeSide: PostgameChallengeSide;
   count: string;
   batterId: number;
   pitcherId: number;
 
-  liveRecommendation: "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
+  liveRecommendation: "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY" | "FIELDING" | "NONE";
   expectedValue: number;
   challengeAvailable: boolean;
 
@@ -68,6 +71,19 @@ export function battingSideFromHalfInning(halfInning: string): PostgameBattingSi
   return halfInning.toLowerCase() === "top" ? "away" : "home";
 }
 
+export function fieldingSideFromHalfInning(halfInning: string): PostgameBattingSide {
+  return battingSideFromHalfInning(halfInning) === "away" ? "home" : "away";
+}
+
+export function challengingTeamSide(
+  halfInning: string,
+  challengeSide: PostgameChallengeSide
+): PostgameBattingSide {
+  return challengeSide === "fielding"
+    ? fieldingSideFromHalfInning(halfInning)
+    : battingSideFromHalfInning(halfInning);
+}
+
 export function toPostgameAuditItemDto(
   audit: PostgameChallengeAudit
 ): PostgameAuditItemDto {
@@ -81,6 +97,7 @@ export function toPostgameAuditItemDto(
     inning: audit.inning,
     halfInning: audit.halfInning === "top" ? "Top" : "Bot",
     battingSide: battingSideFromHalfInning(audit.halfInning),
+    challengeSide: (audit.challengeSide === "fielding" ? "fielding" : "batting") as PostgameChallengeSide,
     count: `${audit.balls}-${audit.strikes}`,
     batterId: audit.batterId,
     pitcherId: audit.pitcherId,
@@ -105,14 +122,18 @@ function buildTeamSummary(
   missedChallenges: PostgameAuditItemDto[],
   allAudits: PostgameAuditItemDto[]
 ): PostgameAuditTeamSummaryDto {
-  const teamMissed = missedChallenges.filter((a) => a.battingSide === side);
+  const teamMissed = missedChallenges.filter(
+    (a) => challengingTeamSide(a.halfInning, a.challengeSide) === side
+  );
   return {
     teamId,
     side,
     totalMissedValue: teamMissed.reduce((sum, a) => sum + a.expectedValue, 0),
     missedChallengeCount: teamMissed.length,
     badChallengeCount: allAudits.filter(
-      (a) => a.badChallengeAllowed && a.battingSide === side
+      (a) =>
+        a.badChallengeAllowed &&
+        challengingTeamSide(a.halfInning, a.challengeSide) === side
     ).length,
     topMissed: teamMissed.slice(0, 3),
   };

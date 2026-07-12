@@ -338,6 +338,13 @@ describe("parseAtBatSnapshot", () => {
     expect(snapshot?.pitcherId).toBe(656731);
   });
 
+  it("maps batter and pitcher handedness from matchup", () => {
+    const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
+
+    expect(snapshot?.batterHand).toBe("R");
+    expect(snapshot?.pitcherHand).toBe("L");
+  });
+
   it("maps inning, halfInning, and outs at the start of the at-bat", () => {
     const snapshot = parseAtBatSnapshot(buildLiveFeedResponse(), FETCHED_AT);
 

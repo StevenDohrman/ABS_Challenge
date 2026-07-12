@@ -3,6 +3,7 @@ import type { RecommendationLabel } from "./recommendation";
 export type PostgameAuditStatus = "pending" | "ready" | "unavailable";
 
 export type PostgameBattingSide = "home" | "away";
+export type PostgameChallengeSide = "batting" | "fielding";
 
 export interface PostgameAuditItem {
   atBatIndex: number;
@@ -10,11 +11,12 @@ export interface PostgameAuditItem {
   inning: number;
   halfInning: string;
   battingSide: PostgameBattingSide;
+  challengeSide: PostgameChallengeSide;
   count: string;
   batterId: number;
   pitcherId: number;
 
-  liveRecommendation: RecommendationLabel;
+  liveRecommendation: RecommendationLabel | "FIELDING" | "NONE";
   expectedValue: number;
   challengeAvailable: boolean;
 

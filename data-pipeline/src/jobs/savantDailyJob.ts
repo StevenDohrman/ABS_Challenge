@@ -30,20 +30,19 @@ import {
   SavantPitcherPitchMix,
 } from "../sources/savant/savant.types";
 
+interface DailyCsvBundle {
+  expectedStatsCsv: string;
+  disciplineCsv: string;
+  sprayCsv: string;
+  sprintCsv: string;
+  fielderOaaCsv: string;
+  pitcherArsenalCsv: string;
+  pitcherStatcastCsv: string;
+  leagueOps: number | null;
+}
+
 /**
  * Type-safe event overloads for SavantDailyJob.
- *
- * The backend registers handlers on these events to cache pregame context
- * before the first pitch of the day. Each pipeline emits independently so
- * the backend can begin caching as soon as any segment completes.
- *
- * Example (backend):
- *   const job = new SavantDailyJob();
- *   job.on('batterStatlines', (s) => cache.set('batters', s));
- *   job.on('sprayProfiles',   (s) => cache.set('spray', s));
- *   job.on('fielderOaa',      (s) => cache.set('oaa', s));
- *   job.on('sprintSpeed',     (s) => cache.set('speed', s));
- *   await job.run(2026);
  */
 export interface SavantDailyJob {
   on(
@@ -75,64 +74,106 @@ export interface SavantDailyJob {
 
 /**
  * Fetches all Savant pregame context data for a given season.
- *
- * Runs five independent pipelines in parallel:
- *   1. Batter statlines   (expected-statistics + plate-discipline merge)
- *   2. Batter spray profiles
- *   3. Fielder OAA        (all positions)
- *   4. Sprint speed       (all positions)
- *   5. Pitcher pitch mix  (pitch arsenal + Statcast ball rates)
- *
- * Errors from individual pipelines are emitted on `error` with a
- * descriptive message; remaining pipelines continue unaffected.
+ * CSVs are downloaded once per run and shared across pipelines.
  */
 export class SavantDailyJob extends EventEmitter {
   async run(season: number): Promise<void> {
     const fetchedAt = new Date().toISOString();
 
+    let bundle: DailyCsvBundle;
+    try {
+      bundle = await this.fetchDailyCsvBundle(season);
+    } catch (err) {
+      this.emitError("daily CSV bundle", err);
+      return;
+    }
+
     await Promise.allSettled([
-      this.runBatterStatlines(season, fetchedAt),
-      this.runSprayProfiles(season, fetchedAt),
-      this.runFielderOaa(season, fetchedAt),
-      this.runSprintSpeed(season, fetchedAt),
-      this.runPitcherPitchMix(season, fetchedAt),
+      this.runBatterStatlines(bundle, fetchedAt),
+      this.runSprayProfiles(bundle.sprayCsv, fetchedAt),
+      this.runFielderOaa(bundle.fielderOaaCsv, fetchedAt),
+      this.runSprintSpeed(bundle.sprintCsv, fetchedAt),
+      this.runPitcherPitchMix(bundle, season, fetchedAt),
+      this.runLeagueAverages(bundle, season, fetchedAt),
     ]);
   }
 
+  private async fetchDailyCsvBundle(season: number): Promise<DailyCsvBundle> {
+    const [
+      expectedStatsCsv,
+      disciplineCsv,
+      sprayCsv,
+      sprintCsv,
+      fielderOaaCsv,
+      pitcherArsenalCsv,
+      pitcherStatcastCsv,
+      leagueOps,
+    ] = await Promise.all([
+      fetchExpectedStatsCsv(season),
+      fetchPlateDisciplineCsv(season),
+      fetchSprayProfileCsv(season),
+      fetchSprintSpeedCsv(season),
+      fetchFielderOaaCsv(season),
+      fetchPitchArsenalStatsCsv(season),
+      fetchSeasonPitcherStatcastCsv(season),
+      fetchLeagueOps(season),
+    ]);
+
+    return {
+      expectedStatsCsv,
+      disciplineCsv,
+      sprayCsv,
+      sprintCsv,
+      fielderOaaCsv,
+      pitcherArsenalCsv,
+      pitcherStatcastCsv,
+      leagueOps,
+    };
+  }
+
   private async runBatterStatlines(
-    season: number,
+    bundle: DailyCsvBundle,
     fetchedAt: string
   ): Promise<void> {
     try {
-      const [xStatsCsv, disciplineCsv] = await Promise.all([
-        fetchExpectedStatsCsv(season),
-        fetchPlateDisciplineCsv(season),
-      ]);
-      const statlines = parseExpectedStats(xStatsCsv, fetchedAt);
-      this.emit("batterStatlines", mergePlateDiscipline(statlines, disciplineCsv));
-
-      const leagueOps = await fetchLeagueOps(season);
+      const statlines = parseExpectedStats(bundle.expectedStatsCsv, fetchedAt);
       this.emit(
-        "leagueAverages",
-        computeLeagueAveragesFromCsvs(
-          disciplineCsv,
-          xStatsCsv,
-          season,
-          leagueOps,
-          fetchedAt
-        )
+        "batterStatlines",
+        mergePlateDiscipline(statlines, bundle.disciplineCsv)
       );
     } catch (err) {
       this.emitError("batter statlines", err);
     }
   }
 
-  private async runSprayProfiles(
+  private async runLeagueAverages(
+    bundle: DailyCsvBundle,
     season: number,
     fetchedAt: string
   ): Promise<void> {
     try {
-      const csv = await fetchSprayProfileCsv(season);
+      this.emit(
+        "leagueAverages",
+        computeLeagueAveragesFromCsvs(
+          bundle.disciplineCsv,
+          bundle.expectedStatsCsv,
+          season,
+          bundle.leagueOps,
+          bundle.sprayCsv,
+          bundle.sprintCsv,
+          fetchedAt
+        )
+      );
+    } catch (err) {
+      this.emitError("league averages", err);
+    }
+  }
+
+  private async runSprayProfiles(
+    csv: string,
+    fetchedAt: string
+  ): Promise<void> {
+    try {
       this.emit("sprayProfiles", parseSprayProfiles(csv, fetchedAt));
     } catch (err) {
       this.emitError("spray profiles", err);
@@ -140,11 +181,10 @@ export class SavantDailyJob extends EventEmitter {
   }
 
   private async runFielderOaa(
-    season: number,
+    csv: string,
     fetchedAt: string
   ): Promise<void> {
     try {
-      const csv = await fetchFielderOaaCsv(season);
       this.emit("fielderOaa", parseFielderOaa(csv, fetchedAt));
     } catch (err) {
       this.emitError("fielder OAA", err);
@@ -152,11 +192,10 @@ export class SavantDailyJob extends EventEmitter {
   }
 
   private async runSprintSpeed(
-    season: number,
+    csv: string,
     fetchedAt: string
   ): Promise<void> {
     try {
-      const csv = await fetchSprintSpeedCsv(season);
       this.emit("sprintSpeed", parseSprintSpeed(csv, fetchedAt));
     } catch (err) {
       this.emitError("sprint speed", err);
@@ -164,18 +203,20 @@ export class SavantDailyJob extends EventEmitter {
   }
 
   private async runPitcherPitchMix(
+    bundle: DailyCsvBundle,
     season: number,
     fetchedAt: string
   ): Promise<void> {
     try {
-      const [arsenalCsv, statcastCsv] = await Promise.all([
-        fetchPitchArsenalStatsCsv(season),
-        fetchSeasonPitcherStatcastCsv(season),
-      ]);
-      const ballRates = aggregatePitchMixBallRates(statcastCsv);
+      const ballRates = aggregatePitchMixBallRates(bundle.pitcherStatcastCsv);
       this.emit(
         "pitcherPitchMix",
-        parsePitchArsenalStats(arsenalCsv, ballRates, season, fetchedAt)
+        parsePitchArsenalStats(
+          bundle.pitcherArsenalCsv,
+          ballRates,
+          season,
+          fetchedAt
+        )
       );
     } catch (err) {
       this.emitError("pitcher pitch mix", err);

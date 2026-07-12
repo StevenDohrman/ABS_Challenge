@@ -71,7 +71,8 @@ export interface DefensiveContextResult {
  * -4% on the multiplier; a -10 OAA fielder gives +4%.
  */
 export function computeDefensiveContext(
-  player: PlayerChallengeContext
+  player: PlayerChallengeContext,
+  league: { gbRate: number; fbRate: number; ldRate: number }
 ): DefensiveContextResult {
   let sprayAdj = 0;
   let oaaAdj = 0;
@@ -84,13 +85,13 @@ export function computeDefensiveContext(
     const { gbPercent, fbPercent, ldPercent } = player.sprayProfile;
 
     if (gbPercent !== null && Number.isFinite(gbPercent)) {
-      sprayAdj -= (gbPercent - DEFENSIVE.LEAGUE_AVG_GB_RATE) * DEFENSIVE.GB_SCALE;
+      sprayAdj -= (gbPercent - league.gbRate) * DEFENSIVE.GB_SCALE;
     }
     if (fbPercent !== null && Number.isFinite(fbPercent)) {
-      sprayAdj += (fbPercent - DEFENSIVE.LEAGUE_AVG_FB_RATE) * DEFENSIVE.FB_SCALE;
+      sprayAdj += (fbPercent - league.fbRate) * DEFENSIVE.FB_SCALE;
     }
     if (ldPercent !== null && Number.isFinite(ldPercent)) {
-      sprayAdj += (ldPercent - DEFENSIVE.LEAGUE_AVG_LD_RATE) * DEFENSIVE.LD_SCALE;
+      sprayAdj += (ldPercent - league.ldRate) * DEFENSIVE.LD_SCALE;
     }
   }
 

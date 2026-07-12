@@ -155,6 +155,10 @@ export interface MlbAtBatSnapshot {
    */
   battingOrder?: number[];
 
+  /** Batter and pitcher handedness from live feed matchup (when present). */
+  batterHand?: "L" | "R" | "S";
+  pitcherHand?: "L" | "R";
+
   fetchedAt: string;
 }
 

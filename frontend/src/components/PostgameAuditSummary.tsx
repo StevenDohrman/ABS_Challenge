@@ -39,6 +39,9 @@ function TeamMissedCard({
 }
 
 function MissedRow({ item, rank }: { item: PostgameAuditItem; rank?: number }) {
+  const isFielding = item.challengeSide === "fielding";
+  const callLabel = isFielding ? "called ball" : "called strike";
+
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
       {rank !== undefined && (
@@ -51,6 +54,9 @@ function MissedRow({ item, rank }: { item: PostgameAuditItem; rank?: number }) {
           </span>
           <span className="text-xs font-mono text-white/30">·</span>
           <span className="text-xs font-mono text-white/50">{item.count}</span>
+          <span className="text-[10px] font-mono text-sky-300/80 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded">
+            {isFielding ? "Fielding" : "Batting"}
+          </span>
           {!item.challengeAvailable && (
             <span className="text-[10px] font-mono text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
               Out of challenges
@@ -58,14 +64,20 @@ function MissedRow({ item, rank }: { item: PostgameAuditItem; rank?: number }) {
           )}
         </div>
         <p className="text-[11px] text-white/30 mt-0.5">
-          Zone: {item.zoneResult} · Live: called strike
+          Zone: {item.zoneResult} · Live: {callLabel}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <RecommendationBadge
-          recommendation={item.liveRecommendation}
-          size="sm"
-        />
+        {item.liveRecommendation !== "FIELDING" && item.liveRecommendation !== "NONE" ? (
+          <RecommendationBadge
+            recommendation={item.liveRecommendation}
+            size="sm"
+          />
+        ) : (
+          <span className="text-[10px] font-mono text-white/40 border border-white/10 px-1.5 py-0.5 rounded">
+            {item.challengeSide === "fielding" ? "Zone RE" : "Calculated RE"}
+          </span>
+        )}
         <ExpectedValuePill value={item.expectedValue} size="sm" />
       </div>
     </div>
@@ -131,8 +143,9 @@ export function PostgameAuditSummary({ audit, loading, awayAbbrev, homeAbbrev }:
           {summary.missedChallengeCount > 0 && (
             <div className="px-5 py-3 border-t border-white/10 bg-white/[0.02]">
               <p className="text-[11px] text-white/30 text-center font-mono">
-                Team splits count missed opportunities when that team was batting
-                (Top = {awayAbbrev}, Bot = {homeAbbrev})
+                Team splits attribute missed value to the team that should have
+                challenged — batting (called strikes) or fielding (called balls).
+                Top = {awayAbbrev}, Bot = {homeAbbrev}.
               </p>
             </div>
           )}

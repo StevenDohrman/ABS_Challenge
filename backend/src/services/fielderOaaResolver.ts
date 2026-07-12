@@ -9,6 +9,7 @@
 import type { DefensiveLineup } from "@abs/data-pipeline";
 import { SEASONS } from "../db/constants";
 import { findFielderOaaBatch } from "../db/defensiveRepository";
+import { getLeagueSprayDefaultsPercent } from "./leagueAveragesStore";
 
 /**
  * Mapping from DefensiveLineup slot names (MLB live feed keys) to the OAA
@@ -147,13 +148,20 @@ export async function resolveFielderOaa(
     return lookupSingle(defense.center, "CF");
   }
 
+  const leagueSpray = getLeagueSprayDefaultsPercent();
+  const defaultPull = leagueSpray?.pull ?? 33;
+  const defaultStraight = leagueSpray?.straight ?? 34;
+  const defaultOppo = leagueSpray?.oppo ?? 33;
+  const defaultGb = leagueSpray?.gb ?? 44;
+  const defaultFb = leagueSpray?.fb ?? 56;
+
   const zoneWeights = computeZoneWeights(
     hand,
-    pull ?? 33,
-    straight ?? 34,
-    oppo ?? 33,
-    gb ?? 44,
-    fb ?? 56
+    pull ?? defaultPull,
+    straight ?? defaultStraight,
+    oppo ?? defaultOppo,
+    gb ?? defaultGb,
+    fb ?? defaultFb
   );
 
   if (zoneWeights.length === 0) return null;

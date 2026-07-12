@@ -444,7 +444,14 @@ export async function buildGameExportBundle(
       }),
       prisma.postgameChallengeAudit.findMany({ where: { gamePk } }),
     ]);
-    const auditsByAtBat = new Map(postgameAudits.map((a) => [a.atBatIndex, a]));
+    const auditsByAtBat = new Map<number, (typeof postgameAudits)[number]>();
+    for (const audit of postgameAudits) {
+      if (!audit.missedChallenge) continue;
+      const existing = auditsByAtBat.get(audit.atBatIndex);
+      if (!existing || audit.runExpectancySwing > existing.runExpectancySwing) {
+        auditsByAtBat.set(audit.atBatIndex, audit);
+      }
+    }
     atBatHistory = toGameAtBatHistoryDto(
       gamePk,
       snapshots,

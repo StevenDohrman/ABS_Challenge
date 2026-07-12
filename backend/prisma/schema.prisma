@@ -307,15 +307,16 @@ model SavantPitchEvent {
 // postgame_challenge_audits
 // ─────────────────────────────────────────────────────────────────────────────
 
-// One row per auditable called-strike pitch with a triggered recommendation.
+// One row per auditable pitch (batting called-strike or fielding called-ball).
 model PostgameChallengeAudit {
   id         Int @id @default(autoincrement())
   gamePk     Int
   atBatIndex Int
   pitchNumber Int
 
-  pitchEventId     Int @unique
-  recommendationId Int @unique
+  pitchEventId     Int  @unique
+  recommendationId Int? @unique
+  challengeSide    String @default("batting") // "batting" | "fielding"
 
   inning     Int
   halfInning String
@@ -349,9 +350,9 @@ model PostgameChallengeAudit {
 
   createdAt DateTime @default(now())
 
-  game             Game                   @relation(fields: [gamePk], references: [gamePk])
-  pitchEvent     LivePitchEvent          @relation(fields: [pitchEventId], references: [id])
-  recommendation ChallengeRecommendation @relation(fields: [recommendationId], references: [id])
+  game             Game                    @relation(fields: [gamePk], references: [gamePk])
+  pitchEvent     LivePitchEvent           @relation(fields: [pitchEventId], references: [id])
+  recommendation ChallengeRecommendation? @relation(fields: [recommendationId], references: [id])
 
   @@index([gamePk, missedChallenge])
   @@index([gamePk, runExpectancySwing])
@@ -438,6 +439,34 @@ model PlayerSprintSpeed {
   @@unique([playerId, season])
   @@index([playerId])
   @@map("player_sprint_speed")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// league_averages_snapshots
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Season-level league baselines computed from daily Savant + MLB Stats API pulls.
+// One row per season; upserted on each SavantDailyJob run.
+model LeagueAveragesSnapshot {
+  id                 Int      @id @default(autoincrement())
+  season             Int      @unique
+  chaseRate          Float
+  walkRate           Float
+  strikeoutRate      Float
+  whiffRate          Float
+  ops                Float
+  woba               Float
+  gbRate             Float
+  fbRate             Float
+  ldRate             Float
+  pullRate           Float
+  straightawayRate   Float
+  oppoRate           Float
+  sprintSpeed        Float
+  computedAt         DateTime
+  updatedAt          DateTime @updatedAt
+
+  @@map("league_averages_snapshots")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -550,6 +579,8 @@ model TeamRankingDayBucket {
   challengesOverturned Int    @default(0)
   battingMissedCount   Int    @default(0)
   battingMissedValue   Float  @default(0)
+  fieldingMissedCount  Int    @default(0)
+  fieldingMissedValue  Float  @default(0)
   battingGainedRe      Float  @default(0)
   fieldingGainedRe     Float  @default(0)
   badChallenges        Int    @default(0)
@@ -583,6 +614,8 @@ model TeamRankingSeasonTotal {
   challengesOverturned Int    @default(0)
   battingMissedCount   Int    @default(0)
   battingMissedValue   Float  @default(0)
+  fieldingMissedCount  Int    @default(0)
+  fieldingMissedValue  Float  @default(0)
   battingGainedRe      Float  @default(0)
   fieldingGainedRe     Float  @default(0)
   badChallenges        Int    @default(0)

@@ -59,6 +59,7 @@ import {
   waitForGameBackfillPitchReady,
 } from "./db/pipelineDbQueue";
 import { SEASONS } from "./db/constants";
+import { hydrateLeagueAveragesFromDb } from "./services/leagueAveragesStore";
 
 /** How often to re-run the Savant daily job in milliseconds (24 hours). */
 const SAVANT_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1_000;
@@ -74,6 +75,9 @@ const DATA_RETENTION_DAYS = parseInt(process.env["DATA_RETENTION_DAYS"] ?? "7", 
  * Called once at server startup.
  */
 export async function startOrchestrator(): Promise<void> {
+  // Hydrate last-known league baselines before Savant job so restarts use season data.
+  await hydrateLeagueAveragesFromDb(SEASONS.CURRENT);
+
   // Load pregame Savant data FIRST, before live polling starts. Two reasons:
   //   1. The Savant batch is a large bulk upsert; running it before the live
   //      poll begins means the two never contend for the connection pool at
@@ -213,7 +217,7 @@ async function runSavantDailyJob(): Promise<void> {
   });
 
   job.on("leagueAverages", async (averages) => {
-    handleLeagueAverages(averages);
+    await handleLeagueAverages(averages);
   });
 
   job.on("error", (err) => {

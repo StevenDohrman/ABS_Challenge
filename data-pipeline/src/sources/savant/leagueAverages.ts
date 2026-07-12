@@ -10,6 +10,16 @@ export interface LeagueAveragesSnapshot {
   whiffRate: number;
   ops: number;
   woba: number;
+  /** League-average batted-ball rates (0–1). */
+  gbRate: number;
+  fbRate: number;
+  ldRate: number;
+  /** Directional spray means (0–1). */
+  pullRate: number;
+  straightawayRate: number;
+  oppoRate: number;
+  /** Mean Statcast sprint speed (ft/s). */
+  sprintSpeed: number;
   computedAt: string;
 }
 
@@ -19,7 +29,14 @@ const FALLBACKS = {
   strikeoutRate: 0.225,
   whiffRate: 0.25,
   ops: 0.728,
-  woba: 0.315,
+  woba: 0.32,
+  gbRate: 0.44,
+  fbRate: 0.33,
+  ldRate: 0.23,
+  pullRate: 0.39,
+  straightawayRate: 0.34,
+  oppoRate: 0.27,
+  sprintSpeed: 27,
 } as const;
 
 function columnMean(rows: Record<string, string>[], column: string): number | null {
@@ -40,6 +57,16 @@ function columnMeanFromKeys(
     if (mean !== null) return mean;
   }
   return null;
+}
+
+/** Normalize Savant percent columns to a 0–1 rate. */
+function columnMeanRate(
+  rows: Record<string, string>[],
+  ...keys: string[]
+): number | null {
+  const mean = columnMeanFromKeys(rows, ...keys);
+  if (mean === null) return null;
+  return mean > 1 ? mean / 100 : mean;
 }
 
 interface MlbLeagueStatsResponse {
@@ -78,23 +105,70 @@ export async function fetchLeagueOps(year: number): Promise<number | null> {
 
 /**
  * Compute league-average batter rates from Savant CSVs already fetched for
- * batter statlines — no extra Savant HTTP calls.
+ * the daily job — no extra Savant HTTP calls.
  */
 export function computeLeagueAveragesFromCsvs(
   disciplineCsv: string,
   expectedStatsCsv: string,
   season: number,
   leagueOps: number | null,
+  sprayCsv = "",
+  sprintCsv = "",
   computedAt = new Date().toISOString()
 ): LeagueAveragesSnapshot {
   const disciplineRows = parseCsvToRows(disciplineCsv);
   const expectedRows = parseCsvToRows(expectedStatsCsv);
+  const sprayRows = parseCsvToRows(sprayCsv);
+  const sprintRows = parseCsvToRows(sprintCsv);
 
   const chaseRaw = columnMeanFromKeys(disciplineRows, "oz_swing_percent");
   const whiffRaw = columnMeanFromKeys(disciplineRows, "whiff_percent");
   const bbRaw = columnMeanFromKeys(expectedRows, "bb%", "bb_percent");
   const kRaw = columnMeanFromKeys(expectedRows, "k%", "k_percent");
   const wobaRaw = columnMeanFromKeys(expectedRows, "woba", "woba_value");
+
+  const gbRate = columnMeanRate(
+    sprayRows,
+    "gb_rate",
+    "gb_percent",
+    "ground_ball_percent",
+    "gb"
+  );
+  const fbRate = columnMeanRate(
+    sprayRows,
+    "fb_rate",
+    "fb_percent",
+    "fly_ball_percent",
+    "fb"
+  );
+  const ldRate = columnMeanRate(
+    sprayRows,
+    "ld_rate",
+    "ld_percent",
+    "line_drive_percent",
+    "ld"
+  );
+  const pullRate = columnMeanRate(
+    sprayRows,
+    "pull_rate",
+    "pull_percent",
+    "pull"
+  );
+  const straightawayRate = columnMeanRate(
+    sprayRows,
+    "straight_rate",
+    "straightaway_percent",
+    "cent"
+  );
+  const oppoRate = columnMeanRate(
+    sprayRows,
+    "oppo_rate",
+    "oppo_percent",
+    "opposite_percent",
+    "oppo"
+  );
+
+  const sprintRaw = columnMeanFromKeys(sprintRows, "sprint_speed", "speed");
 
   return {
     season,
@@ -104,6 +178,13 @@ export function computeLeagueAveragesFromCsvs(
     whiffRate: whiffRaw !== null ? whiffRaw / 100 : FALLBACKS.whiffRate,
     ops: leagueOps ?? FALLBACKS.ops,
     woba: wobaRaw ?? FALLBACKS.woba,
+    gbRate: gbRate ?? FALLBACKS.gbRate,
+    fbRate: fbRate ?? FALLBACKS.fbRate,
+    ldRate: ldRate ?? FALLBACKS.ldRate,
+    pullRate: pullRate ?? FALLBACKS.pullRate,
+    straightawayRate: straightawayRate ?? FALLBACKS.straightawayRate,
+    oppoRate: oppoRate ?? FALLBACKS.oppoRate,
+    sprintSpeed: sprintRaw ?? FALLBACKS.sprintSpeed,
     computedAt,
   };
 }
@@ -117,18 +198,25 @@ export async function computeCurrentLeagueAverages(
   fetchCsv: {
     discipline: (season: number) => Promise<string>;
     expected: (season: number) => Promise<string>;
+    spray?: (season: number) => Promise<string>;
+    sprint?: (season: number) => Promise<string>;
   }
 ): Promise<LeagueAveragesSnapshot> {
-  const [disciplineCsv, expectedCsv, leagueOps] = await Promise.all([
-    fetchCsv.discipline(year),
-    fetchCsv.expected(year),
-    fetchLeagueOps(year),
-  ]);
+  const [disciplineCsv, expectedCsv, sprayCsv, sprintCsv, leagueOps] =
+    await Promise.all([
+      fetchCsv.discipline(year),
+      fetchCsv.expected(year),
+      fetchCsv.spray?.(year) ?? Promise.resolve(""),
+      fetchCsv.sprint?.(year) ?? Promise.resolve(""),
+      fetchLeagueOps(year),
+    ]);
 
   return computeLeagueAveragesFromCsvs(
     disciplineCsv,
     expectedCsv,
     year,
-    leagueOps
+    leagueOps,
+    sprayCsv,
+    sprintCsv
   );
 }

@@ -3,13 +3,15 @@ import type { PostgameChallengeAudit } from "@prisma/client";
 
 export type ZoneResult = "ball" | "strike" | "unknown";
 export type OriginalCall = "ball" | "strike" | "unknown";
+export type ChallengeSide = "batting" | "fielding";
 
 export interface PostgameAuditInput {
   gamePk: number;
   atBatIndex: number;
   pitchNumber: number;
   pitchEventId: number;
-  recommendationId: number;
+  recommendationId: number | null;
+  challengeSide: ChallengeSide;
   inning: number;
   halfInning: string;
   balls: number;
@@ -41,12 +43,15 @@ export async function upsertPostgameAudits(
     await prisma.postgameChallengeAudit.upsert({
       where: { pitchEventId: audit.pitchEventId },
       update: {
+        challengeSide: audit.challengeSide,
         zoneResult: audit.zoneResult,
         callWasProbablyWrong: audit.callWasProbablyWrong,
         shouldHaveChallenged: audit.shouldHaveChallenged,
         missedChallenge: audit.missedChallenge,
         badChallengeAllowed: audit.badChallengeAllowed,
         runExpectancySwing: audit.runExpectancySwing,
+        liveRecommendation: audit.liveRecommendation,
+        challengeAvailable: audit.challengeAvailable,
         notesJson: audit.notes,
         plateX: audit.plateX,
         plateZ: audit.plateZ,
@@ -59,6 +64,7 @@ export async function upsertPostgameAudits(
         pitchNumber: audit.pitchNumber,
         pitchEventId: audit.pitchEventId,
         recommendationId: audit.recommendationId,
+        challengeSide: audit.challengeSide,
         inning: audit.inning,
         halfInning: audit.halfInning,
         balls: audit.balls,
