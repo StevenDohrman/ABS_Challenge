@@ -7,7 +7,10 @@ import {
 } from "../services/pitcherChallengeHintsService";
 
 function makeRow(
-  overrides: Partial<PitcherPitchMix> & Pick<PitcherPitchMix, "pitchType" | "ballRate" | "usageRate" | "pitchCount">
+  overrides: Partial<PitcherPitchMix> &
+    Pick<PitcherPitchMix, "pitchType" | "usageRate" | "pitchCount"> & {
+      ballRate?: number | null;
+    }
 ): PitcherPitchMix {
   return {
     id: 1,
@@ -15,6 +18,7 @@ function makeRow(
     pitcherName: "Kevin Gausman",
     season: 2026,
     pitchTypeName: overrides.pitchType,
+    ballRate: overrides.ballRate ?? 0.4,
     strikeRate: 0.5,
     fetchedAt: new Date("2026-07-01T00:00:00Z"),
     updatedAt: new Date("2026-07-01T00:00:00Z"),
@@ -23,11 +27,12 @@ function makeRow(
 }
 
 describe("filterPitchMixRows", () => {
-  it("requires minimum pitch count and usage rate", () => {
+  it("requires minimum pitch count, usage rate, and known ball rate", () => {
     const rows = [
       makeRow({ pitchType: "FF", ballRate: 0.45, usageRate: 0.5, pitchCount: 899 }),
       makeRow({ pitchType: "CH", ballRate: 0.5, usageRate: 0.04, pitchCount: 40 }),
       makeRow({ pitchType: "SL", ballRate: 0.42, usageRate: 0.2, pitchCount: 20 }),
+      makeRow({ pitchType: "CU", ballRate: null, usageRate: 0.2, pitchCount: 100 }),
     ];
 
     expect(filterPitchMixRows(rows).map((row) => row.pitchType)).toEqual(["FF"]);
@@ -45,6 +50,12 @@ describe("pickHighlightedPitchTypes", () => {
 
     expect([...highlighted]).toEqual(expect.arrayContaining(["SL", "CH"]));
     expect(highlighted.has("FF")).toBe(false);
+  });
+
+  it("returns empty when all ball rates are unknown", () => {
+    expect(
+      pickHighlightedPitchTypes([{ pitchType: "SL", ballRate: null }]).size
+    ).toBe(0);
   });
 });
 
@@ -80,5 +91,12 @@ describe("buildPitcherChallengeHintsFromRows", () => {
     expect(hints?.pitches[0].pitchType).toBe("SL");
     expect(hints?.pitches.filter((pitch) => pitch.highlight).length).toBeGreaterThan(0);
     expect(hints?.summary).toMatch(/recognize one of these pitches/i);
+  });
+
+  it("returns null when only pitches lack Statcast ball-rate samples", () => {
+    const hints = buildPitcherChallengeHintsFromRows(592332, 2026, [
+      makeRow({ pitchType: "SL", ballRate: null, usageRate: 0.5, pitchCount: 362 }),
+    ]);
+    expect(hints).toBeNull();
   });
 });

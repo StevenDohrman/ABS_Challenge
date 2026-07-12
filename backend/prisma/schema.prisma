@@ -450,7 +450,7 @@ model PitcherPitchMix {
   pitchTypeName String
 
   usageRate  Float
-  ballRate   Float
+  ballRate   Float?
   strikeRate Float?
   pitchCount Int
 

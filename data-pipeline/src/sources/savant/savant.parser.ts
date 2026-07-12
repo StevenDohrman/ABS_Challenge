@@ -320,6 +320,19 @@ function pitchMixKey(pitcherId: number, pitchType: string): string {
   return `${pitcherId}:${pitchType}`;
 }
 
+/** Classify a pitch as ball (B), strike (S), or neither (in-play / unknown). */
+function classifyPitchOutcome(row: Record<string, string>): "B" | "S" | null {
+  const resultType = col(row, "type").toUpperCase();
+  if (resultType === "B") return "B";
+  if (resultType === "S") return "S";
+
+  const desc = col(row, "description").toLowerCase();
+  if (desc === "ball") return "B";
+  if (desc.includes("strike")) return "S";
+
+  return null;
+}
+
 /**
  * Aggregate per-(pitcher, pitch_type) ball and strike counts from a bulk
  * season Statcast CSV or a single-player history CSV.
@@ -338,9 +351,9 @@ export function aggregatePitchMixBallRates(
     const entry = stats.get(key) ?? { pitchCount: 0, ballCount: 0, strikeCount: 0 };
     entry.pitchCount += 1;
 
-    const resultType = col(row, "type");
-    if (resultType === "B") entry.ballCount += 1;
-    else if (resultType === "S") entry.strikeCount += 1;
+    const outcome = classifyPitchOutcome(row);
+    if (outcome === "B") entry.ballCount += 1;
+    else if (outcome === "S") entry.strikeCount += 1;
 
     stats.set(key, entry);
   }
@@ -373,7 +386,7 @@ export function parsePitchArsenalStats(
       const rateStats = ballRates.get(pitchMixKey(pitcherId, pitchType));
       const counted = rateStats?.pitchCount ?? 0;
       const ballRate =
-        counted > 0 ? rateStats!.ballCount / counted : 0;
+        counted > 0 ? rateStats!.ballCount / counted : null;
       const strikeRate =
         counted > 0 ? rateStats!.strikeCount / counted : null;
 
@@ -433,9 +446,9 @@ export function aggregatePitcherPitchMixFromStatcastHistory(
     };
     entry.pitchCount += 1;
 
-    const resultType = col(row, "type");
-    if (resultType === "B") entry.ballCount += 1;
-    else if (resultType === "S") entry.strikeCount += 1;
+    const outcome = classifyPitchOutcome(row);
+    if (outcome === "B") entry.ballCount += 1;
+    else if (outcome === "S") entry.strikeCount += 1;
 
     byType.set(pitchType, entry);
   }

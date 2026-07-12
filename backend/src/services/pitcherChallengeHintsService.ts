@@ -11,7 +11,7 @@ import type { PitcherPitchMix } from "@prisma/client";
 export interface PitcherChallengeHintsPitchDto {
   pitchType: string;
   pitchTypeName: string;
-  ballRate: number;
+  ballRate: number | null;
   usageRate: number;
   pitchCount: number;
   highlight: boolean;
@@ -64,17 +64,25 @@ export function formatPitchTypeName(
 
 export function filterPitchMixRows(rows: PitcherPitchMix[]): PitcherPitchMix[] {
   return rows.filter(
-    (row) => row.pitchCount >= MIN_PITCH_COUNT && row.usageRate >= MIN_USAGE_RATE
+    (row) =>
+      row.pitchCount >= MIN_PITCH_COUNT &&
+      row.usageRate >= MIN_USAGE_RATE &&
+      row.ballRate !== null
   );
 }
 
 /** Pick highlighted pitch types — top quartile and/or above 40% ball rate. */
 export function pickHighlightedPitchTypes(
-  pitches: Array<{ pitchType: string; ballRate: number }>
+  pitches: Array<{ pitchType: string; ballRate: number | null }>
 ): Set<string> {
   if (pitches.length === 0) return new Set();
 
-  const sorted = [...pitches].sort((a, b) => b.ballRate - a.ballRate);
+  const known = pitches.filter(
+    (p): p is { pitchType: string; ballRate: number } => p.ballRate !== null
+  );
+  if (known.length === 0) return new Set();
+
+  const sorted = [...known].sort((a, b) => b.ballRate - a.ballRate);
   const quartileCount = Math.max(1, Math.ceil(sorted.length * 0.25));
   const topQuartile = new Set(
     sorted.slice(0, quartileCount).map((pitch) => pitch.pitchType)
@@ -100,7 +108,9 @@ export function buildPitcherChallengeHintsFromRows(
   const filtered = filterPitchMixRows(rows);
   if (filtered.length === 0) return null;
 
-  const sorted = [...filtered].sort((a, b) => b.ballRate - a.ballRate);
+  const sorted = [...filtered].sort(
+    (a, b) => (b.ballRate ?? 0) - (a.ballRate ?? 0)
+  );
   const highlighted = pickHighlightedPitchTypes(sorted);
 
   if (highlighted.size === 0) return null;

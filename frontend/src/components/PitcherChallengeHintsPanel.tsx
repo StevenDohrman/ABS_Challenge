@@ -4,7 +4,8 @@ interface Props {
   hints: PitcherChallengeHints;
 }
 
-function formatPercent(rate: number): string {
+function formatPercent(rate: number | null): string {
+  if (rate === null) return "—";
   return `${Math.round(rate * 100)}%`;
 }
 

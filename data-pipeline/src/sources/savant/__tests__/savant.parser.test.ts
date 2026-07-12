@@ -463,6 +463,21 @@ describe("parsePitchArsenalStats", () => {
     expect(changeup?.pitchCount).toBe(20);
     expect(changeup?.usageRate).toBe(0.08);
   });
+
+  it("returns null ball rate when arsenal row has no Statcast sample", () => {
+    const mix = parsePitchArsenalStats(
+      PITCH_ARSENAL_STATS_CSV,
+      new Map(),
+      2026,
+      FETCHED_AT
+    );
+    const gausmanSl = mix.find(
+      (row) => row.pitcherId === 592332 && row.pitchType === "SL"
+    );
+    expect(gausmanSl?.pitchCount).toBe(420);
+    expect(gausmanSl?.ballRate).toBeNull();
+    expect(gausmanSl?.strikeRate).toBeNull();
+  });
 });
 
 describe("aggregatePitcherPitchMixFromStatcastHistory", () => {
