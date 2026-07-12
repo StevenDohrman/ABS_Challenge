@@ -14,6 +14,8 @@
 import {
   fetchExpectedStatsCsv,
   fetchPlateDisciplineCsv,
+  fetchSprayProfileCsv,
+  fetchSprintSpeedCsv,
 } from "../sources/savant/savant.client";
 import { computeCurrentLeagueAverages } from "../sources/savant/leagueAverages";
 
@@ -31,6 +33,8 @@ async function main() {
   const snapshot = await computeCurrentLeagueAverages(season, {
     discipline: fetchPlateDisciplineCsv,
     expected: fetchExpectedStatsCsv,
+    spray: fetchSprayProfileCsv,
+    sprint: fetchSprintSpeedCsv,
   });
 
   if (jsonMode) {
@@ -56,6 +60,8 @@ export const LEAGUE_AVERAGES = {
 } as const;
 
 // woba (lineup context): ${fmt(snapshot.woba, 3)}
+// gbRate: ${fmt(snapshot.gbRate)}  fbRate: ${fmt(snapshot.fbRate)}  ldRate: ${fmt(snapshot.ldRate)}
+// sprintSpeed: ${fmt(snapshot.sprintSpeed, 1)}
 `);
 
   console.error(`computedAt : ${snapshot.computedAt}`);

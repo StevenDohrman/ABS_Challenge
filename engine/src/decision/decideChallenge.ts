@@ -143,7 +143,8 @@ function runPipeline(input: ChallengeDecisionInput): PipelineContext {
 
   const baserunning = computeBaserunningContext(
     input.gameState,
-    input.baserunningContext
+    input.baserunningContext,
+    league.sprintSpeed
   );
 
   const credibility = computePlayerCredibility(
@@ -157,7 +158,7 @@ function runPipeline(input: ChallengeDecisionInput): PipelineContext {
 
   const lineupContext = computeLineupContext(input.lineupContext, league);
 
-  const defensiveContext = computeDefensiveContext(input.playerContext);
+  const defensiveContext = computeDefensiveContext(input.playerContext, league);
 
   const rawEV =
     credibility.pCallWasWrong *

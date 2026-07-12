@@ -295,6 +295,7 @@ describe("toPostgameAuditResponseDto", () => {
         pitchNumber: 1,
         inning: 7,
         halfInning: "top",
+        challengeSide: "batting",
         balls: 1,
         strikes: 2,
         batterId: 1,
@@ -320,6 +321,7 @@ describe("toPostgameAuditResponseDto", () => {
         pitchNumber: 2,
         inning: 3,
         halfInning: "bottom",
+        challengeSide: "batting",
         balls: 0,
         strikes: 2,
         batterId: 3,
@@ -359,5 +361,49 @@ describe("toPostgameAuditResponseDto", () => {
     expect(dto.summary.topMissed[0].expectedValue).toBeCloseTo(0.18);
     expect(dto.summary.topMissed[0].battingSide).toBe("away");
     expect(dto.missedChallenges).toHaveLength(2);
+  });
+
+  it("attributes fielding misses to the fielding team in team splits", () => {
+    const audits = [
+      {
+        atBatIndex: 2,
+        pitchNumber: 3,
+        inning: 4,
+        halfInning: "top",
+        challengeSide: "fielding",
+        balls: 2,
+        strikes: 1,
+        batterId: 5,
+        pitcherId: 6,
+        originalCall: "ball",
+        plateX: 0.1,
+        plateZ: 2.5,
+        szTop: 3.5,
+        szBot: 1.6,
+        zoneResult: "strike",
+        callWasProbablyWrong: true,
+        liveRecommendation: "FIELDING",
+        playerConfidence: null,
+        challengeAvailable: true,
+        shouldHaveChallenged: true,
+        missedChallenge: true,
+        badChallengeAllowed: false,
+        runExpectancySwing: 0.09,
+        notesJson: [],
+      },
+    ];
+
+    const dto = toPostgameAuditResponseDto(
+      824991,
+      "ready",
+      new Date(),
+      audits as unknown as PostgameChallengeAudit[],
+      { homeTeamId: 133, awayTeamId: 134 }
+    );
+
+    expect(dto.summary.byTeam.home.missedChallengeCount).toBe(1);
+    expect(dto.summary.byTeam.home.totalMissedValue).toBeCloseTo(0.09);
+    expect(dto.summary.byTeam.away.missedChallengeCount).toBe(0);
+    expect(dto.missedChallenges[0].challengeSide).toBe("fielding");
   });
 });

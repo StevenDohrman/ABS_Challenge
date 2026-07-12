@@ -83,16 +83,24 @@ export async function buildAtBatChallengeContext(
   const statSnapshot = await findPlayerStatSnapshot(snapshot.batterId, SEASONS.CURRENT);
   const sprayProfile = await findSprayProfile(snapshot.batterId, SEASONS.CURRENT);
 
-  const battingHand = statSnapshot?.battingHand ?? null;
+  const battingHand =
+    snapshot.batterHand ?? statSnapshot?.battingHand ?? null;
   const fielderOaa = await resolveFielderOaa(
     options?.defenseOverride ?? snapshot.defense,
     sprayProfile,
     battingHand
   );
 
-  const playerContext = statSnapshot
+  let playerContext = statSnapshot
     ? buildPlayerChallengeContext(statSnapshot, sprayProfile, fielderOaa)
     : buildDefaultPlayerChallengeContext(snapshot.batterId);
+
+  if (snapshot.batterHand) {
+    playerContext = {
+      ...playerContext,
+      battingHand: snapshot.batterHand,
+    };
+  }
 
   const baserunningContext = await resolveBaserunningContext(snapshot);
 
@@ -127,7 +135,7 @@ export async function buildAtBatChallengeContext(
 
   const pitchContext: PitchCallContext = {
     callType: "called_strike",
-    pitcherHandedness: null,
+    pitcherHandedness: snapshot.pitcherHand ?? null,
   };
 
   return {

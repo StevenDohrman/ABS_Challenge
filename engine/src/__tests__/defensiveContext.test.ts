@@ -10,6 +10,12 @@ import { DEFENSIVE } from "../constants";
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
+const testLeague = {
+  gbRate: DEFENSIVE.LEAGUE_AVG_GB_RATE,
+  fbRate: DEFENSIVE.LEAGUE_AVG_FB_RATE,
+  ldRate: DEFENSIVE.LEAGUE_AVG_LD_RATE,
+};
+
 function makePlayer(
   sprayProfile: PlayerChallengeContext["sprayProfile"],
   fielderOaa: number | null = null
@@ -65,15 +71,14 @@ const heavyLdFbSpray: PlayerChallengeContext["sprayProfile"] = {
 
 describe("computeDefensiveContext — null safety", () => {
   test("returns 1.0× multiplier when sprayProfile is null and fielderOaa is null", () => {
-    const result = computeDefensiveContext(makePlayer(null));
+    const result = computeDefensiveContext(makePlayer(null), testLeague);
     expect(result.multiplier).toBe(1.0);
     expect(result.sprayDataAvailable).toBe(false);
     expect(result.fielderOaaAvailable).toBe(false);
   });
 
   test("returns 1.0× multiplier with all null spray fields and no OAA", () => {
-    const result = computeDefensiveContext(
-      makePlayer({
+    const result = computeDefensiveContext(makePlayer({
         pullPercent: null,
         straightawayPercent: null,
         oppoPercent: null,
@@ -81,15 +86,14 @@ describe("computeDefensiveContext — null safety", () => {
         fbPercent: null,
         ldPercent: null,
       })
-    );
+    , testLeague);
     expect(result.multiplier).toBe(1.0);
     expect(result.sprayDataAvailable).toBe(true);
   });
 
   test("partial null fields use only available components", () => {
     // Only gbPercent available — should apply a GB-only adjustment
-    const result = computeDefensiveContext(
-      makePlayer({
+    const result = computeDefensiveContext(makePlayer({
         pullPercent: null,
         straightawayPercent: null,
         oppoPercent: null,
@@ -97,7 +101,7 @@ describe("computeDefensiveContext — null safety", () => {
         fbPercent: null,
         ldPercent: null,
       })
-    );
+    , testLeague);
     expect(result.multiplier).toBeLessThan(1.0);
     expect(result.sprayDataAvailable).toBe(true);
   });
@@ -109,23 +113,23 @@ describe("computeDefensiveContext — null safety", () => {
 
 describe("computeDefensiveContext — spray direction of effect", () => {
   test("league-average spray produces multiplier ≈ 1.0", () => {
-    const result = computeDefensiveContext(makePlayer(leagueAvgSpray));
+    const result = computeDefensiveContext(makePlayer(leagueAvgSpray), testLeague);
     expect(result.multiplier).toBeCloseTo(1.0, 3);
   });
 
   test("heavy GB hitter yields a multiplier below 1.0 (defense-favourable)", () => {
-    const result = computeDefensiveContext(makePlayer(heavyGbSpray));
+    const result = computeDefensiveContext(makePlayer(heavyGbSpray), testLeague);
     expect(result.multiplier).toBeLessThan(1.0);
   });
 
   test("heavy LD/FB hitter yields a multiplier above 1.0 (offense-favourable)", () => {
-    const result = computeDefensiveContext(makePlayer(heavyLdFbSpray));
+    const result = computeDefensiveContext(makePlayer(heavyLdFbSpray), testLeague);
     expect(result.multiplier).toBeGreaterThan(1.0);
   });
 
   test("heavy GB hitter multiplier is lower than heavy LD/FB hitter", () => {
-    const gbResult = computeDefensiveContext(makePlayer(heavyGbSpray));
-    const ldResult = computeDefensiveContext(makePlayer(heavyLdFbSpray));
+    const gbResult = computeDefensiveContext(makePlayer(heavyGbSpray), testLeague);
+    const ldResult = computeDefensiveContext(makePlayer(heavyLdFbSpray), testLeague);
     expect(gbResult.multiplier).toBeLessThan(ldResult.multiplier);
   });
 });
@@ -136,57 +140,57 @@ describe("computeDefensiveContext — spray direction of effect", () => {
 
 describe("computeDefensiveContext — fielder OAA", () => {
   test("fielderOaa null → same multiplier as OAA=0 (no adjustment)", () => {
-    const withNull = computeDefensiveContext(makePlayer(leagueAvgSpray, null));
-    const withZero = computeDefensiveContext(makePlayer(leagueAvgSpray, 0));
+    const withNull = computeDefensiveContext(makePlayer(leagueAvgSpray, null), testLeague);
+    const withZero = computeDefensiveContext(makePlayer(leagueAvgSpray, 0), testLeague);
     expect(withNull.multiplier).toBeCloseTo(withZero.multiplier, 5);
   });
 
   test("positive OAA (elite defender) decreases multiplier — fewer hits expected", () => {
-    const noOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, null));
-    const eliteOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, 15));
+    const noOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, null), testLeague);
+    const eliteOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, 15), testLeague);
     expect(eliteOaa.multiplier).toBeLessThan(noOaa.multiplier);
   });
 
   test("negative OAA (poor defender) increases multiplier — more hits expected", () => {
-    const noOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, null));
-    const poorOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, -15));
+    const noOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, null), testLeague);
+    const poorOaa = computeDefensiveContext(makePlayer(leagueAvgSpray, -15), testLeague);
     expect(poorOaa.multiplier).toBeGreaterThan(noOaa.multiplier);
   });
 
   test("+15 OAA produces approximately 6% penalty on the multiplier", () => {
-    const base = computeDefensiveContext(makePlayer(leagueAvgSpray, null));
-    const elite = computeDefensiveContext(makePlayer(leagueAvgSpray, 15));
+    const base = computeDefensiveContext(makePlayer(leagueAvgSpray, null), testLeague);
+    const elite = computeDefensiveContext(makePlayer(leagueAvgSpray, 15), testLeague);
     // 15 * OAA_SCALE = 15 * 0.004 = 0.06 → ~6% reduction
     const expectedOaaAdj = -15 * DEFENSIVE.OAA_SCALE;
     expect(elite.multiplier).toBeCloseTo(base.multiplier + expectedOaaAdj, 4);
   });
 
   test("-15 OAA produces approximately 6% boost on the multiplier", () => {
-    const base = computeDefensiveContext(makePlayer(leagueAvgSpray, null));
-    const poor = computeDefensiveContext(makePlayer(leagueAvgSpray, -15));
+    const base = computeDefensiveContext(makePlayer(leagueAvgSpray, null), testLeague);
+    const poor = computeDefensiveContext(makePlayer(leagueAvgSpray, -15), testLeague);
     const expectedOaaAdj = 15 * DEFENSIVE.OAA_SCALE;
     expect(poor.multiplier).toBeCloseTo(base.multiplier + expectedOaaAdj, 4);
   });
 
   test("OAA component stacks additively with spray component", () => {
-    const sprayOnly = computeDefensiveContext(makePlayer(heavyGbSpray, null));
-    const sprayAndOaa = computeDefensiveContext(makePlayer(heavyGbSpray, -10));
+    const sprayOnly = computeDefensiveContext(makePlayer(heavyGbSpray, null), testLeague);
+    const sprayAndOaa = computeDefensiveContext(makePlayer(heavyGbSpray, -10), testLeague);
     // Poor defender on top of GB-heavy spray → multiplier should be higher
     expect(sprayAndOaa.multiplier).toBeGreaterThan(sprayOnly.multiplier);
   });
 
   test("fielderOaaAvailable is true when fielderOaa is provided", () => {
-    const result = computeDefensiveContext(makePlayer(null, 5));
+    const result = computeDefensiveContext(makePlayer(null, 5), testLeague);
     expect(result.fielderOaaAvailable).toBe(true);
   });
 
   test("fielderOaaAvailable is false when fielderOaa is null", () => {
-    const result = computeDefensiveContext(makePlayer(null, null));
+    const result = computeDefensiveContext(makePlayer(null, null), testLeague);
     expect(result.fielderOaaAvailable).toBe(false);
   });
 
   test("fielderOaa alone (no spray) still shifts multiplier from 1.0", () => {
-    const withOaa = computeDefensiveContext(makePlayer(null, 10));
+    const withOaa = computeDefensiveContext(makePlayer(null, 10), testLeague);
     // 10 * 0.004 = 0.04 penalty from league-average 1.0
     expect(withOaa.multiplier).toBeCloseTo(0.96, 4);
   });
@@ -198,23 +202,22 @@ describe("computeDefensiveContext — fielder OAA", () => {
 
 describe("computeDefensiveContext — magnitude", () => {
   test("heavy GB hitter shows ≥5% penalty from league average", () => {
-    const leagueResult = computeDefensiveContext(makePlayer(leagueAvgSpray));
-    const gbResult = computeDefensiveContext(makePlayer(heavyGbSpray));
+    const leagueResult = computeDefensiveContext(makePlayer(leagueAvgSpray), testLeague);
+    const gbResult = computeDefensiveContext(makePlayer(heavyGbSpray), testLeague);
     const pctDiff = (leagueResult.multiplier - gbResult.multiplier) / leagueResult.multiplier;
     expect(pctDiff).toBeGreaterThanOrEqual(0.05);
   });
 
   test("heavy LD/FB hitter shows ≥5% boost from league average", () => {
-    const leagueResult = computeDefensiveContext(makePlayer(leagueAvgSpray));
-    const ldResult = computeDefensiveContext(makePlayer(heavyLdFbSpray));
+    const leagueResult = computeDefensiveContext(makePlayer(leagueAvgSpray), testLeague);
+    const ldResult = computeDefensiveContext(makePlayer(heavyLdFbSpray), testLeague);
     const pctDiff = (ldResult.multiplier - leagueResult.multiplier) / leagueResult.multiplier;
     expect(pctDiff).toBeGreaterThanOrEqual(0.05);
   });
 
   test("multiplier is always clamped to [MIN_MULTIPLIER, MAX_MULTIPLIER]", () => {
     // Extreme profile: pure GB hitter against an elite defender
-    const extremeGb = computeDefensiveContext(
-      makePlayer({
+    const extremeGb = computeDefensiveContext(makePlayer({
         pullPercent: 0.50,
         straightawayPercent: 0.30,
         oppoPercent: 0.20,
@@ -222,13 +225,12 @@ describe("computeDefensiveContext — magnitude", () => {
         fbPercent: 0.10,
         ldPercent: 0.10,
       }, 25)
-    );
+    , testLeague);
     expect(extremeGb.multiplier).toBeGreaterThanOrEqual(DEFENSIVE.MIN_MULTIPLIER);
     expect(extremeGb.multiplier).toBeLessThanOrEqual(DEFENSIVE.MAX_MULTIPLIER);
 
     // Extreme profile: all LD against a terrible defender
-    const extremeLd = computeDefensiveContext(
-      makePlayer({
+    const extremeLd = computeDefensiveContext(makePlayer({
         pullPercent: 0.40,
         straightawayPercent: 0.35,
         oppoPercent: 0.25,
@@ -236,13 +238,13 @@ describe("computeDefensiveContext — magnitude", () => {
         fbPercent: 0.30,
         ldPercent: 0.50,
       }, -25)
-    );
+    , testLeague);
     expect(extremeLd.multiplier).toBeGreaterThanOrEqual(DEFENSIVE.MIN_MULTIPLIER);
     expect(extremeLd.multiplier).toBeLessThanOrEqual(DEFENSIVE.MAX_MULTIPLIER);
   });
 
   test("multiplier is never exactly 0", () => {
-    const result = computeDefensiveContext(makePlayer(heavyGbSpray));
+    const result = computeDefensiveContext(makePlayer(heavyGbSpray), testLeague);
     expect(result.multiplier).toBeGreaterThan(0);
   });
 });

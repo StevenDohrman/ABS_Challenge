@@ -56,7 +56,19 @@ export interface LeagueAverages {
 
   /**
    * League wOBA for the average MLB batter. Used for lineup context multiplier.
-   * Falls back to LINEUP.LEAGUE_AVG_WOBA via resolveLeagueAverages() when omitted.
    */
   woba: number;
+
+  /** League-average batted-ball type rates (0–1). Source: Savant spray CSV. */
+  gbRate: number;
+  fbRate: number;
+  ldRate: number;
+
+  /** League-average spray direction rates (0–1). */
+  pullRate: number;
+  straightawayRate: number;
+  oppoRate: number;
+
+  /** League-average Statcast sprint speed (ft/s). */
+  sprintSpeed: number;
 }

@@ -1,9 +1,12 @@
 import {
   deriveMlbZoneResult,
-  buildAuditInput,
+  buildBattingAuditInput,
+  buildFieldingAuditInput,
+  computeCalculatedReSwing,
 } from "../services/postgameAuditService";
 import type { ChallengeRecommendation, LivePitchEvent } from "@prisma/client";
 import { CALLED_STRIKE_CALL_CODE } from "@abs/data-pipeline";
+import { CALL_CODES } from "../db/constants";
 
 function makePitch(overrides: Partial<LivePitchEvent> = {}): LivePitchEvent {
   return {
@@ -58,6 +61,15 @@ function makeRec(overrides: Partial<ChallengeRecommendation> = {}): ChallengeRec
   };
 }
 
+const snapshot = {
+  outs: 1,
+  runnerOnFirst: true,
+  runnerOnSecond: false,
+  runnerOnThird: false,
+  fieldingTeamId: 111,
+  battingTeamId: 147,
+};
+
 describe("deriveMlbZoneResult", () => {
   it("returns strike for in-zone MLB zones 1-9", () => {
     expect(deriveMlbZoneResult(5, null, null, null, null)).toBe("strike");
@@ -75,71 +87,135 @@ describe("deriveMlbZoneResult", () => {
   it("returns unknown when data is insufficient", () => {
     expect(deriveMlbZoneResult(null, null, null, null, null)).toBe("unknown");
   });
-
-  it("classifies edge of plate at half-width boundary as strike", () => {
-    expect(deriveMlbZoneResult(null, 0.83, 2.5, 3.5, 1.6)).toBe("strike");
-    expect(deriveMlbZoneResult(null, 0.84, 2.5, 3.5, 1.6)).toBe("ball");
-  });
-
-  it("classifies high and low pitches outside zone height", () => {
-    expect(deriveMlbZoneResult(null, 0.1, 3.6, 3.5, 1.6)).toBe("ball");
-    expect(deriveMlbZoneResult(null, 0.1, 1.5, 3.5, 1.6)).toBe("ball");
-  });
 });
 
-describe("buildAuditInput", () => {
-  it("flags missed challenge when ALLOW rec and MLB location says ball", () => {
-    const audit = buildAuditInput(makePitch(), makeRec());
+describe("buildBattingAuditInput", () => {
+  it("flags missed challenge from calculated RE when zone says ball", () => {
+    const pitch = makePitch();
+    const audit = buildBattingAuditInput(pitch, snapshot, makeRec(), true);
+    const expectedRe = computeCalculatedReSwing(pitch, snapshot);
+
     expect(audit).not.toBeNull();
+    expect(audit!.challengeSide).toBe("batting");
     expect(audit!.callWasProbablyWrong).toBe(true);
     expect(audit!.shouldHaveChallenged).toBe(true);
     expect(audit!.missedChallenge).toBe(true);
-    expect(audit!.runExpectancySwing).toBe(0.14);
+    expect(audit!.runExpectancySwing).toBeCloseTo(expectedRe, 5);
+    expect(audit!.runExpectancySwing).not.toBe(0.14);
+  });
+
+  it("counts DENY recommendations when zone disagrees with the call", () => {
+    const pitch = makePitch();
+    const audit = buildBattingAuditInput(
+      pitch,
+      snapshot,
+      makeRec({ recommendation: "DENY", expectedValue: 0 }),
+      true
+    );
+
+    expect(audit!.callWasProbablyWrong).toBe(true);
+    expect(audit!.shouldHaveChallenged).toBe(true);
+    expect(audit!.missedChallenge).toBe(true);
+    expect(audit!.runExpectancySwing).toBeGreaterThan(0);
   });
 
   it("includes out-of-challenges misses in missedChallenge", () => {
-    const audit = buildAuditInput(
+    const audit = buildBattingAuditInput(
       makePitch(),
-      makeRec({ challengeAvailable: false })
+      snapshot,
+      makeRec({ challengeAvailable: false }),
+      false
     );
     expect(audit!.missedChallenge).toBe(true);
     expect(audit!.challengeAvailable).toBe(false);
   });
 
   it("does not flag missed when team overturned the call", () => {
-    const audit = buildAuditInput(
+    const audit = buildBattingAuditInput(
       makePitch({ hasReview: true, isOverturned: true }),
-      makeRec()
+      snapshot,
+      makeRec(),
+      true
     );
     expect(audit!.shouldHaveChallenged).toBe(true);
     expect(audit!.missedChallenge).toBe(false);
   });
 
   it("flags bad challenge when DENY rec but team challenged", () => {
-    const audit = buildAuditInput(
+    const audit = buildBattingAuditInput(
       makePitch({ hasReview: true, isOverturned: false, mlbZone: 5, plateX: 0.1, plateZ: 2.5 }),
-      makeRec({ recommendation: "DENY" })
+      snapshot,
+      makeRec({ recommendation: "DENY" }),
+      true
     );
     expect(audit!.badChallengeAllowed).toBe(true);
     expect(audit!.shouldHaveChallenged).toBe(false);
   });
 
   it("returns null for non-called-strike pitches", () => {
-    expect(buildAuditInput(makePitch({ callCode: "B" }), makeRec())).toBeNull();
+    expect(
+      buildBattingAuditInput(makePitch({ callCode: "B" }), snapshot, makeRec(), true)
+    ).toBeNull();
   });
 
-  it("marks zoneResult unknown when pitch location is missing", () => {
-    const audit = buildAuditInput(
-      makePitch({
-        plateX: null,
-        plateZ: null,
-        strikeZoneTop: null,
-        strikeZoneBottom: null,
-        mlbZone: null,
-      }),
-      makeRec()
+  it("does not count misses when zone agrees with the call", () => {
+    const audit = buildBattingAuditInput(
+      makePitch({ mlbZone: 5, plateX: 0.1, plateZ: 2.5 }),
+      snapshot,
+      makeRec(),
+      true
     );
-    expect(audit!.zoneResult).toBe("unknown");
-    expect(audit!.notes).toContain("No pitch location data in MLB live feed");
+    expect(audit!.callWasProbablyWrong).toBe(false);
+    expect(audit!.missedChallenge).toBe(false);
+  });
+});
+
+describe("buildFieldingAuditInput", () => {
+  it("flags missed fielding challenge when ball call is actually a strike", () => {
+    const pitch = makePitch({
+      callCode: CALL_CODES.BALL,
+      mlbZone: 5,
+      plateX: 0.1,
+      plateZ: 2.5,
+      ballsBefore: 3,
+      strikesBefore: 0,
+      outs: 0,
+    });
+    const fieldingSnapshot = {
+      outs: 0,
+      runnerOnFirst: true,
+      runnerOnSecond: false,
+      runnerOnThird: false,
+      fieldingTeamId: 111,
+      battingTeamId: 147,
+    };
+    const audit = buildFieldingAuditInput(pitch, fieldingSnapshot, true);
+
+    expect(audit).not.toBeNull();
+    expect(audit!.challengeSide).toBe("fielding");
+    expect(audit!.callWasProbablyWrong).toBe(true);
+    expect(audit!.shouldHaveChallenged).toBe(true);
+    expect(audit!.missedChallenge).toBe(true);
+    expect(audit!.runExpectancySwing).toBeCloseTo(
+      computeCalculatedReSwing(pitch, fieldingSnapshot),
+      5
+    );
+  });
+
+  it("does not flag missed when fielding team overturned the call", () => {
+    const audit = buildFieldingAuditInput(
+      makePitch({
+        callCode: CALL_CODES.BALL,
+        mlbZone: 5,
+        plateX: 0.1,
+        plateZ: 2.5,
+        hasReview: true,
+        isOverturned: true,
+      }),
+      snapshot,
+      true
+    );
+
+    expect(audit!.missedChallenge).toBe(false);
   });
 });

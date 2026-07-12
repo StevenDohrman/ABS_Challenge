@@ -28,7 +28,8 @@ export interface BaserunningContextResult {
 
 export function computeBaserunningContext(
   gameState: GameStateContext,
-  baserunning: BaserunningContextInput | undefined
+  baserunning: BaserunningContextInput | undefined,
+  leagueAvgSprintSpeed: number = BASERUNNING.LEAGUE_AVG_SPRINT_SPEED
 ): BaserunningContextResult {
   const noData: BaserunningContextResult = {
     multiplier: 1.0,
@@ -57,7 +58,7 @@ export function computeBaserunningContext(
 
   const totalWeight = known.reduce((sum, s) => sum + s.weight, 0);
   const weightedMult = known.reduce(
-    (sum, s) => sum + speedToMultiplier(s.effectiveSpeed!) * s.weight,
+    (sum, s) => sum + speedToMultiplier(s.effectiveSpeed!, leagueAvgSprintSpeed) * s.weight,
     0
   ) / totalWeight;
 
@@ -138,9 +139,9 @@ function bottleneckSpeed(mover: number | null, leadAhead: number | null): number
   return Math.min(mover, leadAhead);
 }
 
-function speedToMultiplier(speed: number): number {
+function speedToMultiplier(speed: number, leagueAvgSprintSpeed: number): number {
   return clamp(
-    1 + (speed - BASERUNNING.LEAGUE_AVG_SPRINT_SPEED) * BASERUNNING.SPEED_SCALE,
+    1 + (speed - leagueAvgSprintSpeed) * BASERUNNING.SPEED_SCALE,
     BASERUNNING.MIN_MULTIPLIER,
     BASERUNNING.MAX_MULTIPLIER
   );

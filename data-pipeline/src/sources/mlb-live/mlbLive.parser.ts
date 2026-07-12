@@ -25,6 +25,23 @@ function parseRunnerIds(
   return result;
 }
 
+function parseMatchupHands(matchup: MlbMatchup | undefined): {
+  batterHand?: "L" | "R" | "S";
+  pitcherHand?: "L" | "R";
+} {
+  const batterCode = matchup?.batSide?.code;
+  const pitcherCode = matchup?.pitchHand?.code;
+
+  return {
+    ...(batterCode === "L" || batterCode === "R" || batterCode === "S"
+      ? { batterHand: batterCode }
+      : {}),
+    ...(pitcherCode === "L" || pitcherCode === "R"
+      ? { pitcherHand: pitcherCode }
+      : {}),
+  };
+}
+
 /** Post-play runner positions from play.matchup.postOn* (end of that at-bat). */
 function parseRunnersFromMatchup(matchup: MlbMatchup | undefined): {
   runnerOnFirst: boolean;
@@ -288,6 +305,7 @@ export function parseAtBatSnapshot(
     fieldingTeamId,
     defense: parseDefensiveLineup(linescore?.defense),
     battingOrder: parseBattingOrderForTeam(feed, battingTeamId),
+    ...parseMatchupHands(currentPlay.matchup),
     fetchedAt,
   };
 }
@@ -348,6 +366,7 @@ function parsePlaysInIndexRange(
           awayScore,
           battingTeamId: halfInning === "top" ? awayTeamId : homeTeamId,
           fieldingTeamId: halfInning === "top" ? homeTeamId : awayTeamId,
+          ...parseMatchupHands(play.matchup),
           fetchedAt,
         });
       }

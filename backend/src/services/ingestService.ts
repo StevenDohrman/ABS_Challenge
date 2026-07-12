@@ -13,13 +13,14 @@
 
 import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, SavantPitcherPitchMix, ActiveGame, GameLineupEntry, LeagueAveragesSnapshot } from "@abs/data-pipeline";
 import { upsertGame, markGameFinal, markGameIngested, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
-import { upsertBatterStatlines } from "../db/playerRepository";
+import { upsertBatterStatlines, patchPlayerBattingHand } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
 import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
 import { upsertPitcherPitchMixBatch } from "../db/pitcherPitchMixRepository";
 import { upsertGameLineup } from "../db/lineupRepository";
 import { recordNamesFromPitchRow } from "../db/playerNameRepository";
-import { setLeagueAverages } from "./leagueAveragesStore";
+import { SEASONS } from "../db/constants";
+import { persistLeagueAverages } from "./leagueAveragesStore";
 import { trackTeamGameAppearances } from "./rankingsIncrementalService";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +114,18 @@ export async function handleAtBatStart(
       });
     }
     await upsertAtBatSnapshot(snapshot);
+
+    if (
+      snapshot.batterHand === "L" ||
+      snapshot.batterHand === "R" ||
+      snapshot.batterHand === "S"
+    ) {
+      await patchPlayerBattingHand(
+        snapshot.batterId,
+        SEASONS.CURRENT,
+        snapshot.batterHand
+      );
+    }
   } catch (err) {
     console.error(
       `[ingestService] failed to upsert at-bat snapshot ` +
@@ -215,9 +228,15 @@ export async function handlePitcherPitchMix(
   await ingestSavantBatch("pitcher pitch mix rows", rows, upsertPitcherPitchMixBatch);
 }
 
-/** Cache current-season league averages computed from the daily Savant batter CSVs. */
-export function handleLeagueAverages(snapshot: LeagueAveragesSnapshot): void {
-  setLeagueAverages(snapshot);
+/** Cache + persist season league averages from the SavantDailyJob. */
+export async function handleLeagueAverages(
+  snapshot: LeagueAveragesSnapshot
+): Promise<void> {
+  try {
+    await persistLeagueAverages(snapshot);
+  } catch (err) {
+    console.error("[ingestService] failed to persist league averages:", err);
+  }
 }
 
 /**

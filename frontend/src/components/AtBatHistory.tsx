@@ -99,7 +99,7 @@ function AtBatRow({ ab }: { ab: AtBatHistoryItem }) {
           {ab.postgameAudit?.missedChallenge && (
             <div className="mt-0.5">
               <span className="inline-flex items-center text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border bg-orange-500/15 border-orange-500/30 text-orange-300">
-                Missed · Zone {ab.postgameAudit.zoneResult}
+                Missed {ab.postgameAudit.challengeSide === "fielding" ? "fielding" : "batting"} · Zone {ab.postgameAudit.zoneResult}
                 {!ab.postgameAudit.challengeAvailable && " · out of challenges"}
               </span>
             </div>

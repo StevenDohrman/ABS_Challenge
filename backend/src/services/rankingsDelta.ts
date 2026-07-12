@@ -18,6 +18,8 @@ export interface TeamBucketDelta {
   challengesOverturned?: number;
   battingMissedCount?: number;
   battingMissedValue?: number;
+  fieldingMissedCount?: number;
+  fieldingMissedValue?: number;
   battingGainedRe?: number;
   fieldingGainedRe?: number;
   badChallenges?: number;
@@ -51,7 +53,9 @@ export interface PitchReviewContext {
 export interface PostgameAuditContext {
   pitchEventId: number;
   batterId: number;
+  pitcherId: number;
   halfInning: string;
+  challengeSide: "batting" | "fielding";
   missedChallenge: boolean;
   badChallengeAllowed: boolean;
   runExpectancySwing: number;
@@ -68,6 +72,12 @@ export function battingTeamId(game: RankingsGameContext, halfInning: string): nu
   return battingSideFromHalfInning(halfInning) === "away"
     ? game.awayTeamId
     : game.homeTeamId;
+}
+
+export function fieldingTeamId(game: RankingsGameContext, halfInning: string): number {
+  return battingTeamId(game, halfInning) === game.awayTeamId
+    ? game.homeTeamId
+    : game.awayTeamId;
 }
 
 function isBattingSideChallenge(
@@ -122,6 +132,12 @@ function addTeamDelta(
   }
   if (patch.battingMissedValue) {
     row.battingMissedValue = (row.battingMissedValue ?? 0) + patch.battingMissedValue;
+  }
+  if (patch.fieldingMissedCount) {
+    row.fieldingMissedCount = (row.fieldingMissedCount ?? 0) + patch.fieldingMissedCount;
+  }
+  if (patch.fieldingMissedValue) {
+    row.fieldingMissedValue = (row.fieldingMissedValue ?? 0) + patch.fieldingMissedValue;
   }
   if (patch.battingGainedRe) row.battingGainedRe = (row.battingGainedRe ?? 0) + patch.battingGainedRe;
   if (patch.fieldingGainedRe) row.fieldingGainedRe = (row.fieldingGainedRe ?? 0) + patch.fieldingGainedRe;
@@ -178,14 +194,26 @@ export function buildPostgameAuditDelta(
   const playerAppearanceIds: number[] = [audit.batterId];
 
   if (audit.missedChallenge) {
-    addPlayerDelta(playerDeltas, audit.batterId, {
-      missedOpportunities: 1,
-      totalMissedValue: audit.runExpectancySwing,
-    });
-    addTeamDelta(teamDeltas, battingTeamId(game, audit.halfInning), {
-      battingMissedCount: 1,
-      battingMissedValue: audit.runExpectancySwing,
-    });
+    if (audit.challengeSide === "fielding") {
+      addPlayerDelta(playerDeltas, audit.pitcherId, {
+        missedOpportunities: 1,
+        totalMissedValue: audit.runExpectancySwing,
+      });
+      playerAppearanceIds.push(audit.pitcherId);
+      addTeamDelta(teamDeltas, fieldingTeamId(game, audit.halfInning), {
+        fieldingMissedCount: 1,
+        fieldingMissedValue: audit.runExpectancySwing,
+      });
+    } else {
+      addPlayerDelta(playerDeltas, audit.batterId, {
+        missedOpportunities: 1,
+        totalMissedValue: audit.runExpectancySwing,
+      });
+      addTeamDelta(teamDeltas, battingTeamId(game, audit.halfInning), {
+        battingMissedCount: 1,
+        battingMissedValue: audit.runExpectancySwing,
+      });
+    }
   }
 
   if (audit.badChallengeAllowed && audit.challengerPlayerId !== null) {
@@ -226,6 +254,8 @@ export function negateRankingsEventDelta(delta: RankingsEventDelta): RankingsEve
       challengesOverturned: negate(d.challengesOverturned),
       battingMissedCount: negate(d.battingMissedCount),
       battingMissedValue: negate(d.battingMissedValue),
+      fieldingMissedCount: negate(d.fieldingMissedCount),
+      fieldingMissedValue: negate(d.fieldingMissedValue),
       battingGainedRe: negate(d.battingGainedRe),
       fieldingGainedRe: negate(d.fieldingGainedRe),
       badChallenges: negate(d.badChallenges),

@@ -63,11 +63,33 @@ describe("buildPitchReviewDelta", () => {
 });
 
 describe("buildPostgameAuditDelta", () => {
+  it("attributes fielding missed opportunities to pitcher and fielding team", () => {
+    const delta = buildPostgameAuditDelta(game, {
+      pitchEventId: 21,
+      batterId: 600,
+      pitcherId: 700,
+      halfInning: "bottom",
+      challengeSide: "fielding",
+      missedChallenge: true,
+      badChallengeAllowed: false,
+      runExpectancySwing: 0.11,
+      challengerPlayerId: null,
+      challengerTeamId: null,
+    });
+
+    expect(delta?.playerDeltas.find((d) => d.playerId === 700)?.missedOpportunities).toBe(1);
+    expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.fieldingMissedCount).toBe(1);
+    expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.fieldingMissedValue).toBeCloseTo(0.11);
+    expect(delta?.playerDeltas.find((d) => d.playerId === 600)?.missedOpportunities).toBeUndefined();
+  });
+
   it("attributes missed opportunities to batter and batting team", () => {
     const delta = buildPostgameAuditDelta(game, {
       pitchEventId: 20,
       batterId: 600,
+      pitcherId: 700,
       halfInning: "top",
+      challengeSide: "batting",
       missedChallenge: true,
       badChallengeAllowed: false,
       runExpectancySwing: 0.15,
@@ -83,7 +105,9 @@ describe("buildPostgameAuditDelta", () => {
     const delta = buildPostgameAuditDelta(game, {
       pitchEventId: 11,
       batterId: 601,
+      pitcherId: 701,
       halfInning: "top",
+      challengeSide: "batting",
       missedChallenge: false,
       badChallengeAllowed: true,
       runExpectancySwing: 0,

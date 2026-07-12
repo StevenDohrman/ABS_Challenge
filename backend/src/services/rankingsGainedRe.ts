@@ -30,13 +30,22 @@ export function rawOverturnReSwing(
   return Math.max(0, ifSucceeds - ifFails);
 }
 
+/** Defensive RE benefit from overturning a called ball to a strike. */
+export function fieldingOverturnReSwing(
+  outs: number,
+  ballsBefore: number,
+  strikesBefore: number,
+  runners: { first: boolean; second: boolean; third: boolean }
+): number {
+  return rawOverturnReSwing(outs, ballsBefore, strikesBefore, runners);
+}
+
 /**
  * Resolve gained RE for a successful overturn.
  *
- * Batting-side called-strike challenges prefer the stored recommendation EV
- * (same basis as missed-opportunity RE). Fielding-side ball challenges and
- * any case without a positive recommendation fall back to the raw RE swing
- * computed from the at-bat snapshot.
+ * Batting-side called-strike challenges prefer the stored audit RE when present.
+ * Fielding-side ball challenges and any case without an audit row fall back to
+ * the raw RE swing computed from the at-bat snapshot.
  */
 export async function resolveGainedReForPitch(
   pitch: GainedRePitchContext
@@ -80,11 +89,11 @@ export async function resolveGainedReForPitch(
   const recommendation = recByPitch ?? recByCount;
 
   if (pitch.callCode === CALL_CODES.CALLED_STRIKE) {
-    if (recommendation && recommendation.expectedValue > 0) {
-      return recommendation.expectedValue;
-    }
     if (audit && audit.runExpectancySwing > 0) {
       return audit.runExpectancySwing;
+    }
+    if (recommendation && recommendation.expectedValue > 0) {
+      return recommendation.expectedValue;
     }
   }
 
