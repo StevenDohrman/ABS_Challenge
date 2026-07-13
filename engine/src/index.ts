@@ -33,6 +33,10 @@ export type {
 export {
   lookupBaseRE,
   computeChallengeOutcomeExpectancies,
+  lookupCountDelta,
+  resolveCountDelta,
+  LEAGUE_COUNT_DELTA,
+  FALLBACK_LEAGUE_WOBA_BY_COUNT,
 } from "./data/runExpectancy";
 
 export { buildDueUpWindow } from "./features/lineupContext";
@@ -40,6 +44,9 @@ export { buildDueUpWindow } from "./features/lineupContext";
 export type {
   Runners,
   ChallengeOutcomeExpectancies,
+  CountDeltaContext,
+  CountDeltaResult,
+  CountDeltaSource,
 } from "./data/runExpectancy";
 
 // Constants — exported so backend and tests can reference the same values

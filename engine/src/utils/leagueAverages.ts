@@ -23,5 +23,6 @@ export function resolveLeagueAverages(
     straightawayRate: override?.straightawayRate ?? 0.34,
     oppoRate: override?.oppoRate ?? 0.27,
     sprintSpeed: override?.sprintSpeed ?? BASERUNNING.LEAGUE_AVG_SPRINT_SPEED,
+    countWobaByState: override?.countWobaByState,
   };
 }

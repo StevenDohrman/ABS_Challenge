@@ -60,6 +60,7 @@ import {
 } from "./db/pipelineDbQueue";
 import { SEASONS } from "./db/constants";
 import { hydrateLeagueAveragesFromDb } from "./services/leagueAveragesStore";
+import { ingestCountPerformanceForGame } from "./services/countPerformanceIngestService";
 
 /** How often to re-run the Savant daily job in milliseconds (24 hours). */
 const SAVANT_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1_000;
@@ -178,6 +179,11 @@ function startLivePollJob(): void {
       `lineup game=${gamePk} count=${entries.length}`,
       () => handleLineupUpdate(entries),
       "high"
+    );
+    await enqueuePipelineDbWork(
+      `count-performance game=${gamePk}`,
+      () => ingestCountPerformanceForGame(gamePk),
+      "low"
     );
   });
 

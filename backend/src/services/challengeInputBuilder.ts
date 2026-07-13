@@ -19,6 +19,7 @@ import {
   type PlayerChallengeContext,
   type Balls,
   type Strikes,
+  type CountDeltaContext,
 } from "@abs/engine";
 import type { MlbAtBatSnapshot, DefensiveLineup } from "@abs/data-pipeline";
 import { SEASONS } from "../db/constants";
@@ -27,12 +28,17 @@ import { findPlayerStatSnapshot, findPlayerStatSnapshotBatch } from "../db/playe
 import { findSprayProfile } from "../db/defensiveRepository";
 import { findSprintSpeedBatch } from "../db/sprintSpeedRepository";
 import { findBattingOrder } from "../db/lineupRepository";
+import { findPlayerCountPerformance } from "../db/countPerformanceRepository";
 import {
   buildPlayerChallengeContext,
   buildDefaultPlayerChallengeContext,
 } from "./playerContextBuilder";
 import { resolveFielderOaa } from "./fielderOaaResolver";
-import { getLeagueAveragesForEngine } from "./leagueAveragesStore";
+import {
+  getLeagueAveragesForEngine,
+  getLeagueAveragesSnapshot,
+} from "./leagueAveragesStore";
+import { buildBatterWobaByCount } from "./countPerformanceContext";
 
 /** Shared context computed once per at-bat, reused for all 12 count states. */
 export interface AtBatChallengeContext {
@@ -48,6 +54,7 @@ export interface AtBatChallengeContext {
     second: boolean;
     third: boolean;
   };
+  countDeltaContext: CountDeltaContext | undefined;
 }
 
 /** Optional overrides for branch preview (no DB challenge derivation). */
@@ -102,6 +109,27 @@ export async function buildAtBatChallengeContext(
     };
   }
 
+  const countPerformance = await findPlayerCountPerformance(
+    snapshot.batterId,
+    SEASONS.CURRENT
+  );
+  const batterWobaByCount = buildBatterWobaByCount(countPerformance);
+  if (batterWobaByCount) {
+    playerContext = {
+      ...playerContext,
+      countWobaByState: batterWobaByCount,
+    };
+  }
+
+  const leagueSnapshot = getLeagueAveragesSnapshot();
+  const countDeltaContext: CountDeltaContext | undefined =
+    batterWobaByCount || leagueSnapshot?.countWobaByState
+      ? {
+          batterWobaByCount,
+          leagueWobaByCount: leagueSnapshot?.countWobaByState,
+        }
+      : undefined;
+
   const baserunningContext = await resolveBaserunningContext(snapshot);
 
   const battingOrder =
@@ -151,6 +179,7 @@ export async function buildAtBatChallengeContext(
       second: snapshot.runnerOnSecond,
       third: snapshot.runnerOnThird,
     },
+    countDeltaContext,
   };
 }
 
@@ -187,7 +216,8 @@ export function buildChallengeInputForCount(
     gameState.outs,
     gameState.balls,
     gameState.strikes,
-    ctx.runners
+    ctx.runners,
+    ctx.countDeltaContext
   );
 
   return {

@@ -79,6 +79,7 @@ export function getLeagueAveragesForEngine(): Partial<LeagueAverages> | undefine
     straightawayRate: snap.straightawayRate,
     oppoRate: snap.oppoRate,
     sprintSpeed: snap.sprintSpeed,
+    countWobaByState: snap.countWobaByState,
   };
 }
 

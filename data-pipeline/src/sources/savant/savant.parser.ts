@@ -550,6 +550,9 @@ export function parsePlayerStatcastHistory(
         szTop: parseNum(col(row, "sz_top")),
         szBot: parseNum(col(row, "sz_bot")),
         zone: parseNum(col(row, "zone")),
+        wobaValue: parseNum(col(row, "woba_value")),
+        wobaDenom: parseNum(col(row, "woba_denom")),
+        estimatedWoba: parseNum(col(row, "estimated_woba_using_speedangle")),
         raw: row,
         fetchedAt,
       };

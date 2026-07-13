@@ -18,11 +18,17 @@
  *      Runs matter most when the game is within reach. Indexed by absolute
  *      run gap; blowouts (≥ BLOWOUT_MIN_RUN_DIFF) receive the lowest leverage.
  *
+ *      When the batting team is trailing, the gap is reduced by "rally potential":
+ *      runners already on base plus RE24 for the current base/out state. Down 4
+ *      with the bases loaded is treated as reachable (could tie this inning), not
+ *      the same as down 4 with the bases empty.
+ *
  * Final weight = clamp(inningLeverage × runDiffLeverage, WEIGHT_MIN, WEIGHT_MAX)
  */
 
 import { GameStateContext } from "../domain/gameContext.types";
 import { BASEBALL_RULES, SITUATION } from "../constants";
+import { lookupBaseRE } from "../data/runExpectancy";
 import { clamp } from "../utils/clamp";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +43,10 @@ export interface SituationWeightResult {
   components: {
     inningLeverage: number;
     runDiffLeverage: number;
+    /** Scoreboard gap before rally-potential adjustment (absolute). */
+    rawRunGap: number;
+    /** Gap after subtracting runners on base + inning RE when trailing. */
+    effectiveRunGap: number | null;
     /** Use-it-or-lose-it boost when challenges remain in the 9th or later. */
     challengeUrgency: number;
     isLateAndClose: boolean; // inning ≥ LATE_GAME_INNING and |runDiff| ≤ CLOSE_GAME_MAX_RUN_DIFF
@@ -58,9 +68,8 @@ export function computeSituationWeight(
     gameState.runDifferentialForBattingTeam
   );
 
-  const runDiffLeverage = computeRunDiffLeverage(
-    gameState.runDifferentialForBattingTeam
-  );
+  const { leverage: runDiffLeverage, rawRunGap, effectiveRunGap } =
+    computeRunDiffLeverage(gameState);
 
   const challengeUrgency = computeChallengeUrgency(
     gameState.inning,
@@ -80,6 +89,8 @@ export function computeSituationWeight(
     components: {
       inningLeverage,
       runDiffLeverage,
+      rawRunGap,
+      effectiveRunGap,
       challengeUrgency,
       isLateAndClose:
         gameState.inning >= SITUATION.LATE_GAME_INNING &&
@@ -130,19 +141,67 @@ function computeInningLeverage(
 // Run differential leverage
 // ---------------------------------------------------------------------------
 
+interface RunDiffLeverageResult {
+  leverage: number;
+  rawRunGap: number;
+  /** Set when trailing and rally potential was evaluated. */
+  effectiveRunGap: number | null;
+}
+
 /**
  * Returns a leverage multiplier based on how close the game is.
  *
  * Uses RUN_DIFF_LEVERAGE_BY_GAP indexed by the absolute run gap (0–4).
  * Gaps of 5 or more runs use RUN_DIFF_LEVERAGE_BLOWOUT.
  *
- * The sign of the differential does not affect magnitude — being up 3 and
- * down 3 are equally "close" from a run-value standpoint.
+ * When trailing, the gap is first reduced by rally potential (runners on base
+ * plus RE24 from the current state) so a deficit that could be erased this
+ * inning is not discounted like a distant blowout.
  */
-function computeRunDiffLeverage(runDifferentialForBattingTeam: number): number {
-  const absGap = Math.abs(runDifferentialForBattingTeam);
+function computeRunDiffLeverage(
+  gameState: GameStateContext
+): RunDiffLeverageResult {
+  const runDiff = gameState.runDifferentialForBattingTeam;
+  const rawRunGap = Math.abs(runDiff);
+
+  if (runDiff >= 0) {
+    return {
+      leverage: leverageForRunGap(rawRunGap),
+      rawRunGap,
+      effectiveRunGap: null,
+    };
+  }
+
+  const runners = {
+    first: gameState.runnerOnFirst,
+    second: gameState.runnerOnSecond,
+    third: gameState.runnerOnThird,
+  };
+  const runnersOnBase =
+    Number(runners.first) + Number(runners.second) + Number(runners.third);
+
+  if (runnersOnBase === 0) {
+    return {
+      leverage: leverageForRunGap(rawRunGap),
+      rawRunGap,
+      effectiveRunGap: null,
+    };
+  }
+
+  const rallyPotential = runnersOnBase + lookupBaseRE(gameState.outs, runners);
+  const effectiveRunGap = Math.max(0, rawRunGap - rallyPotential);
+
+  return {
+    leverage: leverageForRunGap(effectiveRunGap),
+    rawRunGap,
+    effectiveRunGap,
+  };
+}
+
+function leverageForRunGap(absGap: number): number {
+  const index = Math.floor(absGap);
   return (
-    SITUATION.RUN_DIFF_LEVERAGE_BY_GAP[absGap] ??
+    SITUATION.RUN_DIFF_LEVERAGE_BY_GAP[index] ??
     SITUATION.RUN_DIFF_LEVERAGE_BLOWOUT
   );
 }

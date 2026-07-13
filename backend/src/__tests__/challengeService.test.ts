@@ -17,6 +17,7 @@ import * as recRepo from "../db/recommendationRepository";
 import * as defRepo from "../db/defensiveRepository";
 import * as sprintRepo from "../db/sprintSpeedRepository";
 import * as lineupRepo from "../db/lineupRepository";
+import * as countPerformanceRepo from "../db/countPerformanceRepository";
 import * as contextBuilder from "../services/playerContextBuilder";
 import {
   precomputeAtBatRecommendations,
@@ -54,6 +55,7 @@ jest.mock("../db/recommendationRepository");
 jest.mock("../db/defensiveRepository");
 jest.mock("../db/sprintSpeedRepository");
 jest.mock("../db/lineupRepository");
+jest.mock("../db/countPerformanceRepository");
 jest.mock("../services/playerContextBuilder");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +89,10 @@ const mockFindSprintSpeedBatch = sprintRepo.findSprintSpeedBatch as jest.MockedF
 const mockFindBattingOrder = lineupRepo.findBattingOrder as jest.MockedFunction<
   typeof lineupRepo.findBattingOrder
 >;
+const mockFindPlayerCountPerformance =
+  countPerformanceRepo.findPlayerCountPerformance as jest.MockedFunction<
+    typeof countPerformanceRepo.findPlayerCountPerformance
+  >;
 const mockFindPlayerStatSnapshotBatch =
   playerRepo.findPlayerStatSnapshotBatch as jest.MockedFunction<
     typeof playerRepo.findPlayerStatSnapshotBatch
@@ -156,6 +162,7 @@ describe("precomputeAtBatRecommendations", () => {
     mockBuildDefaultPlayerChallengeContext.mockReturnValue(DEFAULT_PLAYER_CONTEXT);
     mockBuildPlayerChallengeContext.mockReturnValue(DEFAULT_PLAYER_CONTEXT);
     mockComputeTeamChallengesRemaining.mockResolvedValue(2);
+    mockFindPlayerCountPerformance.mockResolvedValue(null);
   });
 
   describe("when the game is not in the database", () => {

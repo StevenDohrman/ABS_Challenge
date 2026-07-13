@@ -180,6 +180,33 @@ export async function fetchPitchArsenalStatsCsv(season: number): Promise<string>
 }
 
 /**
+ * Fetch all regular-season Statcast pitch rows for batters in a season.
+ * Used to compute league wOBA-by-count for RE scaling (SavantDailyJob).
+ */
+export async function fetchSeasonBatterStatcastCsv(season: number): Promise<string> {
+  const { data } = await savantHttp.get<string>(
+    `${SAVANT_BASE}/statcast_search/csv`,
+    {
+      params: {
+        all: "true",
+        hfGT: "R|",
+        hfSea: `${season}|`,
+        player_type: "batter",
+        type: "details",
+        csv: "true",
+      },
+      responseType: "text",
+    }
+  );
+  if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
+    throw new Error(
+      `[savant.client] fetchSeasonBatterStatcastCsv(${season}) received HTML instead of CSV`
+    );
+  }
+  return data;
+}
+
+/**
  * Fetch all regular-season Statcast pitch rows for pitchers in a season.
  * Used to compute per-pitch-type ball/strike rates for the daily mix ingest.
  */
