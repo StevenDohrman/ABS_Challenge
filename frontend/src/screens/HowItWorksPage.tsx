@@ -9,7 +9,7 @@ function Section({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-xs font-mono uppercase tracking-widest text-white/40">
+      <h2 className="text-xs font-mono uppercase tracking-widest text-app-muted">
         {title}
       </h2>
       {children}
@@ -19,7 +19,7 @@ function Section({
 
 function StepList({ items }: { items: string[] }) {
   return (
-    <ol className="list-decimal list-inside space-y-2 text-sm text-white/60 leading-relaxed">
+    <ol className="list-decimal list-inside space-y-2 text-sm text-app-secondary leading-relaxed">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -29,7 +29,7 @@ function StepList({ items }: { items: string[] }) {
 
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc list-inside space-y-2 text-sm text-white/60 leading-relaxed pl-0.5">
+    <ul className="list-disc list-inside space-y-2 text-sm text-app-secondary leading-relaxed pl-0.5">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -40,8 +40,8 @@ function BulletList({ items }: { items: string[] }) {
 function Term({ name, children }: { name: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <p className="text-sm font-medium text-white/80">{name}</p>
-      <p className="text-sm text-white/55 leading-relaxed">{children}</p>
+      <p className="text-sm font-medium text-app">{name}</p>
+      <p className="text-sm text-app-secondary leading-relaxed">{children}</p>
     </div>
   );
 }
@@ -51,7 +51,7 @@ export function HowItWorksPage() {
     <div className="space-y-8 pb-4">
       <header className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight">How it works</h1>
-        <p className="text-white/55 leading-relaxed text-sm">
+        <p className="text-app-secondary leading-relaxed text-sm">
           End-to-end flow from daily ingest through live recommendations,
           postgame audit, rankings, and optional local game branches.
         </p>
@@ -80,14 +80,14 @@ export function HowItWorksPage() {
       </Section>
 
       <Section title="3. Recommendation engine">
-        <p className="text-sm text-white/55 leading-relaxed">
+        <p className="text-sm text-app-secondary leading-relaxed">
           At each new at-bat the backend builds a{" "}
-          <code className="text-white/70">ChallengeDecisionInput</code> and runs{" "}
-          <code className="text-white/70">decideChallenge</code> for all 12
+          <code className="text-app-secondary">ChallengeDecisionInput</code> and runs{" "}
+          <code className="text-app-secondary">decideChallenge</code> for all 12
           count states. When a called strike arrives, the matching precomputed row
           is surfaced as the live recommendation.
         </p>
-        <div className="rounded-2xl border border-white/10 bg-white/3 px-5 py-4 space-y-4">
+        <div className="rounded-2xl border border-app app-surface-subtle px-5 py-4 space-y-4">
           <Term name="Core inputs">
             Inning, outs, count, runners, score, run differential, challenges
             remaining, batter and pitcher profiles, and the current called-strike
@@ -104,7 +104,7 @@ export function HowItWorksPage() {
             minimum confidence threshold, and human-readable explanation sentences.
           </Term>
         </div>
-        <p className="text-xs text-white/35 leading-relaxed">
+        <p className="text-xs text-app-faint leading-relaxed">
           Pitcher challenge hints use the same daily pitch-mix data but are display
           only — they never change the recommendation label.
         </p>
@@ -122,7 +122,7 @@ export function HowItWorksPage() {
             "Results are stored, shown on the game page, and increment player/team rankings.",
           ]}
         />
-        <p className="text-xs text-white/35 leading-relaxed mt-2">
+        <p className="text-xs text-app-faint leading-relaxed mt-2">
           Missed value does not require the live card to have said ALLOW — only
           that the zone-based overturn would have been worth positive run
           expectancy and the team did not get the call reversed.
@@ -130,9 +130,9 @@ export function HowItWorksPage() {
       </Section>
 
       <Section title="5. Rankings">
-        <p className="text-sm text-white/55 leading-relaxed">
+        <p className="text-sm text-app-secondary leading-relaxed">
           Visit the{" "}
-          <Link to="/rankings" className="text-emerald-300/90 hover:text-emerald-300 underline">
+          <Link to="/rankings" className="text-emerald-700 hover:text-emerald-800 dark:text-emerald-300/90 dark:hover:text-emerald-300 underline">
             rankings page
           </Link>{" "}
           to explore aggregated challenge performance.
@@ -145,7 +145,7 @@ export function HowItWorksPage() {
             "Season — running totals from program start (set TRACKING_START_DATE on deploy).",
           ]}
         />
-        <p className="text-xs text-white/35 leading-relaxed">
+        <p className="text-xs text-app-faint leading-relaxed">
           Rankings update incrementally when ABS reviews resolve live and when
           postgame audit completes for a game.
         </p>
@@ -161,7 +161,7 @@ export function HowItWorksPage() {
             "Export JSON or manage saved branches — data stays on your device only and is never written to the tracked-game database.",
           ]}
         />
-        <p className="text-xs text-white/35 leading-relaxed mt-2">
+        <p className="text-xs text-app-faint leading-relaxed mt-2">
           Branches are not limited to replaying a finished game. If you are inputting
           the situation yourself — for example following along pitch-by-pitch without
           MLB tracking — you still get live challenge recommendations and expected run
@@ -170,7 +170,7 @@ export function HowItWorksPage() {
       </Section>
 
       <Section title="Reading the game page">
-        <div className="rounded-2xl border border-white/10 bg-white/3 px-5 py-4 space-y-4">
+        <div className="rounded-2xl border border-app app-surface-subtle px-5 py-4 space-y-4">
           <Term name="Count grid">
             Pre-at-bat recommendations for every balls-strikes combination. Toggle
             visibility from the pre-at-bat banner.
@@ -201,27 +201,27 @@ export function HowItWorksPage() {
       <Section title="Recommendation labels">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-            <p className="text-sm font-medium text-emerald-300">AUTO_ALLOW / ALLOW</p>
-            <p className="text-xs text-white/50 mt-1 leading-relaxed">
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">AUTO_ALLOW / ALLOW</p>
+            <p className="text-xs text-app-muted mt-1 leading-relaxed">
               Strong expected value — challenge is strategically worthwhile if the
               player is confident the call was wrong.
             </p>
           </div>
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
             <p className="text-sm font-medium text-amber-300">WARN</p>
-            <p className="text-xs text-white/50 mt-1 leading-relaxed">
+            <p className="text-xs text-app-muted mt-1 leading-relaxed">
               Borderline value — challenge only with high player confidence.
             </p>
           </div>
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
             <p className="text-sm font-medium text-red-300">DENY</p>
-            <p className="text-xs text-white/50 mt-1 leading-relaxed">
+            <p className="text-xs text-app-muted mt-1 leading-relaxed">
               Low expected value — preserve the challenge for a better spot.
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/3 px-4 py-3">
-            <p className="text-sm font-medium text-white/70">Postgame only</p>
-            <p className="text-xs text-white/50 mt-1 leading-relaxed">
+          <div className="rounded-xl border border-app app-surface-subtle px-4 py-3">
+            <p className="text-sm font-medium text-app-secondary">Postgame only</p>
+            <p className="text-xs text-app-muted mt-1 leading-relaxed">
               Fielding-side audits show zone-calculated RE even though live cards
               trigger on batting called strikes.
             </p>

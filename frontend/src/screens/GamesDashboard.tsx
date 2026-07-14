@@ -74,16 +74,16 @@ export function GamesDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
             {isToday ? "Today's Games" : "Games"}
           </h1>
           {selectedLabel && (
-            <p className="text-sm text-white/40 font-mono mt-0.5">{selectedLabel}</p>
+            <p className="text-sm text-app-muted font-mono mt-0.5">{selectedLabel}</p>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
+        <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 sm:gap-1.5 shrink-0">
           <StatusDot
             status={serverOnline ? "live" : "offline"}
             label={serverOnline ? "Server online" : "Server offline"}
@@ -93,7 +93,7 @@ export function GamesDashboard() {
             label={dbOnline ? "DB connected" : "DB disconnected"}
           />
           {lastRefreshStr && (
-            <span className="text-[11px] text-white/25 font-mono">Updated {lastRefreshStr}</span>
+            <span className="text-[11px] text-app-dim font-mono">Updated {lastRefreshStr}</span>
           )}
         </div>
       </div>
@@ -103,7 +103,7 @@ export function GamesDashboard() {
       {/* Server offline warning */}
       {!serverOnline && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3">
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-red-700 dark:text-red-300">
             Backend at <span className="font-mono">localhost:3001</span> is unreachable.
             Run <span className="font-mono">npm run backend:dev</span> to start it.
           </p>
@@ -113,9 +113,9 @@ export function GamesDashboard() {
       {/* DB disconnected warning */}
       {serverOnline && !dbOnline && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-3">
-          <div className="text-sm text-amber-300 space-y-0.5">
+          <div className="text-sm text-amber-800 dark:text-amber-300 space-y-0.5">
             <p className="font-semibold">Database not connected — recommendations unavailable</p>
-            <p className="text-amber-400/70 text-xs">
+            <p className="text-amber-700/80 dark:text-amber-400/70 text-xs">
               The schedule loads fine, but live tracking requires a working Supabase connection.
               Check <span className="font-mono">backend/.env</span> → <span className="font-mono">DATABASE_URL</span>.
             </p>
@@ -128,11 +128,11 @@ export function GamesDashboard() {
       {/* Error state */}
       {error && !loading && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-4 space-y-2">
-          <p className="text-sm text-red-300 font-semibold">Failed to load schedule</p>
-          <p className="text-xs text-red-400/70 font-mono">{error}</p>
+          <p className="text-sm text-red-700 dark:text-red-300 font-semibold">Failed to load schedule</p>
+          <p className="text-xs text-red-600/80 dark:text-red-400/70 font-mono">{error}</p>
           <button
             onClick={() => void reload()}
-            className="text-xs text-red-300 hover:text-white underline"
+            className="text-xs text-red-700 dark:text-red-300 hover:text-app underline min-h-11 inline-flex items-center"
           >
             Try again
           </button>
@@ -184,7 +184,7 @@ export function GamesDashboard() {
         </section>
       )}
 
-      <p className="text-[11px] text-white/20 font-mono text-center pb-4">
+      <p className="text-[11px] text-app-dim font-mono text-center pb-4">
         Schedule from MLB Stats API · Recommendations from ABS engine
         {isToday ? " · Auto-refreshes every 30s" : ""}
       </p>
@@ -198,8 +198,8 @@ function SectionHeader({ label, count, accent }: { label: string; count: number;
       <span className={`text-xs font-mono font-semibold uppercase tracking-widest ${accent}`}>
         {label}
       </span>
-      <span className="text-xs font-mono text-white/25">{count}</span>
-      <div className="flex-1 h-px bg-white/10" />
+      <span className="text-xs font-mono text-app-dim">{count}</span>
+      <div className="flex-1 h-px app-divider" />
     </div>
   );
 }

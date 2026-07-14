@@ -234,7 +234,7 @@ export function BranchEditorScreen() {
     return (
       <div className="space-y-4">
         <EmptyState title={error} />
-        <Link to="/" className="text-sm text-white/40 hover:text-white/80">
+        <Link to="/" className="text-sm text-app-muted hover:text-app">
           All games
         </Link>
       </div>
@@ -275,7 +275,7 @@ export function BranchEditorScreen() {
         </p>
       )}
 
-      <p className="text-xs text-white/35 leading-relaxed">
+      <p className="text-xs text-app-faint leading-relaxed">
         Personal sandbox — edits stay in your session unless exported. Engine recommendations
         recompute automatically and are cached locally, never written to the database.
       </p>
@@ -287,7 +287,7 @@ export function BranchEditorScreen() {
       )}
 
       {playNote && (
-        <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50">
+        <p className="rounded-lg border border-app app-surface-muted px-3 py-2 text-xs text-app-muted">
           {playNote}
         </p>
       )}
@@ -375,21 +375,21 @@ export function BranchEditorScreen() {
         <button
           type="button"
           onClick={() => void handleReset()}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
+          className="app-btn-ghost min-h-11"
         >
           Reset to fork
         </button>
         <button
           type="button"
           onClick={() => downloadBranchJson(branch)}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
+          className="app-btn-ghost min-h-11"
         >
           Export JSON
         </button>
         <button
           type="button"
           onClick={() => void copyBranchToClipboard(branch)}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
+          className="app-btn-ghost min-h-11"
         >
           Copy JSON
         </button>
@@ -408,12 +408,12 @@ function ScoreStepper({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/4 px-4 py-3">
-      <span className="text-xs font-mono text-white/40">{label}</span>
+    <div className="flex items-center justify-between rounded-xl border border-app app-surface-subtle px-4 py-3">
+      <span className="text-xs font-mono text-app-muted">{label}</span>
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="h-7 w-7 rounded border border-white/15 text-white/60 hover:bg-white/10"
+          className="h-11 w-11 rounded border border-app-strong text-app-secondary app-btn-icon"
           onClick={() => onChange(Math.max(0, value - 1))}
         >
           −
@@ -421,7 +421,7 @@ function ScoreStepper({
         <span className="w-6 text-center font-mono text-lg tabular-nums">{value}</span>
         <button
           type="button"
-          className="h-7 w-7 rounded border border-white/15 text-white/60 hover:bg-white/10"
+          className="h-11 w-11 rounded border border-app-strong text-app-secondary app-btn-icon"
           onClick={() => onChange(value + 1)}
         >
           +

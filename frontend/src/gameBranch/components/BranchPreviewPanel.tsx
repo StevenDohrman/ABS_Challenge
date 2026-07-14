@@ -20,21 +20,21 @@ export function BranchPreviewPanel({ grid, computedAt }: Props) {
   return (
     <div className="space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-white/80">Current situation — challenge value</h3>
+        <h3 className="text-sm font-semibold text-app">Current situation — challenge value</h3>
         {computedAt && (
-          <span className="text-[10px] font-mono text-white/30">
+          <span className="text-[10px] font-mono text-app-faint">
             {new Date(computedAt).toLocaleTimeString()}
           </span>
         )}
       </div>
-      <p className="text-xs text-white/45 leading-relaxed">
+      <p className="text-xs text-app-muted leading-relaxed">
         Expected run (RE) values for the edited count, base state, and lineup — recomputed from
         your branch, not saved to the database.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {rec && grid.bestCount && (
           <>
-            <span className="text-xs font-mono text-white/40">{grid.bestCount}</span>
+            <span className="text-xs font-mono text-app-muted">{grid.bestCount}</span>
             <RecommendationBadge recommendation={rec} size="sm" />
             {grid.bestExpectedValue != null && (
               <ExpectedValuePill value={grid.bestExpectedValue} size="sm" />
@@ -42,7 +42,7 @@ export function BranchPreviewPanel({ grid, computedAt }: Props) {
           </>
         )}
       </div>
-      <p className="text-xs text-white/40">{grid.summaryMessage}</p>
+      <p className="text-xs text-app-muted">{grid.summaryMessage}</p>
       <CountGrid recommendations={grid.recommendations} />
     </div>
   );

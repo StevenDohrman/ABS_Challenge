@@ -11,23 +11,27 @@ const CONFIG: Record<
 > = {
   AUTO_ALLOW: {
     label: "AUTO ALLOW",
-    classes: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40",
-    dot: "bg-emerald-400",
+    classes:
+      "bg-emerald-500/15 text-emerald-800 border border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40",
+    dot: "bg-emerald-600 dark:bg-emerald-400",
   },
   ALLOW: {
     label: "ALLOW",
-    classes: "bg-green-500/20 text-green-300 border border-green-500/40",
-    dot: "bg-green-400",
+    classes:
+      "bg-green-500/15 text-green-800 border border-green-500/40 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40",
+    dot: "bg-green-600 dark:bg-green-400",
   },
   WARN: {
     label: "CAUTION",
-    classes: "bg-amber-500/20 text-amber-300 border border-amber-500/40",
-    dot: "bg-amber-400",
+    classes:
+      "bg-amber-500/15 text-amber-800 border border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40",
+    dot: "bg-amber-600 dark:bg-amber-400",
   },
   DENY: {
     label: "DENY",
-    classes: "bg-red-500/20 text-red-300 border border-red-500/40",
-    dot: "bg-red-400",
+    classes:
+      "bg-red-500/15 text-red-800 border border-red-500/40 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40",
+    dot: "bg-red-600 dark:bg-red-400",
   },
 };
 

@@ -27,15 +27,15 @@ export function RankingsScreen() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Rankings</h1>
-        <p className="text-sm text-white/50 mt-1 leading-relaxed">
+        <h1 className="text-xl sm:text-2xl font-bold">Rankings</h1>
+        <p className="text-sm text-app-muted mt-1 leading-relaxed">
           Data loads once per period from precomputed totals; switching players/teams or sort is instant.
           Last 7 days matches the DB retention window; season totals accumulate
           from program start.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <SegmentedControl
           value={view}
           options={[
@@ -54,7 +54,7 @@ export function RankingsScreen() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <SegmentedControl
           value={sort}
           options={[
@@ -75,7 +75,7 @@ export function RankingsScreen() {
       </div>
 
       {meta && (
-        <p className="text-xs text-white/40 font-mono">
+        <p className="text-xs text-app-muted font-mono">
           {meta.periodLabel}
           {meta.gameCount > 0 && ` · ${meta.gameCount} tracked games`}
           {` · ${orderLabel(sort, order)}`}
@@ -85,24 +85,42 @@ export function RankingsScreen() {
       {loading && <LoadingText>Loading rankings…</LoadingText>}
 
       {error && !loading && (
-        <p className="text-sm text-red-400">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
 
       {!loading && !error && displayedRows.length === 0 && (
-        <p className="text-sm text-white/40">
+        <p className="text-sm text-app-muted">
           No tracked games in this window yet.
         </p>
       )}
 
       {!loading && !error && displayedRows.length > 0 && view === "players" && (
-        <PlayerTable rows={sortedPlayerRows} activeSort={sort} />
+        <>
+          <div className="sm:hidden space-y-2">
+            {sortedPlayerRows.map((row) => (
+              <PlayerCard key={row.playerId} row={row} activeSort={sort} />
+            ))}
+          </div>
+          <div className="hidden sm:block">
+            <PlayerTable rows={sortedPlayerRows} activeSort={sort} />
+          </div>
+        </>
       )}
 
       {!loading && !error && displayedRows.length > 0 && view === "teams" && (
-        <TeamTable rows={sortedTeamRows} activeSort={sort} />
+        <>
+          <div className="sm:hidden space-y-2">
+            {sortedTeamRows.map((row) => (
+              <TeamCard key={row.teamId} row={row} activeSort={sort} />
+            ))}
+          </div>
+          <div className="hidden sm:block">
+            <TeamTable rows={sortedTeamRows} activeSort={sort} />
+          </div>
+        </>
       )}
 
-      <p className="text-[11px] text-white/30 leading-relaxed">
+      <p className="text-[11px] text-app-faint leading-relaxed">
         Missed RE = postgame audit run expectancy left on the table (batting side).
         Gained RE = run expectancy captured on successful overturns (batting or
         fielding side). Challenge success % = overturned challenges ÷ challenges
@@ -112,8 +130,56 @@ export function RankingsScreen() {
   );
 }
 
+function StatRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-app-muted">{label}</span>
+      <span className={`font-mono tabular-nums ${highlight ? "text-emerald-700 dark:text-emerald-300 font-medium" : "text-app"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function PlayerCard({ row, activeSort }: { row: PlayerRankingRow; activeSort: RankingsLeaderboardSort }) {
+  return (
+    <div className="rounded-xl border border-app app-surface-subtle px-4 py-3 space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-mono text-app-faint">#{row.rank}</span>
+        <p className="font-medium text-app truncate flex-1">{row.playerName || `Player ${row.playerId}`}</p>
+      </div>
+      <StatRow label="Missed RE" value={formatRe(row.totalMissedValue)} highlight={activeSort === "missedRe"} />
+      <StatRow label="Bat gained RE" value={formatRe(row.battingGainedRe)} highlight={activeSort === "gainedRe"} />
+      <StatRow label="Fld gained RE" value={formatRe(row.fieldingGainedRe)} />
+      <StatRow label="Misses" value={String(row.missedOpportunities)} />
+      <StatRow label="Challenges" value={String(row.challengesUsed)} />
+      <StatRow label="Success %" value={formatRate(row.overturnRate)} highlight={activeSort === "challengeSuccess"} />
+    </div>
+  );
+}
+
+function TeamCard({ row, activeSort }: { row: TeamRankingRow; activeSort: RankingsLeaderboardSort }) {
+  return (
+    <div className="rounded-xl border border-app app-surface-subtle px-4 py-3 space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-mono text-app-faint">#{row.rank}</span>
+        <Link to="/" className="font-medium text-app hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors">
+          {row.teamAbbrev}
+        </Link>
+      </div>
+      <p className="text-xs text-app-faint truncate">{row.teamName}</p>
+      <StatRow label="Batting missed RE" value={formatRe(row.battingMissedValue)} highlight={activeSort === "missedRe"} />
+      <StatRow label="Bat gained RE" value={formatRe(row.battingGainedRe)} highlight={activeSort === "gainedRe"} />
+      <StatRow label="Fld gained RE" value={formatRe(row.fieldingGainedRe)} />
+      <StatRow label="Misses" value={String(row.battingMissedCount)} />
+      <StatRow label="Challenges" value={String(row.challengesUsed)} />
+      <StatRow label="Success %" value={formatRate(row.overturnRate)} highlight={activeSort === "challengeSuccess"} />
+    </div>
+  );
+}
+
 function thClass(active: boolean): string {
-  return `px-3 py-2 font-medium text-right${active ? " text-emerald-300/90" : ""}${
+  return `px-3 py-2 font-medium text-right${active ? " text-emerald-700 dark:text-emerald-300/90" : ""}${
     active ? "" : " hidden sm:table-cell"
   }`;
 }
@@ -126,10 +192,10 @@ function PlayerTable({
   activeSort: RankingsLeaderboardSort;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
+    <div className="rounded-xl border border-app overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10 text-left text-xs text-white/40 uppercase tracking-wider">
+          <tr className="border-b border-app text-left text-xs text-app-muted uppercase tracking-wider">
             <th className="px-3 py-2 font-medium">#</th>
             <th className="px-3 py-2 font-medium">Player</th>
             <th className={thClass(activeSort === "missedRe")}>Missed RE</th>
@@ -137,37 +203,37 @@ function PlayerTable({
             <th className={thClass(activeSort === "gainedRe")}>Fld gained RE</th>
             <th className="px-3 py-2 font-medium text-right">Misses</th>
             <th className="px-3 py-2 font-medium text-right hidden sm:table-cell">Challenges</th>
-            <th className={activeSort === "challengeSuccess" ? "px-3 py-2 font-medium text-right text-emerald-300/90" : "px-3 py-2 font-medium text-right"}>
+            <th className={activeSort === "challengeSuccess" ? "px-3 py-2 font-medium text-right text-emerald-700 dark:text-emerald-300/90" : "px-3 py-2 font-medium text-right"}>
               Success %
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.playerId} className="border-b border-white/5 hover:bg-white/3">
-              <td className="px-3 py-2.5 text-white/40 font-mono text-xs">{row.rank}</td>
+            <tr key={row.playerId} className="border-b border-app-subtle app-hover-row">
+              <td className="px-3 py-2.5 text-app-muted font-mono text-xs">{row.rank}</td>
               <td className="px-3 py-2.5 font-medium">
                 {row.playerName || `Player ${row.playerId}`}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "missedRe" ? "text-amber-300" : "text-amber-300/90 hidden sm:table-cell"
+                activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
               }`}>
                 {formatRe(row.totalMissedValue)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "gainedRe" ? "text-emerald-300" : "text-emerald-300/80 hidden sm:table-cell"
+                activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"
               }`}>
                 {formatRe(row.battingGainedRe)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "gainedRe" ? "text-emerald-300" : "text-emerald-300/80 hidden sm:table-cell"
+                activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"
               }`}>
                 {formatRe(row.fieldingGainedRe)}
               </td>
               <td className="px-3 py-2.5 text-right">{row.missedOpportunities}</td>
               <td className="px-3 py-2.5 text-right hidden sm:table-cell">{row.challengesUsed}</td>
               <td className={`px-3 py-2.5 text-right ${
-                activeSort === "challengeSuccess" ? "text-white/90 font-medium" : "text-white/60"
+                activeSort === "challengeSuccess" ? "text-app font-medium" : "text-app-secondary"
               }`}>
                 {formatRate(row.overturnRate)}
               </td>
@@ -187,10 +253,10 @@ function TeamTable({
   activeSort: RankingsLeaderboardSort;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
+    <div className="rounded-xl border border-app overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10 text-left text-xs text-white/40 uppercase tracking-wider">
+          <tr className="border-b border-app text-left text-xs text-app-muted uppercase tracking-wider">
             <th className="px-3 py-2 font-medium">#</th>
             <th className="px-3 py-2 font-medium">Team</th>
             <th className={thClass(activeSort === "missedRe")}>Batting missed RE</th>
@@ -198,40 +264,40 @@ function TeamTable({
             <th className={thClass(activeSort === "gainedRe")}>Fld gained RE</th>
             <th className="px-3 py-2 font-medium text-right">Misses</th>
             <th className="px-3 py-2 font-medium text-right hidden sm:table-cell">Challenges</th>
-            <th className={activeSort === "challengeSuccess" ? "px-3 py-2 font-medium text-right text-emerald-300/90" : "px-3 py-2 font-medium text-right"}>
+            <th className={activeSort === "challengeSuccess" ? "px-3 py-2 font-medium text-right text-emerald-700 dark:text-emerald-300/90" : "px-3 py-2 font-medium text-right"}>
               Success %
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.teamId} className="border-b border-white/5 hover:bg-white/3">
-              <td className="px-3 py-2.5 text-white/40 font-mono text-xs">{row.rank}</td>
+            <tr key={row.teamId} className="border-b border-app-subtle app-hover-row">
+              <td className="px-3 py-2.5 text-app-muted font-mono text-xs">{row.rank}</td>
               <td className="px-3 py-2.5 font-medium">
-                <Link to="/" className="hover:text-emerald-300 transition-colors">
+                <Link to="/" className="hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors">
                   {row.teamAbbrev}
                 </Link>
-                <span className="text-white/30 text-xs ml-2 hidden sm:inline">{row.teamName}</span>
+                <span className="text-app-faint text-xs ml-2 hidden sm:inline">{row.teamName}</span>
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "missedRe" ? "text-amber-300" : "text-amber-300/90 hidden sm:table-cell"
+                activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
               }`}>
                 {formatRe(row.battingMissedValue)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "gainedRe" ? "text-emerald-300" : "text-emerald-300/80 hidden sm:table-cell"
+                activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"
               }`}>
                 {formatRe(row.battingGainedRe)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
-                activeSort === "gainedRe" ? "text-emerald-300" : "text-emerald-300/80 hidden sm:table-cell"
+                activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"
               }`}>
                 {formatRe(row.fieldingGainedRe)}
               </td>
               <td className="px-3 py-2.5 text-right">{row.battingMissedCount}</td>
               <td className="px-3 py-2.5 text-right hidden sm:table-cell">{row.challengesUsed}</td>
               <td className={`px-3 py-2.5 text-right ${
-                activeSort === "challengeSuccess" ? "text-white/90 font-medium" : "text-white/60"
+                activeSort === "challengeSuccess" ? "text-app font-medium" : "text-app-secondary"
               }`}>
                 {formatRate(row.overturnRate)}
               </td>

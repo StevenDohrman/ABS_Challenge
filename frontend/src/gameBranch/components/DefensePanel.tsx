@@ -53,9 +53,9 @@ export function DefensePanel({ doc, side, onAssign }: Props) {
   const poolIds = new Set(options.filter((o) => !o.disabled).map((o) => o.playerId));
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/4 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-white/80">{abbrev} defense</h3>
-      <p className="text-[10px] text-white/30 leading-relaxed">
+    <div className="rounded-2xl border border-app app-surface-subtle p-4 space-y-3">
+      <h3 className="text-sm font-semibold text-app">{abbrev} defense</h3>
+      <p className="text-[10px] text-app-faint leading-relaxed">
         Tap a position, then pick a bench replacement (also takes over their lineup spot). Use P
         for bullpen pitchers{blowout ? " — position players can pitch in a blowout" : ""}.
       </p>
@@ -83,11 +83,11 @@ export function DefensePanel({ doc, side, onAssign }: Props) {
               className={`rounded-lg px-2 py-2 text-left transition-colors ${
                 isSelected
                   ? "border border-emerald-500/50 bg-emerald-500/15 ring-1 ring-emerald-500/20"
-                  : "border border-white/10 bg-black/20 hover:border-white/20 hover:bg-black/30"
+                  : "border border-app bg-slate-100 hover:border-slate-300 hover:bg-slate-200 dark:bg-black/20 dark:hover:border-white/20 dark:hover:bg-black/30"
               } ${!id ? "opacity-40" : ""}`}
             >
-              <span className="text-[10px] font-mono text-white/35">{label}</span>
-              <p className="text-xs truncate text-white/75">
+              <span className="text-[10px] font-mono text-app-faint">{label}</span>
+              <p className="text-xs truncate text-app-secondary">
                 {id ? playerLabel(doc.playerNames, id) : "—"}
               </p>
             </button>
@@ -97,7 +97,7 @@ export function DefensePanel({ doc, side, onAssign }: Props) {
 
       {selection && selectedSlot !== "pitcher" && team.bench.length > 0 && (
         <div>
-          <p className="text-[10px] font-mono uppercase text-white/35 mb-1">Bench</p>
+          <p className="text-[10px] font-mono uppercase text-app-faint mb-1">Bench</p>
           <div className="flex flex-wrap gap-1.5">
             {team.bench.map((id) => {
               const opt = options.find((o) => o.playerId === id);
@@ -125,7 +125,7 @@ export function DefensePanel({ doc, side, onAssign }: Props) {
 
       {selection && selectedSlot === "pitcher" && team.bullpen.length > 0 && (
         <div>
-          <p className="text-[10px] font-mono uppercase text-white/35 mb-1">Bullpen</p>
+          <p className="text-[10px] font-mono uppercase text-app-faint mb-1">Bullpen</p>
             <div className="flex flex-wrap gap-1.5">
               {team.bullpen.map((id) => {
                 const opt = options.find((o) => o.playerId === id);
@@ -154,7 +154,7 @@ export function DefensePanel({ doc, side, onAssign }: Props) {
 
       {selection && blowout && selectedSlot === "pitcher" && team.bench.length > 0 && (
         <div>
-          <p className="text-[10px] font-mono uppercase text-white/35 mb-1">
+          <p className="text-[10px] font-mono uppercase text-app-faint mb-1">
             Bench (position players — blowout pitching)
           </p>
           <div className="flex flex-wrap gap-1.5">

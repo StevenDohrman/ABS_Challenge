@@ -36,12 +36,12 @@ export function BranchesScreen() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Your branches</h1>
-        <p className="mt-1 text-sm text-white/45 leading-relaxed">
+        <p className="mt-1 text-sm text-app-muted leading-relaxed">
           Personal game sandboxes saved in this browser only — not synced across devices.
           Up to {MAX_LOCAL_BRANCHES} branches are kept; oldest are removed automatically.
         </p>
         {count > 0 && (
-          <p className="mt-2 text-xs font-mono text-white/30">
+          <p className="mt-2 text-xs font-mono text-app-faint">
             {count} of {MAX_LOCAL_BRANCHES} slots used
           </p>
         )}
@@ -57,7 +57,7 @@ export function BranchesScreen() {
         >
           <Link
             to="/"
-            className="inline-block mt-4 text-sm text-violet-300/90 hover:text-violet-200"
+            className="inline-block mt-4 text-sm font-medium text-violet-700 hover:text-violet-900 dark:text-violet-300/90 dark:hover:text-violet-200"
           >
             Browse games →
           </Link>
@@ -72,7 +72,7 @@ export function BranchesScreen() {
         </ul>
       )}
 
-      <p className="text-[11px] text-white/25 leading-relaxed">
+      <p className="text-[11px] text-app-dim leading-relaxed">
         Branches also sync to the server while your session is active. After a server restart,
         open a branch here to restore it from local storage.
       </p>

@@ -30,20 +30,20 @@ function ChallengeBar({
   const total = CHALLENGES_PER_TEAM;
   return (
     <div className="flex flex-col items-center gap-1.5" title={label}>
-      <span className="text-[10px] font-mono text-white/35">{abbrev}</span>
+      <span className="text-[10px] font-mono text-app-faint">{abbrev}</span>
       <div className="flex items-center gap-1">
         {Array.from({ length: total }).map((_, i) => (
           <span
             key={i}
             className={`w-3 h-3 rounded-sm ${
               i < remaining
-                ? "bg-emerald-500/70 border border-emerald-400/50"
-                : "bg-white/10 border border-white/10"
+                ? "bg-emerald-500/70 border border-emerald-600/50 dark:border-emerald-400/50"
+                : "app-surface-muted border border-app"
             }`}
           />
         ))}
       </div>
-      <span className={`text-[10px] font-mono ${remaining === 0 ? "text-red-400" : "text-white/40"}`}>
+      <span className={`text-[10px] font-mono ${remaining === 0 ? "text-red-600 dark:text-red-400" : "text-app-muted"}`}>
         {remaining}/{total}
       </span>
     </div>
@@ -52,7 +52,7 @@ function ChallengeBar({
 
 function ScorePill({ abbrev, score, isWinner }: { abbrev: string; score: number | null; isWinner: boolean }) {
   return (
-    <div className={`text-center ${isWinner ? "text-white" : "text-white/45"}`}>
+    <div className={`text-center ${isWinner ? "text-app" : "text-app-secondary"}`}>
       <p className="text-xs font-mono">{abbrev}</p>
       <p className="text-2xl font-bold font-mono tabular-nums">{score ?? "-"}</p>
     </div>
@@ -72,7 +72,7 @@ export function GameDetailScreen() {
       <div className="space-y-4">
         <Link
           to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
-          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
+          className="flex items-center gap-2 text-sm app-link min-h-11"
         >
           All games
         </Link>
@@ -133,7 +133,7 @@ function GameDetailContent({
       <div className="flex items-center justify-between">
         <Link
           to={scheduleDate ? `/?date=${scheduleDate}` : "/"}
-          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/80 transition-colors"
+          className="flex items-center gap-2 text-sm app-link min-h-11"
         >
           All games
         </Link>
@@ -141,60 +141,60 @@ function GameDetailContent({
       </div>
 
       {/* Game header */}
-      <div className="rounded-2xl border border-white/10 bg-white/4 px-5 py-4">
+      <div className="rounded-2xl border border-app app-surface-subtle px-4 sm:px-5 py-4">
         <div className="flex items-center justify-between mb-4">
           <span className={`text-xs font-mono font-semibold uppercase tracking-wider ${
-            isLive ? "text-red-400" : isFinal ? "text-slate-400" : "text-amber-400"
+            isLive ? "text-red-600 dark:text-red-400" : isFinal ? "text-slate-600 dark:text-slate-400" : "text-amber-700 dark:text-amber-400"
           }`}>
             {game.detailedState}
           </span>
           <div className="flex items-center gap-2">
             {isLive && <PulsingDot />}
             {liveUpdatedStr && isLive && (
-              <span className="text-[11px] text-white/25 font-mono">{liveUpdatedStr}</span>
+              <span className="text-[11px] text-app-dim font-mono">{liveUpdatedStr}</span>
             )}
           </div>
         </div>
 
         {/* Score board */}
-        <div className="flex items-center justify-center gap-6">
-          <div className="text-right">
-            <p className="text-xs text-white/40 mb-1">{game.awayTeamName}</p>
+        <div className="flex items-center justify-center gap-4 sm:gap-6">
+          <div className="text-right min-w-0 flex-1">
+            <p className="text-xs text-app-muted mb-1 truncate">{game.awayTeamName}</p>
             <ScorePill abbrev={awayAbbrev} score={game.awayScore} isWinner={awayWins} />
           </div>
 
           <div className="text-center px-2">
             {isLive && game.currentInning ? (
               <div className="space-y-1">
-                <p className="text-lg font-mono text-white/60">
+                <p className="text-base sm:text-lg font-mono text-app-secondary">
                   {formatInningShort(game.currentInningHalf, game.currentInning)}
                 </p>
                 {game.balls !== null && game.strikes !== null && (
-                  <p className="text-xs font-mono text-white/40">
+                  <p className="text-xs font-mono text-app-muted">
                     {game.balls}-{game.strikes} · {game.outs} out{game.outs !== 1 ? "s" : ""}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-white/20 font-mono text-lg">@</p>
+              <p className="text-app-dim font-mono text-base sm:text-lg">@</p>
             )}
           </div>
 
-          <div className="text-left">
-            <p className="text-xs text-white/40 mb-1">{game.homeTeamName}</p>
+          <div className="text-left min-w-0 flex-1">
+            <p className="text-xs text-app-muted mb-1 truncate">{game.homeTeamName}</p>
             <ScorePill abbrev={homeAbbrev} score={game.homeScore} isWinner={homeWins} />
           </div>
         </div>
 
         {/* Challenge counts */}
         {game.isTracked && (game.homeChallengesRemaining !== null || game.awayChallengesRemaining !== null) && (
-          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-center gap-6">
+          <div className="mt-4 pt-3 border-t border-app flex items-center justify-center gap-4 sm:gap-6">
             <ChallengeBar
               abbrev={awayAbbrev}
               remaining={game.awayChallengesRemaining}
               label="Away challenges"
             />
-            <div className="h-6 w-px bg-white/10" />
+            <div className="h-6 w-px app-divider" />
             <ChallengeBar
               abbrev={homeAbbrev}
               remaining={game.homeChallengesRemaining}
@@ -205,12 +205,12 @@ function GameDetailContent({
 
         {/* Tracking badge */}
         {!game.isTracked && isFinal && (
-          <p className="text-center text-xs text-amber-400/70 font-mono mt-4">
+          <p className="text-center text-xs text-amber-700/80 dark:text-amber-400/70 font-mono mt-4">
             Backfill pending — postgame analysis will appear once the pipeline ingests this game.
           </p>
         )}
         {!game.isTracked && !isFinal && (
-          <p className="text-center text-xs text-white/30 font-mono mt-4">
+          <p className="text-center text-xs text-app-faint font-mono mt-4">
             This game is not yet tracked by the recommendation pipeline.
           </p>
         )}
@@ -226,23 +226,23 @@ function GameDetailContent({
               onToggleGrid={() => setShowGrid((v) => !v)}
             />
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/3 px-5 py-6 flex items-center gap-4">
+            <div className="rounded-2xl border border-app app-surface-subtle px-4 sm:px-5 py-6 flex items-center gap-4">
               <PulsingDot />
-              <p className="text-sm text-white/40">Waiting for at-bat data…</p>
+              <p className="text-sm text-app-muted">Waiting for at-bat data…</p>
             </div>
           )}
 
           {livePitch ? (
             <section className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-xs text-white/40 font-mono uppercase tracking-widest">Called Strike</p>
+                <p className="text-xs text-app-muted font-mono uppercase tracking-widest">Called Strike</p>
                 <PulsingDot />
               </div>
               <LivePitchCard data={livePitch} />
             </section>
           ) : preBat ? (
-            <div className="rounded-xl border border-white/10 bg-white/3 px-5 py-4">
-              <p className="text-sm text-white/50">No called strike yet this at-bat.</p>
+            <div className="rounded-xl border border-app app-surface-subtle px-4 sm:px-5 py-4">
+              <p className="text-sm text-app-secondary">No called strike yet this at-bat.</p>
             </div>
           ) : null}
 
@@ -253,7 +253,7 @@ function GameDetailContent({
           {history && history.atBats.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <p className="text-xs text-white/40 font-mono uppercase tracking-widest">At-bat history</p>
+                <p className="text-xs text-app-muted font-mono uppercase tracking-widest">At-bat history</p>
                 <StatusDot status="live" label="updating" />
               </div>
               <AtBatHistory atBats={history.atBats} />
@@ -282,7 +282,7 @@ function GameDetailContent({
           />
 
           <section className="space-y-3">
-            <p className="text-xs text-white/40 font-mono uppercase tracking-widest">At-bat review</p>
+            <p className="text-xs text-app-muted font-mono uppercase tracking-widest">At-bat review</p>
 
           {historyLoading && !history && <HistoryRowSkeleton />}
 

@@ -38,7 +38,7 @@ export function BranchGameButton({ gamePk, scheduleDate }: Props) {
 
   if (loading) {
     return (
-      <span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/30">
+      <span className="rounded-lg border border-app px-3 py-2.5 text-xs text-app-faint min-h-11 inline-flex items-center">
         Branch…
       </span>
     );
@@ -52,12 +52,12 @@ export function BranchGameButton({ gamePk, scheduleDate }: Props) {
           title={eligibility.reason}
           disabled={creating}
           onClick={() => void handleBranch()}
-          className="rounded-lg border border-violet-500/35 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-500/20 transition-colors disabled:opacity-50"
+          className="rounded-lg border border-violet-500/35 bg-violet-500/10 px-3 py-2.5 min-h-11 text-xs font-medium text-violet-800 dark:text-violet-200 hover:bg-violet-500/20 transition-colors disabled:opacity-50"
         >
           {creating ? "Branching…" : "Branch game"}
         </button>
         {createError && (
-          <span className="max-w-[12rem] text-right text-[10px] text-red-300/90">
+          <span className="max-w-[12rem] text-right text-[10px] text-red-700 dark:text-red-300/90">
             {createError}
           </span>
         )}
@@ -72,7 +72,7 @@ export function BranchGameButton({ gamePk, scheduleDate }: Props) {
   return (
     <span
       title={reason}
-      className="cursor-not-allowed rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/30"
+      className="cursor-not-allowed rounded-lg border border-app app-surface-muted px-3 py-2.5 min-h-11 inline-flex items-center text-xs text-app-faint"
     >
       Branch game
     </span>

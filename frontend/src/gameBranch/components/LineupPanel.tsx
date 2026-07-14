@@ -39,9 +39,9 @@ export function LineupPanel({ doc, side, onSwap }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/4 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-white/80">{abbrev} lineup</h3>
-      <p className="text-[10px] text-white/30 leading-relaxed">
+    <div className="rounded-2xl border border-app app-surface-subtle p-4 space-y-3">
+      <h3 className="text-sm font-semibold text-app">{abbrev} lineup</h3>
+      <p className="text-[10px] text-app-faint leading-relaxed">
         Tap who is leaving the lineup, then pick a bench player to pinch-hit (offense only).
       </p>
 
@@ -67,10 +67,10 @@ export function LineupPanel({ doc, side, onSwap }: Props) {
                 className={`flex w-full items-center rounded-lg px-3 py-1.5 text-sm transition-colors ${
                   isSelected
                     ? "border border-violet-500/50 bg-violet-500/20 ring-1 ring-violet-500/20"
-                    : "border border-transparent bg-black/20 hover:border-white/15 hover:bg-black/30"
+                    : "border border-transparent bg-black/20 hover:border-app-strong hover:bg-black/30"
                 }`}
               >
-                <span className="font-mono text-white/35 w-5">{i + 1}</span>
+                <span className="font-mono text-app-faint w-5">{i + 1}</span>
                 <span className="flex-1 truncate text-left">
                   {playerLabel(doc.playerNames, id)}
                   {isUp && <span className="ml-1 text-[10px] text-emerald-400">↑ batting</span>}
@@ -80,7 +80,7 @@ export function LineupPanel({ doc, side, onSwap }: Props) {
           );
         })}
         {team.battingOrder.length === 0 && (
-          <li className="text-xs text-white/35">No lineup slots yet</li>
+          <li className="text-xs text-app-faint">No lineup slots yet</li>
         )}
       </ol>
 
@@ -91,7 +91,7 @@ export function LineupPanel({ doc, side, onSwap }: Props) {
         </p>
       ) : (
         <div>
-          <p className="text-[10px] font-mono uppercase text-white/35 mb-1">Bench</p>
+          <p className="text-[10px] font-mono uppercase text-app-faint mb-1">Bench</p>
           <div className="flex flex-wrap gap-1.5">
             {team.bench.map((id) => {
               const opt = options.find((o) => o.playerId === id);
