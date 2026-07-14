@@ -1,7 +1,6 @@
 import { prisma } from "./prisma";
-import { DB_LIMITS } from "./constants";
-import { mapSettledWithConcurrency } from "../utils/concurrency";
-import { recordPlayerName } from "./playerNameRepository";
+import { recordPlayerName, recordPlayerNames } from "./playerNameRepository";
+import { bulkUpsert } from "./bulkUpsert";
 import type { SavantBatterStatline } from "@abs/data-pipeline";
 import type { PlayerStatSnapshot } from "@prisma/client";
 import { deriveObpOpsFromSavant } from "../utils/savantStats";
@@ -71,29 +70,101 @@ export async function upsertBatterStatline(
   });
 }
 
+const STATLINE_COLUMNS = [
+  "playerId",
+  "season",
+  "playerName",
+  "pa",
+  "ba",
+  "obp",
+  "slg",
+  "ops",
+  "woba",
+  "kPercent",
+  "bbPercent",
+  "xba",
+  "xslg",
+  "xwoba",
+  "hardHitPercent",
+  "barrelPercent",
+  "chasePercent",
+  "whiffPercent",
+  "zonePercent",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+// Columns intentionally excluded from the bulk update set — owned by other
+// write paths and must survive a daily Savant refresh untouched:
+//   battingHand                     — patched from the MLB live feed
+//   historicalChallengeAttempts     — incremented by rankings/audit logic
+//   historicalChallengeSuccessRate  — derived from postgame audits
+const STATLINE_UPDATE_COLUMNS = STATLINE_COLUMNS.filter(
+  (c) => c !== "playerId" && c !== "season"
+);
+
 /**
- * Bulk upsert an entire batch of batter statlines.
+ * Bulk upsert an entire batch of batter statlines in one (or a few chunked)
+ * `INSERT ... ON CONFLICT DO UPDATE` statements — one dbGate slot per
+ * statement instead of up to WRITE_CONCURRENCY slots held simultaneously.
  *
- * Upserts run with bounded concurrency (DB_LIMITS.WRITE_CONCURRENCY) so the
- * batch — typically a few hundred rows — cannot exhaust the connection pool.
- * Failures are logged individually so one bad row does not abort the batch.
+ * Player names are recorded in a second pass after the stat snapshot bulk
+ * write so a failure there never blocks the primary stat data from landing.
  */
 export async function upsertBatterStatlines(
   statlines: SavantBatterStatline[]
 ): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    statlines,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (s) => upsertBatterStatline(s)
-  );
+  if (statlines.length === 0) return;
 
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
+  try {
+    await bulkUpsert(statlines, {
+      table: "player_stat_snapshots",
+      columns: [...STATLINE_COLUMNS],
+      conflictColumns: ["playerId", "season"],
+      updateColumns: [...STATLINE_UPDATE_COLUMNS],
+      toRow: (s) => {
+        const { obp, ops } = deriveObpOpsFromSavant(
+          s.ba,
+          s.slg,
+          s.woba,
+          s.bbPercent
+        );
+        return [
+          s.playerId,
+          s.season,
+          s.playerName,
+          s.pa,
+          s.ba,
+          obp,
+          s.slg,
+          ops,
+          s.woba,
+          s.kPercent,
+          s.bbPercent,
+          s.xba,
+          s.xslg,
+          s.xwoba,
+          s.hardHitPercent,
+          s.barrelPercent,
+          s.chasePercent,
+          s.whiffPercent,
+          s.zonePercent,
+          new Date(s.fetchedAt),
+          new Date(),
+        ];
+      },
+    });
+  } catch (err) {
     console.error(
-      `[playerRepository] ${failures.length} of ${statlines.length} batter statline upserts failed`,
-      failures.map((f) => (f as PromiseRejectedResult).reason)
+      `[playerRepository] bulk upsert failed for ${statlines.length} batter statlines:`,
+      err
     );
+    return;
   }
+
+  await recordPlayerNames(
+    statlines.map((s) => ({ playerId: s.playerId, fullName: s.playerName }))
+  );
 }
 
 /**

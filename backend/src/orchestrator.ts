@@ -29,6 +29,14 @@
  */
 
 import { LivePollJob, SavantDailyJob } from "@abs/data-pipeline";
+import type {
+  SavantBatterStatline,
+  SavantBatterSprayProfile,
+  SavantFielderOaa,
+  SavantSprintSpeed,
+  SavantPitcherPitchMix,
+  LeagueAveragesSnapshot,
+} from "@abs/data-pipeline";
 import {
   handleGameDiscovered,
   handleAtBatStart,
@@ -193,39 +201,64 @@ function startLivePollJob(): void {
 // Savant daily job
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function runSavantDailyJob(): Promise<void> {
+/**
+ * Run SavantDailyJob and persist its six datasets **serially**, one dbGate-
+ * heavy bulk write at a time, instead of firing all six ingest handlers
+ * concurrently (Phase 8A).
+ *
+ * SavantDailyJob.run() parses CSVs and emits each dataset synchronously as
+ * soon as it is ready; `EventEmitter.emit` does not await listeners, so the
+ * old fire-and-forget `job.on(...)` handlers all started their bulk upserts
+ * at roughly the same time — up to six concurrent handlers each fanning out
+ * WRITE_CONCURRENCY upserts. Listeners here only buffer the parsed payload
+ * in memory; job.run()'s returned promise still resolves only after every
+ * emit has fired, so every payload is guaranteed to be captured by the time
+ * we start writing.
+ */
+export async function runSavantDailyJob(): Promise<void> {
   const job = new SavantDailyJob();
 
-  job.on("batterStatlines", async (statlines) => {
-    await handleBatterStatlines(statlines);
-  });
+  let batterStatlines: SavantBatterStatline[] | undefined;
+  let sprayProfiles: SavantBatterSprayProfile[] | undefined;
+  let fielderOaa: SavantFielderOaa[] | undefined;
+  let sprintSpeed: SavantSprintSpeed[] | undefined;
+  let pitcherPitchMix: SavantPitcherPitchMix[] | undefined;
+  let leagueAverages: LeagueAveragesSnapshot | undefined;
 
-  job.on("sprayProfiles", async (profiles) => {
-    await handleSprayProfiles(profiles);
+  job.on("batterStatlines", (statlines) => {
+    batterStatlines = statlines;
   });
-
-  job.on("fielderOaa", async (oaaRows) => {
-    await handleFielderOaa(oaaRows);
+  job.on("sprayProfiles", (profiles) => {
+    sprayProfiles = profiles;
   });
-
-  job.on("sprintSpeed", async (speeds) => {
-    await handleSprintSpeed(speeds);
+  job.on("fielderOaa", (oaaRows) => {
+    fielderOaa = oaaRows;
   });
-
-  job.on("pitcherPitchMix", async (mix) => {
-    await handlePitcherPitchMix(mix);
+  job.on("sprintSpeed", (speeds) => {
+    sprintSpeed = speeds;
   });
-
-  job.on("leagueAverages", async (averages) => {
-    await handleLeagueAverages(averages);
+  job.on("pitcherPitchMix", (mix) => {
+    pitcherPitchMix = mix;
   });
-
+  job.on("leagueAverages", (averages) => {
+    leagueAverages = averages;
+  });
   job.on("error", (err) => {
     console.error("[orchestrator] SavantDailyJob error:", err);
   });
 
   console.log(`[orchestrator] running SavantDailyJob for season ${SEASONS.CURRENT}`);
   await job.run(SEASONS.CURRENT);
+
+  // Serialized on purpose — see function doc. Largest / most downstream
+  // datasets first so challenge inputs have fresh player stats soonest.
+  if (batterStatlines) await handleBatterStatlines(batterStatlines);
+  if (sprayProfiles) await handleSprayProfiles(sprayProfiles);
+  if (fielderOaa) await handleFielderOaa(fielderOaa);
+  if (sprintSpeed) await handleSprintSpeed(sprintSpeed);
+  if (pitcherPitchMix) await handlePitcherPitchMix(pitcherPitchMix);
+  if (leagueAverages) await handleLeagueAverages(leagueAverages);
+
   console.log("[orchestrator] SavantDailyJob complete");
 }
 

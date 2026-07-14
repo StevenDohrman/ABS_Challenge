@@ -168,6 +168,25 @@ export async function gameHasTriggeredRecommendation(
   return row !== null;
 }
 
+/**
+ * Returns the subset of `gamePks` that have at least one triggered
+ * recommendation, in a single query — replaces N per-game
+ * `gameHasTriggeredRecommendation` lookups (Phase 8C schedule read).
+ */
+export async function findGamePksWithTriggeredRecommendations(
+  gamePks: number[]
+): Promise<Set<number>> {
+  if (gamePks.length === 0) return new Set();
+
+  const rows = await prisma.challengeRecommendation.findMany({
+    where: { gamePk: { in: gamePks }, triggeredAt: { not: null } },
+    select: { gamePk: true },
+    distinct: ["gamePk"],
+  });
+
+  return new Set(rows.map((r) => r.gamePk));
+}
+
 /** Number of count-state rows expected after a full at-bat precompute. */
 export const FULL_PRECOMPUTE_COUNT = ALL_COUNT_STATES.length;
 

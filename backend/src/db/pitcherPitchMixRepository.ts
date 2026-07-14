@@ -3,9 +3,8 @@
  */
 
 import { prisma } from "./prisma";
-import { DB_LIMITS } from "./constants";
-import { mapSettledWithConcurrency } from "../utils/concurrency";
-import { recordPlayerName } from "./playerNameRepository";
+import { recordPlayerName, recordPlayerNames } from "./playerNameRepository";
+import { bulkUpsert } from "./bulkUpsert";
 import type { SavantPitcherPitchMix } from "@abs/data-pipeline";
 import type { PitcherPitchMix } from "@prisma/client";
 
@@ -47,20 +46,65 @@ export async function upsertPitcherPitchMix(
     });
 }
 
+const PITCH_MIX_COLUMNS = [
+  "pitcherId",
+  "season",
+  "pitchType",
+  "pitcherName",
+  "pitchTypeName",
+  "usageRate",
+  "ballRate",
+  "strikeRate",
+  "pitchCount",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const PITCH_MIX_UPDATE_COLUMNS = PITCH_MIX_COLUMNS.filter(
+  (c) => c !== "pitcherId" && c !== "season" && c !== "pitchType"
+);
+
+/**
+ * Bulk upsert an entire batch of pitch-mix rows in one (or a few chunked)
+ * `INSERT ... ON CONFLICT DO UPDATE` statements. This is the largest Savant
+ * table (~1000+ rows/day across all pitchers), so chunking matters most here.
+ */
 export async function upsertPitcherPitchMixBatch(
   rows: SavantPitcherPitchMix[]
 ): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    rows,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (row) => upsertPitcherPitchMix(row)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
+  if (rows.length === 0) return;
+
+  try {
+    await bulkUpsert(rows, {
+      table: "pitcher_pitch_mix",
+      columns: [...PITCH_MIX_COLUMNS],
+      conflictColumns: ["pitcherId", "season", "pitchType"],
+      updateColumns: [...PITCH_MIX_UPDATE_COLUMNS],
+      toRow: (row) => [
+        row.pitcherId,
+        row.season,
+        row.pitchType,
+        row.pitcherName,
+        row.pitchTypeName,
+        row.usageRate,
+        row.ballRate,
+        row.strikeRate,
+        row.pitchCount,
+        new Date(row.fetchedAt),
+        new Date(),
+      ],
+    });
+  } catch (err) {
     console.error(
-      `[pitcherPitchMixRepository] ${failures.length} of ${rows.length} pitch mix upserts failed`
+      `[pitcherPitchMixRepository] bulk upsert failed for ${rows.length} pitch mix rows:`,
+      err
     );
+    return;
   }
+
+  await recordPlayerNames(
+    rows.map((row) => ({ playerId: row.pitcherId, fullName: row.pitcherName }))
+  );
 }
 
 export async function findPitchMixForPitcher(

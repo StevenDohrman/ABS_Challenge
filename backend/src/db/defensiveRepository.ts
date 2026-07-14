@@ -6,9 +6,8 @@
  */
 
 import { prisma } from "./prisma";
-import { DB_LIMITS } from "./constants";
-import { mapSettledWithConcurrency } from "../utils/concurrency";
-import { recordPlayerName } from "./playerNameRepository";
+import { recordPlayerName, recordPlayerNames } from "./playerNameRepository";
+import { bulkUpsert } from "./bulkUpsert";
 import type {
   SavantBatterSprayProfile,
   SavantFielderOaa,
@@ -49,20 +48,67 @@ export async function upsertSprayProfile(
   });
 }
 
+const SPRAY_COLUMNS = [
+  "playerId",
+  "season",
+  "playerName",
+  "pa",
+  "pullPercent",
+  "straightawayPercent",
+  "oppoPercent",
+  "gbPercent",
+  "fbPercent",
+  "ldPercent",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const SPRAY_UPDATE_COLUMNS = SPRAY_COLUMNS.filter(
+  (c) => c !== "playerId" && c !== "season"
+);
+
+/**
+ * Bulk upsert an entire batch of spray profiles in one (or a few chunked)
+ * `INSERT ... ON CONFLICT DO UPDATE` statements instead of fanning out one
+ * upsert per player.
+ */
 export async function upsertSprayProfiles(
   profiles: SavantBatterSprayProfile[]
 ): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    profiles,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (p) => upsertSprayProfile(p)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
+  if (profiles.length === 0) return;
+
+  try {
+    await bulkUpsert(profiles, {
+      table: "player_spray_profiles",
+      columns: [...SPRAY_COLUMNS],
+      conflictColumns: ["playerId", "season"],
+      updateColumns: [...SPRAY_UPDATE_COLUMNS],
+      toRow: (p) => [
+        p.playerId,
+        p.season,
+        p.playerName,
+        p.pa,
+        p.pullPercent,
+        p.straightawayPercent,
+        p.oppoPercent,
+        p.gbPercent,
+        p.fbPercent,
+        p.ldPercent,
+        new Date(p.fetchedAt),
+        new Date(),
+      ],
+    });
+  } catch (err) {
     console.error(
-      `[defensiveRepository] ${failures.length} of ${profiles.length} spray profile upserts failed`
+      `[defensiveRepository] bulk upsert failed for ${profiles.length} spray profiles:`,
+      err
     );
+    return;
   }
+
+  await recordPlayerNames(
+    profiles.map((p) => ({ playerId: p.playerId, fullName: p.playerName }))
+  );
 }
 
 export async function findSprayProfile(
@@ -110,20 +156,61 @@ export async function upsertFielderOaaRow(
   });
 }
 
+const OAA_COLUMNS = [
+  "playerId",
+  "season",
+  "position",
+  "playerName",
+  "oaa",
+  "oaaVsRhh",
+  "oaaVsLhh",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const OAA_UPDATE_COLUMNS = OAA_COLUMNS.filter(
+  (c) => c !== "playerId" && c !== "season" && c !== "position"
+);
+
+/**
+ * Bulk upsert an entire batch of fielder OAA rows in one (or a few chunked)
+ * `INSERT ... ON CONFLICT DO UPDATE` statements instead of fanning out one
+ * upsert per fielder/position row.
+ */
 export async function upsertFielderOaa(
   rows: SavantFielderOaa[]
 ): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    rows,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (r) => upsertFielderOaaRow(r)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
+  if (rows.length === 0) return;
+
+  try {
+    await bulkUpsert(rows, {
+      table: "fielder_oaa",
+      columns: [...OAA_COLUMNS],
+      conflictColumns: ["playerId", "season", "position"],
+      updateColumns: [...OAA_UPDATE_COLUMNS],
+      toRow: (r) => [
+        r.playerId,
+        r.season,
+        r.position,
+        r.playerName,
+        r.oaa,
+        r.oaaVsRhh,
+        r.oaaVsLhh,
+        new Date(r.fetchedAt),
+        new Date(),
+      ],
+    });
+  } catch (err) {
     console.error(
-      `[defensiveRepository] ${failures.length} of ${rows.length} fielder OAA upserts failed`
+      `[defensiveRepository] bulk upsert failed for ${rows.length} fielder OAA rows:`,
+      err
     );
+    return;
   }
+
+  await recordPlayerNames(
+    rows.map((r) => ({ playerId: r.playerId, fullName: r.playerName }))
+  );
 }
 
 /**

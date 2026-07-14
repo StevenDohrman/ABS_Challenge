@@ -5,9 +5,8 @@
  */
 
 import { prisma } from "./prisma";
-import { DB_LIMITS } from "./constants";
-import { mapSettledWithConcurrency } from "../utils/concurrency";
-import { recordPlayerName } from "./playerNameRepository";
+import { recordPlayerName, recordPlayerNames } from "./playerNameRepository";
+import { bulkUpsert } from "./bulkUpsert";
 import type { SavantSprintSpeed } from "@abs/data-pipeline";
 import type { PlayerSprintSpeed } from "@prisma/client";
 
@@ -37,20 +36,61 @@ export async function upsertSprintSpeedRow(
     });
 }
 
+const SPRINT_COLUMNS = [
+  "playerId",
+  "season",
+  "playerName",
+  "position",
+  "sprintSpeed",
+  "homeTo1b",
+  "competitiveRuns",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const SPRINT_UPDATE_COLUMNS = SPRINT_COLUMNS.filter(
+  (c) => c !== "playerId" && c !== "season"
+);
+
+/**
+ * Bulk upsert an entire batch of sprint speed rows in one (or a few chunked)
+ * `INSERT ... ON CONFLICT DO UPDATE` statements instead of fanning out one
+ * upsert per player.
+ */
 export async function upsertSprintSpeed(
   rows: SavantSprintSpeed[]
 ): Promise<void> {
-  const results = await mapSettledWithConcurrency(
-    rows,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (r) => upsertSprintSpeedRow(r)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
+  if (rows.length === 0) return;
+
+  try {
+    await bulkUpsert(rows, {
+      table: "player_sprint_speed",
+      columns: [...SPRINT_COLUMNS],
+      conflictColumns: ["playerId", "season"],
+      updateColumns: [...SPRINT_UPDATE_COLUMNS],
+      toRow: (r) => [
+        r.playerId,
+        r.season,
+        r.playerName,
+        r.position,
+        r.sprintSpeed,
+        r.homeTo1b,
+        r.competitiveRuns,
+        new Date(r.fetchedAt),
+        new Date(),
+      ],
+    });
+  } catch (err) {
     console.error(
-      `[sprintSpeedRepository] ${failures.length} of ${rows.length} sprint speed upserts failed`
+      `[sprintSpeedRepository] bulk upsert failed for ${rows.length} sprint speed rows:`,
+      err
     );
+    return;
   }
+
+  await recordPlayerNames(
+    rows.map((r) => ({ playerId: r.playerId, fullName: r.playerName }))
+  );
 }
 
 export async function findSprintSpeed(
