@@ -950,7 +950,7 @@ Optional `sort` / `order` query params still work on the API for external client
 | `sort` | `missedRe`, `gainedRe`, `challengeSuccess` | `missedRe` |
 | `order` | `desc`, `asc` | `desc` |
 
-- **Missed RE:** batting-side run expectancy left on the table (postgame audit). Team leaderboard uses batting missed only.
+- **Missed RE:** run expectancy left on the table (postgame audit), split into batting and fielding columns. Fielding misses credit the catcher, not the pitcher. Default sort uses combined total for players; team sort still uses batting missed only.
 - **Gained RE:** run expectancy captured on successful overturns — split into batting and fielding columns.
 - **Challenge success %:** overturned ÷ challenges used; no challenges = — (sorted last).
 - **Deploy:** set `DATA_RETENTION_DAYS` high enough to keep all season games (e.g. `120` through All-Star break); set `TRACKING_START_DATE` to your program start.

@@ -7,14 +7,12 @@ import {
   rollupCountPerformance,
   type LineupPlayer,
 } from "@abs/data-pipeline";
-import { SEASONS } from "../db/constants";
+import { INTERVALS, SEASONS } from "../db/constants";
 import { findGameLineups } from "../db/lineupRepository";
 import {
   findRecentlyRefreshedPerformancePlayerIds,
   upsertPlayerCountPerformance,
 } from "../db/countPerformanceRepository";
-
-const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 
 export async function ingestCountPerformanceForGame(gamePk: number): Promise<void> {
   try {
@@ -27,7 +25,7 @@ export async function ingestCountPerformanceForGame(gamePk: number): Promise<voi
     const recentlyRefreshed = await findRecentlyRefreshedPerformancePlayerIds(
       batterIds,
       season,
-      REFRESH_INTERVAL_MS
+      INTERVALS.SIX_HOURS_MS
     );
     const toFetch = batterIds.filter((id) => !recentlyRefreshed.has(id));
 

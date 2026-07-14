@@ -1,5 +1,6 @@
 import { fetchSchedule } from "./mlbLive.client";
 import { MlbAbstractGameState, MlbScheduleGame } from "./mlbLive.api.types";
+import { mlbToday } from "../../utils/mlbDates";
 
 // ---------------------------------------------------------------------------
 // Domain-level game summary (internal, not raw API)
@@ -116,20 +117,4 @@ function toActiveGame(game: MlbScheduleGame): ActiveGame {
     awayTeamId: game.teams.away.team.id,
     awayTeamName: game.teams.away.team.name,
   };
-}
-
-/**
- * MLB uses Eastern Time for official game dates.
- * A game finishing at 1 AM ET on June 17 still has an officialDate of June 16.
- * We approximate this by shifting UTC by -4 or -5 hours depending on DST.
- *
- * This is intentionally simple. For production, use a proper TZ library.
- */
-function mlbToday(): string {
-  const now = new Date();
-  // ET is UTC-4 (EDT) or UTC-5 (EST). Use -5 as a conservative offset so we
-  // never accidentally advance to the next day too early.
-  const etOffset = -5 * 60;
-  const etMs = now.getTime() + etOffset * 60 * 1_000;
-  return new Date(etMs).toISOString().slice(0, 10);
 }

@@ -58,18 +58,12 @@ import {
   trackGameBackfillPitchReady,
   waitForGameBackfillPitchReady,
 } from "./db/pipelineDbQueue";
-import { SEASONS } from "./db/constants";
+import { getDataRetentionDays, INTERVALS, SEASONS } from "./db/constants";
 import { hydrateLeagueAveragesFromDb } from "./services/leagueAveragesStore";
 import { ingestCountPerformanceForGame } from "./services/countPerformanceIngestService";
 
-/** How often to re-run the Savant daily job in milliseconds (24 hours). */
-const SAVANT_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1_000;
-
-/** How often to scan for untracked Final games to backfill (6 hours). */
-const FINAL_BACKFILL_INTERVAL_MS = 6 * 60 * 60 * 1_000;
-
-/** Retain this many days of game data. Override with DATA_RETENTION_DAYS env var. */
-const DATA_RETENTION_DAYS = parseInt(process.env["DATA_RETENTION_DAYS"] ?? "7", 10);
+const SAVANT_DAILY_INTERVAL_MS = INTERVALS.TWENTY_FOUR_HOURS_MS;
+const FINAL_BACKFILL_INTERVAL_MS = INTERVALS.SIX_HOURS_MS;
 
 /**
  * Start all pipeline jobs and register event handlers.
@@ -249,7 +243,7 @@ function scheduleSavantDailyJob(): void {
 
 async function runFinalGameBackfill(): Promise<void> {
   try {
-    await scanAndBackfillFinalGames(DATA_RETENTION_DAYS);
+    await scanAndBackfillFinalGames(getDataRetentionDays());
   } catch (err) {
     console.error("[orchestrator] final game backfill error:", err);
   }
@@ -281,8 +275,9 @@ async function runRankingsBackfill(): Promise<void> {
 
 async function runCleanupJob(): Promise<void> {
   try {
-    console.log(`[orchestrator] purging game data older than ${DATA_RETENTION_DAYS} days`);
-    const result = await purgeOldGames(DATA_RETENTION_DAYS);
+    const retentionDays = getDataRetentionDays();
+    console.log(`[orchestrator] purging game data older than ${retentionDays} days`);
+    const result = await purgeOldGames(retentionDays);
     if (result.games > 0) {
       console.log(
         `[orchestrator] cleanup removed ${result.games} games, ` +

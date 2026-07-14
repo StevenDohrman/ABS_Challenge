@@ -292,6 +292,8 @@ model PostgameChallengeAudit {
 
   batterId  Int
   pitcherId Int
+  /** Catcher at at-bat start (fielding audits); resolved from live snapshot defense. */
+  catcherId Int?
 
   originalCall String // "ball" | "strike" | "unknown"
 
@@ -544,6 +546,10 @@ model PlayerRankingDayBucket {
   challengesOverturned Int    @default(0)
   missedOpportunities  Int    @default(0)
   totalMissedValue     Float  @default(0)
+  battingMissedCount   Int    @default(0)
+  battingMissedValue   Float  @default(0)
+  fieldingMissedCount  Int    @default(0)
+  fieldingMissedValue  Float  @default(0)
   battingGainedRe      Float  @default(0)
   fieldingGainedRe     Float  @default(0)
   badChallenges        Int    @default(0)
@@ -581,6 +587,10 @@ model PlayerRankingSeasonTotal {
   challengesOverturned Int    @default(0)
   missedOpportunities  Int    @default(0)
   totalMissedValue     Float  @default(0)
+  battingMissedCount   Int    @default(0)
+  battingMissedValue   Float  @default(0)
+  fieldingMissedCount  Int    @default(0)
+  fieldingMissedValue  Float  @default(0)
   battingGainedRe      Float  @default(0)
   fieldingGainedRe     Float  @default(0)
   badChallenges        Int    @default(0)

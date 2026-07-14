@@ -27,7 +27,7 @@
  */
 
 import { GameStateContext } from "../domain/gameContext.types";
-import { BASEBALL_RULES, SITUATION } from "../constants";
+import { BASEBALL_RULES, SITUATION, SCARCITY } from "../constants";
 import { lookupBaseRE } from "../data/runExpectancy";
 import { clamp } from "../utils/clamp";
 
@@ -221,7 +221,7 @@ function computeChallengeUrgency(
     return 1;
   }
 
-  if (challengesRemaining >= 2) {
+  if (challengesRemaining >= SCARCITY.PLENTY_MIN_CHALLENGES) {
     return 1 + SITUATION.CHALLENGE_URGENCY_BONUS_WITH_TWO;
   }
 

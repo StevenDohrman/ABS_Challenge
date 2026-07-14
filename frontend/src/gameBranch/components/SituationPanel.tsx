@@ -1,5 +1,6 @@
 import type { BranchDocument } from "../state/branchTypes";
 import { playerLabel, sideForTeam } from "../state/branchTypes";
+import { GAME_RULES } from "../../constants/gameRules";
 
 interface Props {
   doc: BranchDocument;
@@ -102,7 +103,7 @@ function ChallengeStepper({
       <div className="flex items-center gap-1">
         <button type="button" className="text-app-muted px-2 min-h-11 min-w-11" onClick={() => onChange(Math.max(0, value - 1))}>−</button>
         <span className="font-mono text-sm w-4 text-center">{value}</span>
-        <button type="button" className="text-app-muted px-2 min-h-11 min-w-11" onClick={() => onChange(Math.min(2, value + 1))}>+</button>
+        <button type="button" className="text-app-muted px-2 min-h-11 min-w-11" onClick={() => onChange(Math.min(GAME_RULES.DEFAULT_CHALLENGES_PER_TEAM, value + 1))}>+</button>
       </div>
     </div>
   );

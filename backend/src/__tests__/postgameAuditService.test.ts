@@ -68,6 +68,7 @@ const snapshot = {
   runnerOnThird: false,
   fieldingTeamId: 111,
   battingTeamId: 147,
+  catcherId: 54321,
 };
 
 describe("deriveMlbZoneResult", () => {
@@ -188,11 +189,13 @@ describe("buildFieldingAuditInput", () => {
       runnerOnThird: false,
       fieldingTeamId: 111,
       battingTeamId: 147,
+      catcherId: 660271,
     };
     const audit = buildFieldingAuditInput(pitch, fieldingSnapshot, true);
 
     expect(audit).not.toBeNull();
     expect(audit!.challengeSide).toBe("fielding");
+    expect(audit!.catcherId).toBe(660271);
     expect(audit!.callWasProbablyWrong).toBe(true);
     expect(audit!.shouldHaveChallenged).toBe(true);
     expect(audit!.missedChallenge).toBe(true);
@@ -217,5 +220,22 @@ describe("buildFieldingAuditInput", () => {
     );
 
     expect(audit!.missedChallenge).toBe(false);
+  });
+
+  it("notes unavailable catcher when fielding miss cannot be attributed", () => {
+    const pitch = makePitch({
+      callCode: CALL_CODES.BALL,
+      mlbZone: 5,
+      plateX: 0.1,
+      plateZ: 2.5,
+    });
+    const audit = buildFieldingAuditInput(
+      pitch,
+      { ...snapshot, catcherId: null },
+      true
+    );
+
+    expect(audit!.catcherId).toBeNull();
+    expect(audit!.notes).toContain("Catcher ID unavailable — player attribution skipped");
   });
 });

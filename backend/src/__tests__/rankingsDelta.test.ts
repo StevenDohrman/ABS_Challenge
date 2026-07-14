@@ -63,11 +63,12 @@ describe("buildPitchReviewDelta", () => {
 });
 
 describe("buildPostgameAuditDelta", () => {
-  it("attributes fielding missed opportunities to pitcher and fielding team", () => {
+  it("attributes fielding missed opportunities to catcher and fielding team", () => {
     const delta = buildPostgameAuditDelta(game, {
       pitchEventId: 21,
       batterId: 600,
       pitcherId: 700,
+      catcherId: 800,
       halfInning: "bottom",
       challengeSide: "fielding",
       missedChallenge: true,
@@ -77,17 +78,39 @@ describe("buildPostgameAuditDelta", () => {
       challengerTeamId: null,
     });
 
-    expect(delta?.playerDeltas.find((d) => d.playerId === 700)?.missedOpportunities).toBe(1);
+    expect(delta?.playerDeltas.find((d) => d.playerId === 800)?.fieldingMissedCount).toBe(1);
+    expect(delta?.playerDeltas.find((d) => d.playerId === 800)?.fieldingMissedValue).toBeCloseTo(0.11);
     expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.fieldingMissedCount).toBe(1);
     expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.fieldingMissedValue).toBeCloseTo(0.11);
-    expect(delta?.playerDeltas.find((d) => d.playerId === 600)?.missedOpportunities).toBeUndefined();
+    expect(delta?.playerDeltas.find((d) => d.playerId === 700)?.fieldingMissedValue).toBeUndefined();
+    expect(delta?.playerDeltas.find((d) => d.playerId === 600)?.battingMissedValue).toBeUndefined();
   });
 
-  it("attributes missed opportunities to batter and batting team", () => {
+  it("skips player attribution when catcher ID is unavailable", () => {
+    const delta = buildPostgameAuditDelta(game, {
+      pitchEventId: 22,
+      batterId: 600,
+      pitcherId: 700,
+      catcherId: null,
+      halfInning: "bottom",
+      challengeSide: "fielding",
+      missedChallenge: true,
+      badChallengeAllowed: false,
+      runExpectancySwing: 0.11,
+      challengerPlayerId: null,
+      challengerTeamId: null,
+    });
+
+    expect(delta?.playerDeltas.find((d) => d.playerId === 700)).toBeUndefined();
+    expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.fieldingMissedCount).toBe(1);
+  });
+
+  it("attributes missed opportunities to batter batting columns and batting team", () => {
     const delta = buildPostgameAuditDelta(game, {
       pitchEventId: 20,
       batterId: 600,
       pitcherId: 700,
+      catcherId: null,
       halfInning: "top",
       challengeSide: "batting",
       missedChallenge: true,
@@ -97,6 +120,8 @@ describe("buildPostgameAuditDelta", () => {
       challengerTeamId: null,
     });
 
+    expect(delta?.playerDeltas[0]?.battingMissedCount).toBe(1);
+    expect(delta?.playerDeltas[0]?.battingMissedValue).toBeCloseTo(0.15);
     expect(delta?.playerDeltas[0]?.missedOpportunities).toBe(1);
     expect(delta?.teamDeltas.find((d) => d.teamId === 147)?.battingMissedCount).toBe(1);
   });
@@ -106,6 +131,7 @@ describe("buildPostgameAuditDelta", () => {
       pitchEventId: 11,
       batterId: 601,
       pitcherId: 701,
+      catcherId: null,
       halfInning: "top",
       challengeSide: "batting",
       missedChallenge: false,
