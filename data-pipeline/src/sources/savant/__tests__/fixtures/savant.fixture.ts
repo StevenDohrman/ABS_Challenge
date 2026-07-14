@@ -93,20 +93,20 @@ export const SPRINT_SPEED_CSV = [
 // ---------------------------------------------------------------------------
 
 export const PLAYER_STATCAST_HISTORY_CSV = [
-  "game_pk,game_date,game_year,batter,pitcher,at_bat_number,pitch_number,pitch_type,release_speed,balls,strikes,outs_when_up,inning,stand,p_throws,type,description,events,plate_x,plate_z,sz_top,sz_bot,zone",
+  "game_pk,game_date,game_year,batter,pitcher,at_bat_number,pitch_number,pitch_type,release_speed,balls,strikes,outs_when_up,inning,stand,p_throws,type,description,events,plate_x,plate_z,sz_top,sz_bot,zone,woba_value,woba_denom,estimated_woba_using_speedangle",
   // Called strike on 0-0 count, RHH vs LHP, in zone
-  "824991,2026-06-17,2026,682998,656731,1,1,FF,95.4,0,0,1,9,R,L,S,called_strike,,0.12,2.45,3.50,1.60,2",
+  "824991,2026-06-17,2026,682998,656731,1,1,FF,95.4,0,0,1,9,R,L,S,called_strike,,0.12,2.45,3.50,1.60,2,,,",
   // Ball on 0-1, slightly outside
-  "824991,2026-06-17,2026,682998,656731,1,2,SL,87.2,1,1,1,9,R,L,B,ball,,0.95,2.10,3.50,1.60,13",
+  "824991,2026-06-17,2026,682998,656731,1,2,SL,87.2,1,1,1,9,R,L,B,ball,,0.95,2.10,3.50,1.60,13,,,",
   // In-play terminal pitch (strikeout swinging)
-  "824991,2026-06-17,2026,682998,656731,1,3,CH,82.1,1,2,1,9,R,L,S,swinging_strike,strikeout,0.18,2.80,3.50,1.60,8",
+  "824991,2026-06-17,2026,682998,656731,1,3,CH,82.1,1,2,1,9,R,L,S,swinging_strike,strikeout,0.18,2.80,3.50,1.60,8,0,1,",
   // Different game
-  "824800,2026-06-15,2026,682998,500871,5,1,FF,93.1,0,0,0,3,R,R,B,ball,,-0.82,2.20,3.45,1.55,11",
+  "824800,2026-06-15,2026,682998,500871,5,1,FF,93.1,0,0,0,3,R,R,B,ball,,-0.82,2.20,3.45,1.55,11,0.69,1,",
 ].join("\n");
 
 /** Savant returns an empty CSV when no pitches are found for the player/season. */
 export const EMPTY_PLAYER_HISTORY_CSV =
-  "game_pk,game_date,game_year,batter,pitcher,at_bat_number,pitch_number,pitch_type,release_speed,balls,strikes,outs_when_up,inning,stand,p_throws,type,description,events,plate_x,plate_z,sz_top,sz_bot,zone\n";
+  "game_pk,game_date,game_year,batter,pitcher,at_bat_number,pitch_number,pitch_type,release_speed,balls,strikes,outs_when_up,inning,stand,p_throws,type,description,events,plate_x,plate_z,sz_top,sz_bot,zone,woba_value,woba_denom,estimated_woba_using_speedangle\n";
 
 // ---------------------------------------------------------------------------
 // Pitch arsenal stats leaderboard

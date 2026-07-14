@@ -1,21 +1,52 @@
-# Phase 7: Wire SavantLineupJob (batter count-state splits)
+# Phase 7: SavantLineupJob — batter count-state RE scaling
 
-**Agent task:** Implement end-to-end wiring of `SavantLineupJob` so the challenge engine uses **batter-specific count-state performance** instead of (or blended with) the fixed count modifier in `playerCredibility.ts`.
+**Agent task:** Wire `SavantLineupJob` so challenge run expectancy uses **batter-specific count performance** to scale the league `COUNT_DELTA` table in `runExpectancy.ts` — not credibility count modifiers.
 
-Read this entire document before writing code. Run existing tests after each major step.
+Read this document before writing code. Run existing tests after each major step.
 
 ---
 
-## Context — do not confuse with lineup due-up
+## Context — do not confuse with other features
 
 | Feature | Status | Purpose |
 |---------|--------|---------|
-| **`lineupContext.ts`** | ✅ Wired | Who is due up later this half-inning; season OPS/wOBA → RE multiplier |
-| **`SavantLineupJob`** | ❌ Not wired | Per-batter pitch-by-pitch history → count buckets (0-0, 0-2, 3-2, …) |
+| **`lineupContext.ts`** | ✅ Wired | Due-up window; season OPS/wOBA → RE multiplier |
+| **`playerCredibility.ts`** | ✅ Wired | P(call wrong) from discipline metrics — **unchanged in Phase 7** |
+| **Phase 7 (this task)** | 🎯 Target | Per-batter wOBA-by-count → scale RE count deltas |
 
-Daily pregame data (`SavantDailyJob`) already feeds batter stat lines, spray, OAA, sprint, league averages, and pitcher pitch mix. **This task adds lineup-time pitch history for count splits only.**
+Daily pregame data (`SavantDailyJob`) feeds stat lines, spray, OAA, sprint, league averages, pitcher mix, and **league wOBA-by-count** from a season batter Statcast CSV. **Lineup-time** `SavantLineupJob` fetches per-batter pitch history for batter-specific wOBA-by-count.
 
 Postgame audit uses MLB live feed pitch location — **do not wire `SavantPostgameJob`**.
+
+---
+
+## RE scaling formula
+
+For each count state (`balls-strikes`):
+
+```
+delta = LEAGUE_COUNT_DELTA[count] × (batterWoba / leagueWoba)
+```
+
+When batter or league wOBA is unavailable for that count, fall back to fixed `LEAGUE_COUNT_DELTA` (same values as legacy `COUNT_DELTA`).
+
+**Engine:** `engine/src/data/countDelta.ts` → `resolveCountDelta`  
+**RE compute:** `computeChallengeOutcomeExpectancies(..., countDeltaContext?)` in `runExpectancy.ts`
+
+---
+
+## Data sources
+
+| Data | Job | Storage |
+|------|-----|---------|
+| League wOBA-by-count | `SavantDailyJob` (season batter CSV) | `league_averages_snapshots.countWobaByState` |
+| Batter wOBA-by-count | `SavantLineupJob` on lineup lock | `player_count_performance.buckets` (JSON) |
+
+**Rollup:** `data-pipeline/src/sources/savant/countPerformance.ts`
+
+- Terminal PAs grouped by count at PA end (`balls-strikes` on terminal pitch)
+- `woba_value` / `woba_denom` from Savant CSV
+- Optional `estimated_woba_using_speedangle` for thin samples (blend when PA ≥ 8, full trust at ≥ 20)
 
 ---
 
@@ -24,128 +55,57 @@ Postgame audit uses MLB live feed pitch location — **do not wire `SavantPostga
 | Piece | Path |
 |-------|------|
 | Job | `data-pipeline/src/jobs/savantLineupJob.ts` |
-| Fetch CSV | `data-pipeline/src/sources/savant/savant.client.ts` → `fetchPlayerStatcastHistoryCsv` |
-| Parse pitches | `data-pipeline/src/sources/savant/savant.parser.ts` → `parsePlayerStatcastHistory` |
-| Type | `SavantPlayerPitchHistory` in `savant.types.ts` (balls, strikes, type B/S/X, etc.) |
-| Lineup ingest hook | `backend/src/orchestrator.ts` → `LivePollJob` `lineupUpdate` → `handleLineupUpdate` |
-| Lineup storage | `backend/src/db/lineupRepository.ts`, `GameLineup` Prisma model |
-| Fixed count modifier (replace/blend) | `engine/src/features/playerCredibility.ts` → `computeCountModifier` |
-| Engine entry | `backend/src/services/challengeInputBuilder.ts` → `ChallengeDecisionInput` |
-
-Tests already exist: `data-pipeline/src/sources/savant/__tests__/savantLineupJob.test.ts`
+| Fetch CSV | `savant.client.ts` → `fetchPlayerStatcastHistoryCsv`, `fetchSeasonBatterStatcastCsv` |
+| Parse pitches | `savant.parser.ts` → `parsePlayerStatcastHistory` |
+| Lineup hook | `orchestrator.ts` → `lineupUpdate` → `handleLineupUpdate` + `ingestCountPerformanceForGame` |
+| Challenge inputs | `challengeInputBuilder.ts` → `CountDeltaContext` into RE compute |
 
 ---
 
-## Implementation plan
+## Implementation checklist
 
-### 1. Prisma — store count splits
+### 1. Prisma
 
-Add a table (name suggestion: `player_count_splits`) keyed by `(playerId, season)` with JSON or normalized columns for each count bucket.
+- `player_count_performance` — `(playerId, season)` unique, `buckets` JSON, `fetchedAt`
+- `league_averages_snapshots.countWobaByState` JSON
 
-Suggested rollup fields per bucket (`"0-0"`, `"0-2"`, `"3-2"`, etc.):
+Migration: `20260712040000_player_count_performance`
 
-- `pitchCount`
-- `ballRate` / `strikeRate` (called pitches only, exclude in-play if appropriate)
-- `chaseRate` proxy if derivable
-- `whiffRate` if derivable
-- Optional: wOBA proxy from events
+### 2. Pipeline rollup
 
-Also add `fetchedAt` and optional `sourceGamePk` if splits are refreshed per game day.
+- `countPerformance.ts` — `rollupCountPerformance`, `effectiveCountWoba`, `toLeagueCountWoba`
+- `leagueAverages.ts` — `computeLeagueCountWobaFromStatcastCsv` on daily job CSV
+- `savantDailyJob.ts` — fetch season batter Statcast CSV (non-fatal on failure)
 
-**Migration:** create under `backend/prisma/migrations/` and update `schema.prisma`.
+### 3. Backend ingest
 
-### 2. Rollup service — pitch history → splits
+- `countPerformanceRepository.ts` — upsert/find/recent refresh (6h skip)
+- `countPerformanceIngestService.ts` — lineup batters via `SavantLineupJob`
+- `orchestrator.ts` — enqueue ingest after lineup write (`low` priority)
 
-New module e.g. `data-pipeline/src/sources/savant/countSplits.ts` or `backend/src/services/countSplitsRollup.ts`:
+### 4. Challenge wiring
 
-- Input: `SavantPlayerPitchHistory[]`
-- Group by count state at pitch (`balls-strikes` before pitch)
-- Compute rates with minimum sample threshold (e.g. ≥ 20 pitches per bucket before trusting)
-- Export typed `PlayerCountSplits` object
+- `countPerformanceContext.ts` — `buildBatterWobaByCount`
+- `challengeInputBuilder.ts` — load DB buckets, pass `CountDeltaContext` to RE
+- `leagueAveragesRepository.ts` / `leagueAveragesStore.ts` — persist/serve `countWobaByState`
 
-Unit tests with fixture CSV rows.
+### 5. Tests
 
-### 3. Orchestrator — run job on lineup confirmation
-
-In `backend/src/orchestrator.ts`, extend the `lineupUpdate` handler (after `handleLineupUpdate` succeeds):
-
-1. Collect unique batter IDs from both teams’ batting orders (`GameLineup` rows).
-2. Optionally include pitchers as `playerType: "pitcher"` only if needed later — **batters only for v1**.
-3. Instantiate `SavantLineupJob`, subscribe to `playerHistory`, persist rollups via new repository.
-4. Dedupe: skip if splits for `(playerId, season)` were fetched in the last N hours unless lineup changed materially.
-5. Run in background (do not block live poll); log errors per player.
-
-Reference pattern: `runSavantDailyJob()` in the same file.
-
-### 4. Repository + ingest handler
-
-- `backend/src/db/countSplitsRepository.ts` — upsert/find by player + season
-- `backend/src/services/ingestService.ts` — `handlePlayerCountSplits` or inline in lineup handler
-
-### 5. Engine — new input fields
-
-Extend `PlayerChallengeContext` in `engine/src/domain/playerContext.types.ts`:
-
-```ts
-countSplits?: {
-  bucket: string;        // current count e.g. "0-2"
-  ballRate: number | null;
-  strikeRate: number | null;
-  sampleSize: number;
-} | null;
-```
-
-Populate in `challengeInputBuilder.ts` from DB for current batter + current count.
-
-### 6. Engine — blend into credibility
-
-In `playerCredibility.ts`:
-
-- When `countSplits` has sufficient sample, compute a **batter-specific** count adjustment (e.g. high chase / low discipline at 0-2 → higher P(call wrong)).
-- When missing or low sample, **fall back** to existing `computeCountModifier` (fixed table).
-- Keep adjustment magnitude similar to current ±0.06 range unless tests justify wider bounds.
-
-Add engine tests in `engine/src/__tests__/playerCredibility.test.ts` (or new file).
-
-### 7. Backend integration tests
-
-- Mock `SavantLineupJob` emit → verify DB upsert
-- `challengeInputBuilder` includes count splits when present
-- End-to-end: lineup update triggers job (can mock Savant HTTP)
-
-### 8. Docs + UI (optional)
-
-- Update README Phase 7 section to “done” when complete
-- About / How it works: one line on batter-specific count context (optional)
+- `countPerformance.test.ts`, `countDelta.test.ts`, `countPerformanceContext.test.ts`
+- Mock `countPerformanceRepository` in `challengeService.test.ts`
 
 ---
 
-## Constraints
+## Operational notes
 
-- **Rate limits:** `SavantLineupJob` batches requests (default 3 players, 500ms delay). Do not remove.
-- **Fallback:** Never fail live recommendations when Savant lineup fetch fails.
-- **No SavantPostgameJob:** Postgame path is MLB live feed only.
-- **Minimize scope:** Do not refactor RE24 tables or ML in this task.
-
----
-
-## Verification checklist
-
-```bash
-npm run test --workspace=data-pipeline
-npm run test --workspace=engine
-npm run test --workspace=backend
-npm run frontend:test
-npm run pipeline:build
-npm run build --workspace=backend
-```
-
-Manual: trigger lineup update on a tracked game; confirm splits rows in DB; confirm live recommendation still returns; inspect explanation/credibility breakdown if exposed.
+- **Refresh cadence:** Per-batter count performance skipped if refreshed within 6 hours
+- **Fetch failure:** Use last DB data; RE falls back to fixed league deltas when buckets missing
+- **Deploy:** Run `npx prisma migrate deploy` before starting backend with new code
 
 ---
 
-## Suggested commit message
+## Explicitly out of scope
 
-```
-Wire SavantLineupJob for batter count-state splits and blend into player credibility.
-```
+- Credibility count modifiers in `playerCredibility.ts`
+- `SavantPostgameJob`
+- Replacing RE24 base table or walk/K terminal paths

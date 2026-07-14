@@ -46,7 +46,7 @@ describe("computeSituationWeight", () => {
       expect(blowout.components.isBlowout).toBe(true);
     });
 
-    test("negative differential (team is trailing) has same leverage as equivalent positive", () => {
+    test("negative differential (team is trailing) has same leverage as equivalent positive when bases are empty", () => {
       const upThree = computeSituationWeight(
         makeGameState({ runDifferentialForBattingTeam: 3 })
       );
@@ -58,6 +58,32 @@ describe("computeSituationWeight", () => {
         downThree.components.runDiffLeverage,
         5
       );
+    });
+
+    test("trailing deficit within rally potential is not discounted like a blowout", () => {
+      const loaded = computeSituationWeight(
+        makeGameState({
+          inning: 4,
+          runDifferentialForBattingTeam: -4,
+          outs: 0,
+          runnerOnFirst: true,
+          runnerOnSecond: true,
+          runnerOnThird: true,
+        })
+      );
+      const empty = computeSituationWeight(
+        makeGameState({
+          inning: 4,
+          runDifferentialForBattingTeam: -4,
+          outs: 0,
+        })
+      );
+
+      expect(loaded.components.runDiffLeverage).toBe(1);
+      expect(loaded.components.effectiveRunGap).toBe(0);
+      expect(empty.components.runDiffLeverage).toBeLessThan(loaded.components.runDiffLeverage);
+      expect(empty.components.effectiveRunGap).toBeNull();
+      expect(empty.components.runDiffLeverage).toBeCloseTo(0.55, 2);
     });
   });
 

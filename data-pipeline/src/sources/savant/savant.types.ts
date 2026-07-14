@@ -251,6 +251,12 @@ export interface SavantPlayerPitchHistory {
   /** Savant strike zone region 1–9 (in-zone) or 11–14 (shadow/out-of-zone). */
   zone: number | null;
 
+  /** wOBA numerator/denominator on terminal pitches (Statcast search CSV). */
+  wobaValue: number | null;
+  wobaDenom: number | null;
+  /** estimated_woba_using_speedangle on in-play pitches. */
+  estimatedWoba: number | null;
+
   raw: Record<string, string>;
   fetchedAt: string;
 }

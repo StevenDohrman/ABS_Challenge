@@ -1,5 +1,6 @@
 import axios from "axios";
-import { parseCsvToRows } from "./savant.parser";
+import { parseCsvToRows, parsePlayerStatcastHistory } from "./savant.parser";
+import { rollupCountPerformance, toLeagueCountWoba } from "./countPerformance";
 
 /** Mirrors engine LeagueAverages + metadata for the daily Savant refresh. */
 export interface LeagueAveragesSnapshot {
@@ -20,6 +21,8 @@ export interface LeagueAveragesSnapshot {
   oppoRate: number;
   /** Mean Statcast sprint speed (ft/s). */
   sprintSpeed: number;
+  /** League wOBA by count state for RE scaling (optional). */
+  countWobaByState?: Record<string, number>;
   computedAt: string;
 }
 
@@ -103,6 +106,16 @@ export async function fetchLeagueOps(year: number): Promise<number | null> {
   }
 }
 
+/** League wOBA-by-count from a season batter Statcast CSV (SavantDailyJob). */
+export function computeLeagueCountWobaFromStatcastCsv(
+  batterStatcastCsv: string,
+  fetchedAt: string
+): Record<string, number> {
+  if (!batterStatcastCsv.trim()) return {};
+  const history = parsePlayerStatcastHistory(batterStatcastCsv, fetchedAt);
+  return toLeagueCountWoba(rollupCountPerformance(history));
+}
+
 /**
  * Compute league-average batter rates from Savant CSVs already fetched for
  * the daily job — no extra Savant HTTP calls.
@@ -114,7 +127,8 @@ export function computeLeagueAveragesFromCsvs(
   leagueOps: number | null,
   sprayCsv = "",
   sprintCsv = "",
-  computedAt = new Date().toISOString()
+  computedAt = new Date().toISOString(),
+  batterStatcastCsv = ""
 ): LeagueAveragesSnapshot {
   const disciplineRows = parseCsvToRows(disciplineCsv);
   const expectedRows = parseCsvToRows(expectedStatsCsv);
@@ -170,6 +184,11 @@ export function computeLeagueAveragesFromCsvs(
 
   const sprintRaw = columnMeanFromKeys(sprintRows, "sprint_speed", "speed");
 
+  const countWobaByState = computeLeagueCountWobaFromStatcastCsv(
+    batterStatcastCsv,
+    computedAt
+  );
+
   return {
     season,
     chaseRate: chaseRaw !== null ? chaseRaw / 100 : FALLBACKS.chaseRate,
@@ -185,6 +204,8 @@ export function computeLeagueAveragesFromCsvs(
     straightawayRate: straightawayRate ?? FALLBACKS.straightawayRate,
     oppoRate: oppoRate ?? FALLBACKS.oppoRate,
     sprintSpeed: sprintRaw ?? FALLBACKS.sprintSpeed,
+    countWobaByState:
+      Object.keys(countWobaByState).length > 0 ? countWobaByState : undefined,
     computedAt,
   };
 }

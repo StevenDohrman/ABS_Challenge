@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { Prisma } from "@prisma/client";
 import type { LeagueAveragesSnapshot as PipelineSnapshot } from "@abs/data-pipeline";
 import type { LeagueAveragesSnapshot as DbRow } from "@prisma/client";
 
@@ -21,6 +22,10 @@ export async function upsertLeagueAveragesSnapshot(
     straightawayRate: snapshot.straightawayRate,
     oppoRate: snapshot.oppoRate,
     sprintSpeed: snapshot.sprintSpeed,
+    countWobaByState:
+      snapshot.countWobaByState != null
+        ? (snapshot.countWobaByState as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
     computedAt: new Date(snapshot.computedAt),
   };
 
@@ -35,6 +40,21 @@ export async function findLeagueAveragesSnapshot(
   season: number
 ): Promise<DbRow | null> {
   return prisma.leagueAveragesSnapshot.findUnique({ where: { season } });
+}
+
+function parseCountWobaByState(value: unknown): Record<string, number> | undefined {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const result: Record<string, number> = {};
+  for (const [key, woba] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof woba === "number" && Number.isFinite(woba)) {
+      result[key] = woba;
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 export function dbRowToPipelineSnapshot(row: DbRow): PipelineSnapshot {
@@ -53,6 +73,7 @@ export function dbRowToPipelineSnapshot(row: DbRow): PipelineSnapshot {
     straightawayRate: row.straightawayRate,
     oppoRate: row.oppoRate,
     sprintSpeed: row.sprintSpeed,
+    countWobaByState: parseCountWobaByState(row.countWobaByState),
     computedAt: row.computedAt.toISOString(),
   };
 }

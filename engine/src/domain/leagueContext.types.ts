@@ -71,4 +71,10 @@ export interface LeagueAverages {
 
   /** League-average Statcast sprint speed (ft/s). */
   sprintSpeed: number;
+
+  /**
+   * League wOBA at each count state (e.g. "3-0" → 0.57). From daily Statcast rollup.
+   * Used to scale COUNT_DELTA for batter-specific RE; optional — engine uses fallbacks.
+   */
+  countWobaByState?: Record<string, number>;
 }

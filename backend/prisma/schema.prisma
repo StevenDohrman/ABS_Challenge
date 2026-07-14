@@ -429,10 +429,27 @@ model LeagueAveragesSnapshot {
   straightawayRate   Float
   oppoRate           Float
   sprintSpeed        Float
+  /// League wOBA by count key ("0-0", "3-0", …) for RE count-delta scaling.
+  countWobaByState   Json?
   computedAt         DateTime
   updatedAt          DateTime @updatedAt
 
   @@map("league_averages_snapshots")
+}
+
+// Per-batter wOBA by count state for RE scaling. Ingested by SavantLineupJob.
+model PlayerCountPerformance {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  season    Int
+  /// JSON: { "0-2": { paCount, woba, xwoba? }, ... }
+  buckets   Json
+  fetchedAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, season])
+  @@index([playerId, season])
+  @@map("player_count_performance")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

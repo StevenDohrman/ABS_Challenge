@@ -7,6 +7,7 @@ import {
   fetchSprintSpeedCsv,
   fetchPitchArsenalStatsCsv,
   fetchSeasonPitcherStatcastCsv,
+  fetchSeasonBatterStatcastCsv,
 } from "../sources/savant/savant.client";
 import {
   parseExpectedStats,
@@ -38,6 +39,7 @@ interface DailyCsvBundle {
   fielderOaaCsv: string;
   pitcherArsenalCsv: string;
   pitcherStatcastCsv: string;
+  batterStatcastCsv: string;
   leagueOps: number | null;
 }
 
@@ -107,6 +109,7 @@ export class SavantDailyJob extends EventEmitter {
       fielderOaaCsv,
       pitcherArsenalCsv,
       pitcherStatcastCsv,
+      batterStatcastCsv,
       leagueOps,
     ] = await Promise.all([
       fetchExpectedStatsCsv(season),
@@ -116,6 +119,13 @@ export class SavantDailyJob extends EventEmitter {
       fetchFielderOaaCsv(season),
       fetchPitchArsenalStatsCsv(season),
       fetchSeasonPitcherStatcastCsv(season),
+      fetchSeasonBatterStatcastCsv(season).catch((err) => {
+        console.error(
+          `[SavantDailyJob] batter Statcast CSV failed (count wOBA skipped):`,
+          err instanceof Error ? err.message : err
+        );
+        return "";
+      }),
       fetchLeagueOps(season),
     ]);
 
@@ -127,6 +137,7 @@ export class SavantDailyJob extends EventEmitter {
       fielderOaaCsv,
       pitcherArsenalCsv,
       pitcherStatcastCsv,
+      batterStatcastCsv,
       leagueOps,
     };
   }
@@ -161,7 +172,8 @@ export class SavantDailyJob extends EventEmitter {
           bundle.leagueOps,
           bundle.sprayCsv,
           bundle.sprintCsv,
-          fetchedAt
+          fetchedAt,
+          bundle.batterStatcastCsv
         )
       );
     } catch (err) {

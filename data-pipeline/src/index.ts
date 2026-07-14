@@ -9,15 +9,24 @@
 export { LivePollJob } from "./jobs/livePollJob";
 export { SavantDailyJob } from "./jobs/savantDailyJob";
 
-// Optional jobs — not wired by the backend orchestrator today.
-// SavantPostgameJob: superseded by MLB live feed postgame audit (no engine impact).
-// SavantLineupJob: Phase 7 — batter count-state splits; see README "Phase 7 plan".
+// SavantLineupJob: batter count-state wOBA for RE scaling (Phase 7).
 export { SavantPostgameJob } from "./jobs/savantPostgameJob";
 export { SavantLineupJob } from "./jobs/savantLineupJob";
 export type {
   LineupPlayer,
   PlayerHistoryResult,
 } from "./jobs/savantLineupJob";
+export {
+  rollupCountPerformance,
+  toLeagueCountWoba,
+  effectiveCountWoba,
+  MIN_COUNT_PA,
+  MIN_COUNT_PA_BLEND,
+} from "./sources/savant/countPerformance";
+export type {
+  CountPerformanceBucket,
+  PlayerCountPerformanceMap,
+} from "./sources/savant/countPerformance";
 
 export { fetchLiveFeed } from "./sources/mlb-live/mlbLive.client";
 export {

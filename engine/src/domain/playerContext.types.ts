@@ -129,4 +129,10 @@ export interface PlayerChallengeContext {
    * the live lineup is unavailable) → 0× adjustment, same as pre-defensive-feature.
    */
   fielderOaa: number | null;
+
+  /**
+   * Batter wOBA by count state for RE scaling (Phase 7). Keys like "0-2", "3-0".
+   * Populated when sample size is sufficient; engine falls back to league/fixed deltas.
+   */
+  countWobaByState?: Record<string, number> | null;
 }

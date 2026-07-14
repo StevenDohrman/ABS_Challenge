@@ -22,6 +22,10 @@
 
 import { BASEBALL_RULES } from "../constants";
 import { Balls, Outs, Strikes } from "../domain/baseball.types";
+import {
+  lookupCountDelta,
+  type CountDeltaContext,
+} from "./countDelta";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,40 +101,16 @@ export function lookupBaseRE(outs: number, runners: Runners): number {
 }
 
 // ---------------------------------------------------------------------------
-// Count delta table — additive RE adjustment by count
+// Count delta — see countDelta.ts (batter/league wOBA scaling + fixed fallback)
 // ---------------------------------------------------------------------------
 
-/**
- * How much the current count shifts run expectancy relative to a 0-0 start.
- *
- * A count of 3-0 adds ~0.150 runs because a walk is imminent.
- * A count of 0-2 subtracts ~0.106 runs because a strikeout is imminent.
- *
- * These deltas are added to the base/out RE to approximate the run expectancy
- * for an at-bat that is continuing with a given count.
- *
- * Source: calibrated from Retrosheet play-by-play data, consistent with
- * Tango's "The Book" count leverage research.
- */
-const COUNT_DELTA: Record<string, number> = {
-  // balls-strikes: delta
-  "0-0": 0.000,
-  "1-0": 0.031,
-  "2-0": 0.072,
-  "3-0": 0.150,
-  "0-1": -0.041,
-  "1-1": -0.011,
-  "2-1": 0.032,
-  "3-1": 0.116,
-  "0-2": -0.106,
-  "1-2": -0.071,
-  "2-2": -0.041,
-  "3-2": 0.049,
-};
-
-function lookupCountDelta(balls: number, strikes: number): number {
-  return COUNT_DELTA[`${balls}-${strikes}`] ?? 0;
-}
+export type { CountDeltaContext, CountDeltaResult, CountDeltaSource } from "./countDelta";
+export {
+  lookupCountDelta,
+  resolveCountDelta,
+  LEAGUE_COUNT_DELTA,
+  FALLBACK_LEAGUE_WOBA_BY_COUNT,
+} from "./countDelta";
 
 // ---------------------------------------------------------------------------
 // Walk advancement
@@ -219,28 +199,32 @@ function strikeoutRE(outs: number, runners: Runners): number {
  * @param ballsBefore  Ball count BEFORE this pitch was thrown.
  * @param strikesBefore Strike count BEFORE this pitch was thrown.
  * @param runners      Which bases are occupied.
+ * @param countDeltaContext  Optional batter/league wOBA-by-count for RE scaling.
  */
 export function computeChallengeOutcomeExpectancies(
   outs: Outs,
   ballsBefore: Balls,
   strikesBefore: Strikes,
-  runners: Runners
+  runners: Runners,
+  countDeltaContext?: CountDeltaContext | null
 ): ChallengeOutcomeExpectancies {
   const baseRE = lookupBaseRE(outs, runners);
+  const delta = (balls: number, strikes: number) =>
+    lookupCountDelta(balls, strikes, countDeltaContext);
 
-  const current = baseRE + lookupCountDelta(ballsBefore, strikesBefore);
+  const current = baseRE + delta(ballsBefore, strikesBefore);
 
   // --- Success: called strike overturned to ball ---
   const ifSucceeds: number =
     ballsBefore === BASEBALL_RULES.BALLS_FOR_WALK
       ? walkRE(outs, runners)
-      : baseRE + lookupCountDelta(ballsBefore + 1, strikesBefore);
+      : baseRE + delta(ballsBefore + 1, strikesBefore);
 
   // --- Failure: challenge denied, strike stands ---
   const ifFails: number =
     strikesBefore === BASEBALL_RULES.STRIKES_FOR_STRIKEOUT
       ? strikeoutRE(outs, runners)
-      : baseRE + lookupCountDelta(ballsBefore, strikesBefore + 1);
+      : baseRE + delta(ballsBefore, strikesBefore + 1);
 
   return { current, ifSucceeds, ifFails };
 }
