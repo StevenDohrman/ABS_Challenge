@@ -9,7 +9,7 @@ function Section({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-xs font-mono uppercase tracking-widest text-white/40">
+      <h2 className="text-xs font-mono uppercase tracking-widest text-app-muted">
         {title}
       </h2>
       {children}
@@ -19,7 +19,7 @@ function Section({
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/3 px-5 py-4 space-y-3">
+    <div className="rounded-2xl border border-app app-surface-subtle px-5 py-4 space-y-3">
       {children}
     </div>
   );
@@ -27,7 +27,7 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc list-inside space-y-2 text-sm text-white/60 leading-relaxed pl-0.5">
+    <ul className="list-disc list-inside space-y-2 text-sm text-app-secondary leading-relaxed pl-0.5">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
@@ -38,8 +38,8 @@ function BulletList({ items }: { items: string[] }) {
 function Term({ name, children }: { name: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <p className="text-sm font-medium text-white/80">{name}</p>
-      <p className="text-sm text-white/55 leading-relaxed">{children}</p>
+      <p className="text-sm font-medium text-app">{name}</p>
+      <p className="text-sm text-app-secondary leading-relaxed">{children}</p>
     </div>
   );
 }
@@ -49,13 +49,13 @@ export function AboutPage() {
     <div className="space-y-8 pb-4">
       <header className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight">About</h1>
-        <p className="text-white/55 leading-relaxed">
+        <p className="text-app-secondary leading-relaxed">
           ABS Challenge Advisor helps evaluate MLB Automated Ball-Strike manager
           challenges using run expectancy. It separates{" "}
-          <span className="text-white/75">live in-game guidance</span> from{" "}
-          <span className="text-white/75">postgame review</span> and rolls both
+          <span className="text-app-secondary">live in-game guidance</span> from{" "}
+          <span className="text-app-secondary">postgame review</span> and rolls both
           into season and weekly{" "}
-          <Link to="/rankings" className="text-emerald-300/90 hover:text-emerald-300 underline">
+          <Link to="/rankings" className="text-emerald-700 hover:text-emerald-800 dark:text-emerald-300/90 dark:hover:text-emerald-300 underline">
             rankings
           </Link>
           .
@@ -64,7 +64,7 @@ export function AboutPage() {
 
       <Section title="What this app does">
         <Card>
-          <p className="text-sm text-white/60 leading-relaxed">
+          <p className="text-sm text-app-secondary leading-relaxed">
             For tracked games, the system pre-computes challenge value across all
             12 count states, surfaces a recommendation when a called strike
             occurs, and after the game finishes audits both batting and fielding
@@ -88,7 +88,7 @@ export function AboutPage() {
 
       <Section title="Daily pregame context">
         <Card>
-          <p className="text-sm text-white/50 leading-relaxed">
+          <p className="text-sm text-app-muted leading-relaxed">
             Before first pitch, Baseball Savant season data is ingested once per
             day and reused for every live decision that day.
           </p>
@@ -107,7 +107,7 @@ export function AboutPage() {
 
       <Section title="Live game analysis">
         <Card>
-          <p className="text-sm text-white/50 leading-relaxed">
+          <p className="text-sm text-app-muted leading-relaxed">
             Available while a game is in progress and tracked by the pipeline.
           </p>
           <BulletList
@@ -119,7 +119,7 @@ export function AboutPage() {
               "Challenge counts — remaining challenges per team (two per team under ABS rules).",
             ]}
           />
-          <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
+          <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">
             Live recommendations use the MLB live feed plus daily Savant context.
             The engine factors in run expectancy, player credibility, offensive
             value, lineup due-up window, defensive spray/OAA context, baserunning
@@ -132,7 +132,7 @@ export function AboutPage() {
 
       <Section title="Postgame analysis">
         <Card>
-          <p className="text-sm text-white/50 leading-relaxed">
+          <p className="text-sm text-app-muted leading-relaxed">
             Runs shortly after a game goes Final using pitch location already
             stored from the MLB live feed — no Baseball Savant CSV wait.
           </p>
@@ -146,7 +146,7 @@ export function AboutPage() {
               "Team splits — missed value attributed by challenging side (batting team for strike misses, fielding team for ball misses).",
             ]}
           />
-          <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
+          <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">
             Missed value uses zone-calculated run expectancy, not whether the live
             card said ALLOW. Postgame audit is retrospective truth-checking; it
             does not change what was shown live.
@@ -160,7 +160,7 @@ export function AboutPage() {
             <p className="text-xs font-mono uppercase tracking-wider text-red-300/80">
               Live
             </p>
-            <ul className="text-sm text-white/60 space-y-1.5 leading-relaxed">
+            <ul className="text-sm text-app-secondary space-y-1.5 leading-relaxed">
               <li>Real-time during the game</li>
               <li>Pre-bat grid + called-strike trigger</li>
               <li>Full engine with daily Savant context</li>
@@ -171,7 +171,7 @@ export function AboutPage() {
             <p className="text-xs font-mono uppercase tracking-wider text-slate-300/80">
               Postgame
             </p>
-            <ul className="text-sm text-white/60 space-y-1.5 leading-relaxed">
+            <ul className="text-sm text-app-secondary space-y-1.5 leading-relaxed">
               <li>After Final, usually within minutes</li>
               <li>Zone check on batting and fielding calls</li>
               <li>Missed value, bad challenges, top misses</li>
@@ -183,9 +183,9 @@ export function AboutPage() {
 
       <Section title="Rankings">
         <Card>
-          <p className="text-sm text-white/60 leading-relaxed">
+          <p className="text-sm text-app-secondary leading-relaxed">
             The{" "}
-            <Link to="/rankings" className="text-emerald-300/90 hover:text-emerald-300 underline">
+            <Link to="/rankings" className="text-emerald-700 hover:text-emerald-800 dark:text-emerald-300/90 dark:hover:text-emerald-300 underline">
               rankings page
             </Link>{" "}
             aggregates tracked games across players and teams. Switch between a
@@ -207,7 +207,7 @@ export function AboutPage() {
               with no challenges show — when sorting by success rate.
             </Term>
           </div>
-          <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
+          <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">
             Rankings update as games finish and audits complete. The 7-day view
             matches the schedule browser window; season totals accumulate from
             when the program started tracking games.
@@ -217,7 +217,7 @@ export function AboutPage() {
 
       <Section title="Game branches">
         <Card>
-          <p className="text-sm text-white/60 leading-relaxed">
+          <p className="text-sm text-app-secondary leading-relaxed">
             From any game detail page you can{" "}
             <Link to="/branches" className="text-violet-300/90 hover:text-violet-200 underline">
               branch
@@ -233,7 +233,7 @@ export function AboutPage() {
               "Export or import branch JSON to share or restore on another session.",
             ]}
           />
-          <p className="text-xs text-white/35 leading-relaxed border-t border-white/10 pt-3">
+          <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">
             When you are driving the game state, branches provide real-time decision
             support — not a replay of a tracked MLB feed. Recommendations recompute
             automatically from your edits (cached locally, never written to the database).
@@ -257,7 +257,7 @@ export function AboutPage() {
         </Card>
       </Section>
 
-      <footer className="text-xs text-white/30 font-mono leading-relaxed">
+      <footer className="text-xs text-app-faint font-mono leading-relaxed">
         Data sources: MLB Stats API (schedule, live feed, pitch locations for
         postgame audit). Daily batter, fielder, league, and pitcher context from
         Baseball Savant.

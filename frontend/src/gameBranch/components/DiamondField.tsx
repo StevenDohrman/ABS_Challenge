@@ -13,8 +13,8 @@ const BASE_POSITIONS: Record<keyof BranchRunners, { cx: number; cy: number; labe
 
 export function DiamondField({ runners, onToggleBase }: Props) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-emerald-950/30 px-4 py-5">
-      <p className="mb-3 text-center text-xs font-mono uppercase tracking-wider text-white/35">
+    <div className="rounded-2xl border border-app bg-emerald-950/30 px-4 py-5">
+      <p className="mb-3 text-center text-xs font-mono uppercase tracking-wider text-app-faint">
         Tap a base to toggle runner
       </p>
       <svg viewBox="0 0 200 170" className="mx-auto h-44 w-full max-w-xs">

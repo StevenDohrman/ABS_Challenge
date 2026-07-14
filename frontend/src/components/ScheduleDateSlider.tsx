@@ -31,8 +31,8 @@ export function ScheduleDateSlider({ daysAgo, onChange }: Props) {
   const options = buildScheduleDateOptionsOldestFirst();
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/3 px-3 py-3">
-      <p className="text-[10px] font-mono uppercase tracking-widest text-white/35 mb-2.5 px-1">
+    <div className="rounded-xl border border-app app-surface-subtle px-3 py-3">
+      <p className="text-[10px] font-mono uppercase tracking-widest text-app-faint mb-2.5 px-1">
         Game date
       </p>
 
@@ -44,7 +44,7 @@ export function ScheduleDateSlider({ daysAgo, onChange }: Props) {
           <ChevronLeft />
         </NavButton>
 
-        <div className="flex flex-1 items-stretch justify-center gap-1.5 min-w-0 overflow-x-auto">
+        <div className="flex flex-1 items-stretch justify-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
           {options.map((option) => {
             const selected = option.daysAgo === daysAgo;
             const { primary, secondary } = formatScheduleDateSquare(option);
@@ -57,16 +57,16 @@ export function ScheduleDateSlider({ daysAgo, onChange }: Props) {
                 aria-label={option.longLabel}
                 aria-pressed={selected}
                 className={[
-                  "flex min-w-[3.25rem] shrink-0 flex-col items-center justify-center rounded-lg border px-2 py-2 transition-colors",
+                  "flex min-w-[3.25rem] min-h-11 shrink-0 flex-col items-center justify-center rounded-lg border px-2 py-2 transition-colors",
                   selected
-                    ? "border-emerald-400/70 bg-emerald-500/15 text-white shadow-[0_0_0_1px_rgba(52,211,153,0.25)]"
-                    : "border-white/10 bg-white/[0.03] text-white/55 hover:border-white/20 hover:bg-white/[0.06] hover:text-white/80",
+                    ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-900 shadow-sm dark:border-emerald-400/70 dark:bg-emerald-500/15 dark:text-white dark:shadow-[0_0_0_1px_rgba(52,211,153,0.25)]"
+                    : "border-app app-surface-subtle text-app-secondary hover:border-slate-300 hover:bg-slate-100 hover:text-app dark:hover:border-white/20 dark:hover:bg-white/[0.06] dark:hover:text-app",
                 ].join(" ")}
               >
                 <span
                   className={[
                     "text-[10px] font-mono font-semibold leading-none tracking-wide",
-                    selected ? "text-emerald-200" : "",
+                    selected ? "text-emerald-800 dark:text-emerald-200" : "",
                   ].join(" ")}
                 >
                   {primary}
@@ -87,7 +87,7 @@ export function ScheduleDateSlider({ daysAgo, onChange }: Props) {
         </NavButton>
       </div>
 
-      <p className="mt-2.5 px-1 text-[11px] text-white/25 leading-relaxed">
+      <p className="mt-2.5 px-1 text-[11px] text-app-dim leading-relaxed">
         Past dates on the left, today on the right. Arrows move one day at a time (wraps at the ends).
       </p>
     </div>
@@ -108,7 +108,7 @@ function NavButton({
       type="button"
       aria-label={ariaLabel}
       onClick={onClick}
-      className="flex h-auto w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-white/50 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white/90"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-app-strong app-surface-muted text-app-muted transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-app dark:hover:border-white/25 dark:hover:bg-white/[0.08] dark:hover:text-app"
     >
       {children}
     </button>

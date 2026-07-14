@@ -17,7 +17,7 @@ function InningIndicator({
   halfInning: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-mono text-white/50">
+    <span className="inline-flex items-center gap-1 text-xs font-mono text-app-muted">
       <span>{inningHalfArrow(halfInning)}</span>
       <span>{inning}</span>
     </span>
@@ -28,19 +28,19 @@ function CountDisplay({ count }: { count: string }) {
   const [balls, strikes] = count.split("-");
   return (
     <div className="flex items-baseline gap-1 font-mono">
-      <span className="text-3xl font-bold text-white">{balls}</span>
-      <span className="text-xl text-white/40">-</span>
-      <span className="text-3xl font-bold text-white">{strikes}</span>
-      <span className="text-xs text-white/40 ml-1">COUNT</span>
+      <span className="text-2xl sm:text-3xl font-bold text-app">{balls}</span>
+      <span className="text-lg sm:text-xl text-app-muted">-</span>
+      <span className="text-2xl sm:text-3xl font-bold text-app">{strikes}</span>
+      <span className="text-xs text-app-muted ml-1">COUNT</span>
     </div>
   );
 }
 
 const URGENCY_RING: Record<string, string> = {
   AUTO_ALLOW: "ring-2 ring-emerald-500/50",
-  ALLOW:      "ring-1 ring-green-500/40",
-  WARN:       "ring-1 ring-amber-500/40",
-  DENY:       "",
+  ALLOW: "ring-1 ring-green-500/40",
+  WARN: "ring-1 ring-amber-500/40",
+  DENY: "",
 };
 
 export function LivePitchCard({ data }: Props) {
@@ -49,69 +49,61 @@ export function LivePitchCard({ data }: Props) {
           displayMessage, reasons, triggeredAt } = data;
 
   const ring = URGENCY_RING[recommendation] ?? "";
-
   const triggeredTime = formatTimestamp(new Date(triggeredAt));
 
   return (
     <div
-      className={`rounded-2xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl ${ring}`}
+      className={`rounded-2xl overflow-hidden app-surface-elevated border border-app shadow-lg ${ring}`}
     >
-      {/* Top bar — game situation */}
-      <div className="flex items-center gap-4 px-5 py-3 bg-white/5 border-b border-white/10">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 app-surface-muted border-b border-app">
         <InningIndicator inning={inning} halfInning={halfInning} />
-        <span className="text-xs font-mono text-white/40">
+        <span className="text-xs font-mono text-app-muted">
           {outs} out{outs !== 1 ? "s" : ""}
         </span>
-        <span className="text-xs font-mono text-white/40">{baseState}</span>
-        <span className="ml-auto text-[10px] text-white/25 font-mono">
+        <span className="text-xs font-mono text-app-muted">{baseState}</span>
+        <span className="ml-auto text-[10px] text-app-dim font-mono">
           {triggeredTime}
         </span>
       </div>
 
-      {/* Main content */}
-      <div className="px-5 py-5 space-y-5">
-        {/* Count + badge row */}
-        <div className="flex items-start justify-between gap-4">
+      <div className="px-4 sm:px-5 py-4 sm:py-5 space-y-4 sm:space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <CountDisplay count={count} />
-          <div className="flex flex-col items-end gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-2 sm:pt-1">
             <RecommendationBadge recommendation={recommendation} size="lg" />
             <ExpectedValuePill value={expectedValue} />
           </div>
         </div>
 
-        {/* Display message */}
-        <p className="text-white font-semibold text-base leading-snug">
+        <p className="text-app font-semibold text-sm sm:text-base leading-snug">
           {displayMessage}
         </p>
 
-        {/* Score bar */}
         <div className="space-y-1">
-          <div className="flex justify-between text-xs text-white/40">
+          <div className="flex justify-between text-xs text-app-muted">
             <span className="font-mono uppercase tracking-wide">Challenge score</span>
             <span className="font-mono">{Math.round(score)} / 100</span>
           </div>
           <ScoreBar score={score} />
         </div>
 
-        {/* Confidence note */}
-        <div className="rounded-lg bg-white/5 border border-white/10 border-l-2 border-l-emerald-500/35 px-4 py-3">
-          <p className="text-xs text-white/50 uppercase tracking-wide font-mono">
+        <div className="rounded-lg app-surface-muted border border-app border-l-2 border-l-emerald-500/35 px-4 py-3">
+          <p className="text-xs text-app-muted uppercase tracking-wide font-mono">
             Minimum confidence threshold
           </p>
-          <p className="text-white font-semibold mt-0.5">
+          <p className="text-app font-semibold mt-0.5">
             {minimumConfidenceThreshold}% confidence required
           </p>
         </div>
 
-        {/* Engine reasons */}
         {reasons.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs text-white/40 uppercase tracking-wide font-mono">
+            <p className="text-xs text-app-muted uppercase tracking-wide font-mono">
               Why
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-0.5">
               {reasons.map((reason, i) => (
-                <li key={i} className="text-sm text-white/75">
+                <li key={i} className="text-sm text-app-secondary">
                   {reason}
                 </li>
               ))}

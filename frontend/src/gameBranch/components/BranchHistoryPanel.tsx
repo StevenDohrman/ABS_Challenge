@@ -12,15 +12,15 @@ export function BranchHistoryPanel({ history }: Props) {
   if (!history?.atBats.length) return null;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/4 p-4">
+    <div className="rounded-2xl border border-app app-surface-subtle p-4">
       <button
         type="button"
-        className="flex w-full items-center justify-between text-sm font-semibold text-white/80"
+        className="flex w-full items-center justify-between text-sm font-semibold text-app"
         onClick={() => setOpen((o) => !o)}
       >
         <span>
           Fork-time at-bat history ({history.totalAtBats})
-          <span className="ml-2 font-normal text-white/35">
+          <span className="ml-2 font-normal text-app-faint">
             — includes canonical RE per count
           </span>
         </span>

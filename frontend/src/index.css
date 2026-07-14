@@ -9,7 +9,75 @@
   }
 
   body {
-    background-color: theme("colors.slate.950");
-    color: white;
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white;
+  }
+}
+
+@layer components {
+  /* Page shell */
+  .app-shell {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white;
+  }
+
+  /* Surfaces */
+  .app-surface {
+    @apply bg-white dark:bg-white/5;
+  }
+  .app-surface-subtle {
+    @apply bg-slate-100 dark:bg-white/[0.03];
+  }
+  .app-surface-muted {
+    @apply bg-slate-50 dark:bg-white/[0.04];
+  }
+  .app-surface-elevated {
+    @apply bg-white shadow-sm dark:bg-slate-900 dark:shadow-2xl;
+  }
+
+  /* Text */
+  .text-app {
+    @apply text-slate-900 dark:text-white;
+  }
+  .text-app-secondary {
+    @apply text-slate-600 dark:text-white/60;
+  }
+  .text-app-muted {
+    @apply text-slate-500 dark:text-white/40;
+  }
+  .text-app-faint {
+    @apply text-slate-400 dark:text-white/30;
+  }
+  .text-app-dim {
+    @apply text-slate-400 dark:text-white/25;
+  }
+
+  /* Borders */
+  .border-app {
+    @apply border-slate-200 dark:border-white/10;
+  }
+  .border-app-subtle {
+    @apply border-slate-100 dark:border-white/5;
+  }
+  .border-app-strong {
+    @apply border-slate-300 dark:border-white/15;
+  }
+
+  /* Interactive */
+  .app-link {
+    @apply text-slate-500 transition-colors hover:text-slate-800 dark:text-white/40 dark:hover:text-white/80;
+  }
+  .app-btn-ghost {
+    @apply rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-200 dark:border-white/15 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10;
+  }
+  .app-btn-icon {
+    @apply flex items-center justify-center rounded-lg border border-slate-300 bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/15 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10;
+  }
+  .app-input {
+    @apply rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900 dark:border-white/10 dark:bg-black/30 dark:text-white;
+  }
+  .app-hover-row {
+    @apply transition-colors hover:bg-slate-50 dark:hover:bg-white/5;
+  }
+  .app-divider {
+    @apply bg-slate-200 dark:bg-white/10;
   }
 }

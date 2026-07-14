@@ -26,13 +26,13 @@ export function EmptyState({
 }: Props) {
   return (
     <div
-      className={`border border-white/10 ${elevated ? "bg-white/3" : ""} ${SIZE_CLASSES[size]} ${className}`}
+      className={`border border-app ${elevated ? "app-surface-subtle" : ""} ${SIZE_CLASSES[size]} ${className}`}
     >
-      <p className={size === "md" ? "text-white/60 font-medium" : "text-sm text-white/40"}>
+      <p className={size === "md" ? "text-app-secondary font-medium" : "text-sm text-app-muted"}>
         {title}
       </p>
       {description && (
-        <p className="text-sm text-white/30">{description}</p>
+        <p className="text-sm text-app-faint">{description}</p>
       )}
       {children}
     </div>
