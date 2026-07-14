@@ -17,3 +17,4 @@ export { DEFENSIVE } from "./defensive";
 export { BASERUNNING } from "./baserunning";
 export { LINEUP } from "./lineup";
 export { THRESHOLDS } from "./thresholds";
+export { EXPLANATION } from "./explanation";

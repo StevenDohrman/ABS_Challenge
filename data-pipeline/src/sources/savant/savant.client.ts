@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { SAVANT_HTTP } from "./savant.constants";
 
 const SAVANT_BASE = "https://baseballsavant.mlb.com";
 
@@ -7,7 +8,7 @@ const SAVANT_BASE = "https://baseballsavant.mlb.com";
  * @internal Exported for test instrumentation only — use the named functions.
  */
 export const savantHttp: AxiosInstance = axios.create({
-  timeout: 30_000,
+  timeout: SAVANT_HTTP.DEFAULT_TIMEOUT_MS,
   headers: {
     Accept: "text/csv,text/plain,*/*",
     // Savant occasionally blocks non-browser requests; a browser-like agent avoids that.
@@ -196,6 +197,7 @@ export async function fetchSeasonBatterStatcastCsv(season: number): Promise<stri
         csv: "true",
       },
       responseType: "text",
+      timeout: SAVANT_HTTP.SEASON_STATCAST_TIMEOUT_MS,
     }
   );
   if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {
@@ -223,6 +225,7 @@ export async function fetchSeasonPitcherStatcastCsv(season: number): Promise<str
         csv: "true",
       },
       responseType: "text",
+      timeout: SAVANT_HTTP.SEASON_STATCAST_TIMEOUT_MS,
     }
   );
   if (data.trimStart().startsWith("<!DOCTYPE") || data.trimStart().startsWith("<html")) {

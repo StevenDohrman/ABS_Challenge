@@ -1,6 +1,7 @@
 import type { BranchDocument, BranchSituation } from "../state/branchTypes";
+import { GAME_RULES } from "../../constants/gameRules";
 
-export const OUTS_PER_HALF_INNING = 3;
+export const OUTS_PER_HALF_INNING = GAME_RULES.OUTS_PER_HALF_INNING;
 
 export function nextHalfInning(
   inning: number,

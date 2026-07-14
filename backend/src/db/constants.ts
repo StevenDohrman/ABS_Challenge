@@ -123,6 +123,18 @@ export const SAVANT_POSTGAME = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Orchestrator / ingest intervals
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const INTERVALS = {
+  /** Savant daily job rerun cadence. */
+  TWENTY_FOUR_HOURS_MS: 24 * 60 * 60 * 1_000,
+
+  /** Final-game backfill scan and count-performance refresh cadence. */
+  SIX_HOURS_MS: 6 * 60 * 60 * 1_000,
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Data retention
 // ─────────────────────────────────────────────────────────────────────────────
 

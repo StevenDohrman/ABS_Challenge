@@ -139,8 +139,8 @@ export function HowItWorksPage() {
         </p>
         <BulletList
           items={[
-            "Players — missed RE, batting gained RE, fielding gained RE, miss count, challenges used, success %.",
-            "Teams — batting missed RE and count, batting/fielding gained RE, challenges used, success %.",
+            "Players — missed RE (batting + fielding split), batting/fielding gained RE, miss count, challenges used, success %.",
+            "Teams — batting and fielding missed RE, batting/fielding gained RE, challenges used, success %.",
             "Last 7 days — rolling window aligned with the schedule browser and DB retention.",
             "Season — running totals from program start (set TRACKING_START_DATE on deploy).",
           ]}

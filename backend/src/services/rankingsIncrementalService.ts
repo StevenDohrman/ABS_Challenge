@@ -16,6 +16,10 @@ import {
   extractChallengerPlayerId,
 } from "../db/playerNameRepository";
 import { resolveGainedReForPitch } from "./rankingsGainedRe";
+import {
+  catcherFromPitchPayload,
+  catcherFromSnapshotPayload,
+} from "./postgameAuditService";
 
 const SOURCE_PITCH_REVIEW = "pitch_review";
 const SOURCE_POSTGAME_AUDIT = "postgame_audit";
@@ -101,6 +105,83 @@ function totalGainedReInDelta(delta: RankingsEventDelta): number {
   );
 }
 
+function deltasEquivalent(a: RankingsEventDelta, b: RankingsEventDelta): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+async function resolveCatcherIdForAudit(
+  audit: {
+    catcherId: number | null;
+    gamePk: number;
+    atBatIndex: number;
+    pitchEventId: number;
+  }
+): Promise<number | null> {
+  if (audit.catcherId != null) return audit.catcherId;
+
+  const snapshot = await prisma.liveGameSnapshot.findUnique({
+    where: {
+      gamePk_atBatIndex: {
+        gamePk: audit.gamePk,
+        atBatIndex: audit.atBatIndex,
+      },
+    },
+    select: { rawPayload: true },
+  });
+  const fromSnapshot = snapshot
+    ? catcherFromSnapshotPayload(snapshot.rawPayload)
+    : null;
+  if (fromSnapshot != null) return fromSnapshot;
+
+  const pitch = await prisma.livePitchEvent.findUnique({
+    where: { id: audit.pitchEventId },
+    select: { rawPayload: true },
+  });
+  return pitch ? catcherFromPitchPayload(pitch.rawPayload) : null;
+}
+
+async function buildPostgameAuditDeltaFromRow(audit: {
+  id: number;
+  gamePk: number;
+  pitchEventId: number;
+  atBatIndex: number;
+  batterId: number;
+  pitcherId: number;
+  catcherId: number | null;
+  halfInning: string;
+  challengeSide: string;
+  missedChallenge: boolean;
+  badChallengeAllowed: boolean;
+  runExpectancySwing: number;
+}): Promise<RankingsEventDelta | null> {
+  const [game, pitch, catcherId] = await Promise.all([
+    loadGameContext(audit.gamePk),
+    prisma.livePitchEvent.findUnique({
+      where: { id: audit.pitchEventId },
+      select: {
+        challengerTeamId: true,
+        rawPayload: true,
+      },
+    }),
+    resolveCatcherIdForAudit(audit),
+  ]);
+  if (!game) return null;
+
+  return buildPostgameAuditDelta(game, {
+    pitchEventId: audit.pitchEventId,
+    batterId: audit.batterId,
+    pitcherId: audit.pitcherId,
+    catcherId,
+    halfInning: audit.halfInning,
+    challengeSide: audit.challengeSide === "fielding" ? "fielding" : "batting",
+    missedChallenge: audit.missedChallenge,
+    badChallengeAllowed: audit.badChallengeAllowed,
+    runExpectancySwing: audit.runExpectancySwing,
+    challengerPlayerId: pitch ? extractChallengerPlayerId(pitch.rawPayload) : null,
+    challengerTeamId: pitch?.challengerTeamId ?? null,
+  });
+}
+
 /** Record both teams appearing in a tracked game (for gamesAppeared). */
 export async function trackTeamGameAppearances(gamePk: number): Promise<void> {
   const game = await loadGameContext(gamePk);
@@ -179,9 +260,11 @@ export async function applyPostgameAuditContribution(
     select: {
       id: true,
       gamePk: true,
+      atBatIndex: true,
       pitchEventId: true,
       batterId: true,
       pitcherId: true,
+      catcherId: true,
       halfInning: true,
       challengeSide: true,
       missedChallenge: true,
@@ -191,30 +274,10 @@ export async function applyPostgameAuditContribution(
   });
   if (!audit) return false;
 
-  const [game, pitch] = await Promise.all([
-    loadGameContext(audit.gamePk),
-    prisma.livePitchEvent.findUnique({
-      where: { id: audit.pitchEventId },
-      select: {
-        challengerTeamId: true,
-        rawPayload: true,
-      },
-    }),
-  ]);
+  const game = await loadGameContext(audit.gamePk);
   if (!game) return false;
 
-  const delta = buildPostgameAuditDelta(game, {
-    pitchEventId: audit.pitchEventId,
-    batterId: audit.batterId,
-    pitcherId: audit.pitcherId,
-    halfInning: audit.halfInning,
-    challengeSide: audit.challengeSide === "fielding" ? "fielding" : "batting",
-    missedChallenge: audit.missedChallenge,
-    badChallengeAllowed: audit.badChallengeAllowed,
-    runExpectancySwing: audit.runExpectancySwing,
-    challengerPlayerId: pitch ? extractChallengerPlayerId(pitch.rawPayload) : null,
-    challengerTeamId: pitch?.challengerTeamId ?? null,
-  });
+  const delta = await buildPostgameAuditDeltaFromRow(audit);
   if (!delta) return false;
 
   return applyAndRecord(SOURCE_POSTGAME_AUDIT, auditId, game, delta);
@@ -321,6 +384,79 @@ export async function repairMissingPitchReviewGainedRe(): Promise<number> {
   if (repaired > 0) {
     console.log(
       `[rankingsRepair] credited missing gained RE on ${repaired} pitch review(s)`
+    );
+  }
+
+  return repaired;
+}
+
+/**
+ * Repair postgame-audit contributions that credited fielding misses to pitchers
+ * or used the legacy combined missed-RE buckets. Idempotent — skips rows that
+ * already match the corrected catcher + split attribution.
+ */
+export async function repairFieldingMissedAttribution(): Promise<number> {
+  const contributions = await prisma.rankingsContribution.findMany({
+    where: { sourceType: SOURCE_POSTGAME_AUDIT },
+    orderBy: { id: "asc" },
+  });
+
+  let repaired = 0;
+
+  for (const contribution of contributions) {
+    const storedDelta = contribution.payloadJson as unknown as RankingsEventDelta;
+
+    const audit = await prisma.postgameChallengeAudit.findUnique({
+      where: { id: contribution.sourceId },
+      select: {
+        id: true,
+        gamePk: true,
+        atBatIndex: true,
+        pitchEventId: true,
+        batterId: true,
+        pitcherId: true,
+        catcherId: true,
+        halfInning: true,
+        challengeSide: true,
+        missedChallenge: true,
+        badChallengeAllowed: true,
+        runExpectancySwing: true,
+      },
+    });
+    if (!audit) continue;
+
+    const correctedDelta = await buildPostgameAuditDeltaFromRow(audit);
+    if (!correctedDelta) continue;
+    if (deltasEquivalent(storedDelta, correctedDelta)) continue;
+
+    const game = await loadGameContext(audit.gamePk);
+    if (!game || !isWithinTrackingWindow(contribution.gameDate)) continue;
+
+    const season = seasonFromGameDate(contribution.gameDate);
+    await applyRankingsDelta(
+      contribution.gameDate,
+      season,
+      negateRankingsEventDelta(storedDelta),
+      contribution.gamePk,
+      1
+    );
+    await applyRankingsDelta(
+      contribution.gameDate,
+      season,
+      correctedDelta,
+      contribution.gamePk,
+      1
+    );
+    await prisma.rankingsContribution.update({
+      where: { id: contribution.id },
+      data: { payloadJson: correctedDelta as object },
+    });
+    repaired++;
+  }
+
+  if (repaired > 0) {
+    console.log(
+      `[rankingsRepair] re-attributed fielding missed RE on ${repaired} postgame audit(s)`
     );
   }
 

@@ -25,4 +25,23 @@ export const CREDIBILITY = {
 
   HISTORY_MIN_ATTEMPTS: 5,
   HISTORY_FULL_WEIGHT_ATTEMPTS: 20,
+
+  /**
+   * Per-count adjustments to P(call wrong) before player-specific signals.
+   * Pitcher-friendly counts (0-2, 1-2) raise credibility; hitter-friendly counts lower it.
+   */
+  COUNT_MODIFIERS: {
+    "3-0": -0.06,
+    "2-0": -0.03,
+    "1-0": -0.01,
+    "0-0": 0.0,
+    "3-1": 0.0,
+    "2-1": 0.0,
+    "1-1": 0.0,
+    "0-1": 0.02,
+    "3-2": 0.04,
+    "2-2": 0.04,
+    "1-2": 0.05,
+    "0-2": 0.06,
+  } as const,
 } as const;

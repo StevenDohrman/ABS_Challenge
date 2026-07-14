@@ -2,14 +2,13 @@
  * Batter count-state wOBA — persisted rollup from SavantLineupJob.
  */
 
+import { INTERVALS } from "./constants";
 import { prisma } from "./prisma";
 import type { Prisma } from "@prisma/client";
 import type { PlayerCountPerformanceMap } from "@abs/data-pipeline";
 import type { PlayerCountPerformance } from "@prisma/client";
 
 export type { PlayerCountPerformance };
-
-const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
 
 function parseBuckets(value: unknown): PlayerCountPerformanceMap | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
@@ -69,7 +68,7 @@ export async function findPlayerCountPerformance(
 export async function findRecentlyRefreshedPerformancePlayerIds(
   playerIds: number[],
   season: number,
-  maxAgeMs: number = SIX_HOURS_MS
+  maxAgeMs: number = INTERVALS.SIX_HOURS_MS
 ): Promise<Set<number>> {
   if (playerIds.length === 0) return new Set();
 

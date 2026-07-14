@@ -17,6 +17,7 @@
 
 import { ChallengeDecision, ChallengeRecommendation } from "../domain/challengeDecision.types";
 import { Balls, Strikes } from "../domain/baseball.types";
+import { EXPLANATION } from "../constants";
 import { PlayerCredibilityResult } from "../features/playerCredibility";
 import { BaserunningContextResult } from "../features/baserunningContext";
 import { LineupContextResult } from "../features/lineupContext";
@@ -138,7 +139,7 @@ function buildCredibilitySentence(
 function buildBaserunningSentence(
   baserunning: BaserunningContextResult
 ): string | null {
-  if (!baserunning.dataAvailable || Math.abs(baserunning.multiplier - 1) < 0.02) {
+  if (!baserunning.dataAvailable || Math.abs(baserunning.multiplier - 1) < EXPLANATION.NEGLIGIBLE_MULTIPLIER_DELTA) {
     return null;
   }
 
@@ -159,7 +160,7 @@ function buildBaserunningSentence(
 }
 
 function buildLineupSentence(lineup: LineupContextResult): string | null {
-  if (!lineup.dataAvailable || Math.abs(lineup.multiplier - 1) < 0.02) {
+  if (!lineup.dataAvailable || Math.abs(lineup.multiplier - 1) < EXPLANATION.NEGLIGIBLE_MULTIPLIER_DELTA) {
     return null;
   }
 
@@ -192,7 +193,7 @@ function buildSituationSentence(
     return `The large run differential significantly reduces the leverage of any single challenge.`;
   }
 
-  if (inningLeverage < 0.75 && runDiffLeverage < 0.80) {
+  if (inningLeverage < EXPLANATION.LOW_INNING_LEVERAGE && runDiffLeverage < EXPLANATION.LOW_RUN_DIFF_LEVERAGE) {
     return `Early innings with a comfortable run gap — challenge value is below average for this situation.`;
   }
 

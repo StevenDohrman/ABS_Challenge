@@ -44,6 +44,29 @@ export interface AtBatSnapshotForAudit {
   runnerOnThird: boolean;
   fieldingTeamId: number;
   battingTeamId: number;
+  catcherId: number | null;
+}
+
+/** Primary: live_game_snapshots.rawPayload.defense.catcher */
+export function catcherFromSnapshotPayload(raw: unknown): number | null {
+  const defense = (raw as { defense?: { catcher?: number } })?.defense;
+  return typeof defense?.catcher === "number" ? defense.catcher : null;
+}
+
+/** Tertiary fallback: linescore.defense.catcher on a pitch play event. */
+export function catcherFromPitchPayload(raw: unknown): number | null {
+  const linescore = (raw as { linescore?: { defense?: { catcher?: number } } })?.linescore;
+  return typeof linescore?.defense?.catcher === "number"
+    ? linescore.defense.catcher
+    : null;
+}
+
+export function resolveCatcherId(
+  snapshot: AtBatSnapshotForAudit | undefined,
+  pitchRawPayload: unknown
+): number | null {
+  if (snapshot?.catcherId != null) return snapshot.catcherId;
+  return catcherFromPitchPayload(pitchRawPayload);
 }
 
 /** MLB zones 1–9 are in the strike zone; 11–14 are shadow/out-of-zone. */
@@ -243,9 +266,15 @@ export function buildFieldingAuditInput(
     pitch
   );
 
+  const catcherId = resolveCatcherId(snapshot, pitch.rawPayload);
+  if (missedChallenge && catcherId === null) {
+    notes.push("Catcher ID unavailable — player attribution skipped");
+  }
+
   return {
     ...buildSharedAuditFields(pitch, zoneResult, notes),
     challengeSide: "fielding",
+    catcherId,
     recommendationId: null,
     callWasProbablyWrong,
     liveRecommendation: "FIELDING",
@@ -272,6 +301,7 @@ export function buildAuditInput(
       runnerOnThird: false,
       fieldingTeamId: 0,
       battingTeamId: 0,
+      catcherId: null,
     },
     recommendation,
     recommendation.challengeAvailable
@@ -350,6 +380,7 @@ export async function auditGame(gamePk: number): Promise<number> {
         runnerOnThird: snap.runnerOnThird,
         fieldingTeamId: snap.fieldingTeamId,
         battingTeamId: snap.battingTeamId,
+        catcherId: catcherFromSnapshotPayload(snap.rawPayload),
       } satisfies AtBatSnapshotForAudit,
     ])
   );

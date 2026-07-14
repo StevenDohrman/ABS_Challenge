@@ -11,6 +11,10 @@ export interface PlayerRankingRowDto {
   challengesOverturned: number;
   overturnRate: number | null;
   missedOpportunities: number;
+  battingMissedCount: number;
+  battingMissedValue: number;
+  fieldingMissedCount: number;
+  fieldingMissedValue: number;
   totalMissedValue: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
@@ -29,6 +33,9 @@ export interface TeamRankingRowDto {
   overturnRate: number | null;
   battingMissedCount: number;
   battingMissedValue: number;
+  fieldingMissedCount: number;
+  fieldingMissedValue: number;
+  totalMissedValue: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
   totalGainedRe: number;

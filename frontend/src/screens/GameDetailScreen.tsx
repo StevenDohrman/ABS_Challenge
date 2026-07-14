@@ -14,8 +14,7 @@ import { useScheduleGame } from "../hooks/useSchedule";
 import { formatInningShort, teamAbbrev } from "../utils/baseballDisplay";
 import { formatTimestamp } from "../utils/format";
 import { BranchGameButton } from "../components/BranchGameButton";
-
-const CHALLENGES_PER_TEAM = 2;
+import { GAME_RULES } from "../constants/gameRules";
 
 function ChallengeBar({
   abbrev,
@@ -27,7 +26,7 @@ function ChallengeBar({
   label: string;
 }) {
   if (remaining === null) return null;
-  const total = CHALLENGES_PER_TEAM;
+  const total = GAME_RULES.DEFAULT_CHALLENGES_PER_TEAM;
   return (
     <div className="flex flex-col items-center gap-1.5" title={label}>
       <span className="text-[10px] font-mono text-app-faint">{abbrev}</span>

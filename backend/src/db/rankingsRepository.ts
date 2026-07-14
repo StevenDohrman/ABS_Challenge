@@ -21,6 +21,8 @@ function rate(numerator: number, denominator: number): number | null {
 function playerHasActivity(row: {
   challengesUsed: number;
   missedOpportunities: number;
+  battingMissedCount: number;
+  fieldingMissedCount: number;
   badChallenges: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
@@ -28,6 +30,8 @@ function playerHasActivity(row: {
   return (
     row.challengesUsed > 0 ||
     row.missedOpportunities > 0 ||
+    row.battingMissedCount > 0 ||
+    row.fieldingMissedCount > 0 ||
     row.badChallenges > 0 ||
     row.battingGainedRe > 0 ||
     row.fieldingGainedRe > 0
@@ -37,6 +41,7 @@ function playerHasActivity(row: {
 function teamHasActivity(row: {
   challengesUsed: number;
   battingMissedCount: number;
+  fieldingMissedCount: number;
   badChallenges: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
@@ -44,6 +49,7 @@ function teamHasActivity(row: {
   return (
     row.challengesUsed > 0 ||
     row.battingMissedCount > 0 ||
+    row.fieldingMissedCount > 0 ||
     row.badChallenges > 0 ||
     row.battingGainedRe > 0 ||
     row.fieldingGainedRe > 0
@@ -110,6 +116,10 @@ export async function fetchPlayerRankingRows(
     challengesOverturned: number;
     missedOpportunities: number;
     totalMissedValue: number;
+    battingMissedCount: number;
+    battingMissedValue: number;
+    fieldingMissedCount: number;
+    fieldingMissedValue: number;
     battingGainedRe: number;
     fieldingGainedRe: number;
     badChallenges: number;
@@ -140,6 +150,10 @@ export async function fetchPlayerRankingRows(
           challengesOverturned: 0,
           missedOpportunities: 0,
           totalMissedValue: 0,
+          battingMissedCount: 0,
+          battingMissedValue: 0,
+          fieldingMissedCount: 0,
+          fieldingMissedValue: 0,
           battingGainedRe: 0,
           fieldingGainedRe: 0,
           badChallenges: 0,
@@ -150,6 +164,10 @@ export async function fetchPlayerRankingRows(
       acc.challengesOverturned += bucket.challengesOverturned;
       acc.missedOpportunities += bucket.missedOpportunities;
       acc.totalMissedValue += bucket.totalMissedValue;
+      acc.battingMissedCount += bucket.battingMissedCount;
+      acc.battingMissedValue += bucket.battingMissedValue;
+      acc.fieldingMissedCount += bucket.fieldingMissedCount;
+      acc.fieldingMissedValue += bucket.fieldingMissedValue;
       acc.battingGainedRe += bucket.battingGainedRe;
       acc.fieldingGainedRe += bucket.fieldingGainedRe;
       acc.badChallenges += bucket.badChallenges;
@@ -163,21 +181,34 @@ export async function fetchPlayerRankingRows(
     countPlayerAppearances(playerIds, periodStart, periodEnd),
   ]);
 
-  return active.map((acc) => ({
-    rank: 0,
-    playerId: acc.playerId,
-    playerName: names.get(acc.playerId) ?? `Player ${acc.playerId}`,
-    challengesUsed: acc.challengesUsed,
-    challengesOverturned: acc.challengesOverturned,
-    overturnRate: rate(acc.challengesOverturned, acc.challengesUsed),
-    missedOpportunities: acc.missedOpportunities,
-    totalMissedValue: round3(acc.totalMissedValue),
-    battingGainedRe: round3(acc.battingGainedRe),
-    fieldingGainedRe: round3(acc.fieldingGainedRe),
-    totalGainedRe: round3(acc.battingGainedRe + acc.fieldingGainedRe),
-    badChallenges: acc.badChallenges,
-    gamesAppeared: appearances.get(acc.playerId) ?? 0,
-  }));
+  return active.map((acc) => {
+    const splitMissedValue = acc.battingMissedValue + acc.fieldingMissedValue;
+    const totalMissedValue =
+      splitMissedValue > 0 ? splitMissedValue : acc.totalMissedValue;
+    const splitMissedCount = acc.battingMissedCount + acc.fieldingMissedCount;
+    const missedOpportunities =
+      splitMissedCount > 0 ? splitMissedCount : acc.missedOpportunities;
+
+    return {
+      rank: 0,
+      playerId: acc.playerId,
+      playerName: names.get(acc.playerId) ?? `Player ${acc.playerId}`,
+      challengesUsed: acc.challengesUsed,
+      challengesOverturned: acc.challengesOverturned,
+      overturnRate: rate(acc.challengesOverturned, acc.challengesUsed),
+      missedOpportunities,
+      battingMissedCount: acc.battingMissedCount,
+      battingMissedValue: round3(acc.battingMissedValue),
+      fieldingMissedCount: acc.fieldingMissedCount,
+      fieldingMissedValue: round3(acc.fieldingMissedValue),
+      totalMissedValue: round3(totalMissedValue),
+      battingGainedRe: round3(acc.battingGainedRe),
+      fieldingGainedRe: round3(acc.fieldingGainedRe),
+      totalGainedRe: round3(acc.battingGainedRe + acc.fieldingGainedRe),
+      badChallenges: acc.badChallenges,
+      gamesAppeared: appearances.get(acc.playerId) ?? 0,
+    };
+  });
 }
 
 export async function fetchTeamRankingRows(
@@ -193,6 +224,8 @@ export async function fetchTeamRankingRows(
     challengesOverturned: number;
     battingMissedCount: number;
     battingMissedValue: number;
+    fieldingMissedCount: number;
+    fieldingMissedValue: number;
     battingGainedRe: number;
     fieldingGainedRe: number;
     badChallenges: number;
@@ -223,6 +256,8 @@ export async function fetchTeamRankingRows(
           challengesOverturned: 0,
           battingMissedCount: 0,
           battingMissedValue: 0,
+          fieldingMissedCount: 0,
+          fieldingMissedValue: 0,
           battingGainedRe: 0,
           fieldingGainedRe: 0,
           badChallenges: 0,
@@ -233,6 +268,8 @@ export async function fetchTeamRankingRows(
       acc.challengesOverturned += bucket.challengesOverturned;
       acc.battingMissedCount += bucket.battingMissedCount;
       acc.battingMissedValue += bucket.battingMissedValue;
+      acc.fieldingMissedCount += bucket.fieldingMissedCount;
+      acc.fieldingMissedValue += bucket.fieldingMissedValue;
       acc.battingGainedRe += bucket.battingGainedRe;
       acc.fieldingGainedRe += bucket.fieldingGainedRe;
       acc.badChallenges += bucket.badChallenges;
@@ -255,6 +292,9 @@ export async function fetchTeamRankingRows(
       overturnRate: rate(acc.challengesOverturned, acc.challengesUsed),
       battingMissedCount: acc.battingMissedCount,
       battingMissedValue: round3(acc.battingMissedValue),
+      fieldingMissedCount: acc.fieldingMissedCount,
+      fieldingMissedValue: round3(acc.fieldingMissedValue),
+      totalMissedValue: round3(acc.battingMissedValue + acc.fieldingMissedValue),
       battingGainedRe: round3(acc.battingGainedRe),
       fieldingGainedRe: round3(acc.fieldingGainedRe),
       totalGainedRe: round3(acc.battingGainedRe + acc.fieldingGainedRe),

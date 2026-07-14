@@ -101,6 +101,8 @@ export class SavantDailyJob extends EventEmitter {
   }
 
   private async fetchDailyCsvBundle(season: number): Promise<DailyCsvBundle> {
+    // Lightweight leaderboards first — avoid competing with ~17 MB Statcast exports
+    // for the same 30–60 s connection budget.
     const [
       expectedStatsCsv,
       disciplineCsv,
@@ -108,8 +110,6 @@ export class SavantDailyJob extends EventEmitter {
       sprintCsv,
       fielderOaaCsv,
       pitcherArsenalCsv,
-      pitcherStatcastCsv,
-      batterStatcastCsv,
       leagueOps,
     ] = await Promise.all([
       fetchExpectedStatsCsv(season),
@@ -118,7 +118,17 @@ export class SavantDailyJob extends EventEmitter {
       fetchSprintSpeedCsv(season),
       fetchFielderOaaCsv(season),
       fetchPitchArsenalStatsCsv(season),
-      fetchSeasonPitcherStatcastCsv(season),
+      fetchLeagueOps(season),
+    ]);
+
+    const [pitcherStatcastCsv, batterStatcastCsv] = await Promise.all([
+      fetchSeasonPitcherStatcastCsv(season).catch((err) => {
+        console.error(
+          `[SavantDailyJob] pitcher Statcast CSV failed (pitch mix ball rates skipped):`,
+          err instanceof Error ? err.message : err
+        );
+        return "";
+      }),
       fetchSeasonBatterStatcastCsv(season).catch((err) => {
         console.error(
           `[SavantDailyJob] batter Statcast CSV failed (count wOBA skipped):`,
@@ -126,7 +136,6 @@ export class SavantDailyJob extends EventEmitter {
         );
         return "";
       }),
-      fetchLeagueOps(season),
     ]);
 
     return {

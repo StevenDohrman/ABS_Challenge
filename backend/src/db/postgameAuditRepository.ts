@@ -19,6 +19,7 @@ export interface PostgameAuditInput {
   outs: number;
   batterId: number;
   pitcherId: number;
+  catcherId?: number | null;
   originalCall: OriginalCall;
   plateX: number | null;
   plateZ: number | null;
@@ -57,6 +58,7 @@ export async function upsertPostgameAudits(
         plateZ: audit.plateZ,
         szTop: audit.szTop,
         szBot: audit.szBot,
+        catcherId: audit.catcherId ?? null,
       },
       create: {
         gamePk: audit.gamePk,
@@ -72,6 +74,7 @@ export async function upsertPostgameAudits(
         outs: audit.outs,
         batterId: audit.batterId,
         pitcherId: audit.pitcherId,
+        catcherId: audit.catcherId ?? null,
         originalCall: audit.originalCall,
         plateX: audit.plateX,
         plateZ: audit.plateZ,

@@ -13,7 +13,7 @@
 
 import { GameStateContext } from "../domain/gameContext.types";
 import { BaserunningContextInput } from "../domain/baserunningContext.types";
-import { BASEBALL_RULES, BASERUNNING } from "../constants";
+import { BASEBALL_RULES, BASERUNNING, EXPLANATION } from "../constants";
 import { clamp } from "../utils/clamp";
 
 export interface BaserunningContextResult {
@@ -152,7 +152,7 @@ function describeNote(
   ctx: BaserunningContextInput,
   multiplier: number
 ): BaserunningContextResult["note"] {
-  if (Math.abs(multiplier - 1) < 0.02) return null;
+  if (Math.abs(multiplier - 1) < EXPLANATION.NEGLIGIBLE_MULTIPLIER_DELTA) return null;
 
   const leadSlot = slots.find((s) => s.label === "r2" || s.label === "r3");
   if (

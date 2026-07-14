@@ -258,22 +258,8 @@ function computeHandednessModifier(
  * borderline pitches — a called strike is more likely to be genuinely close.
  */
 function computeCountModifier(balls: Balls, strikes: Strikes): number {
-  const COUNT_MODIFIERS: Record<string, number> = {
-    "3-0": -0.06, // pitcher aiming for heart of plate; called strike likely correct
-    "2-0": -0.03,
-    "1-0": -0.01,
-    "0-0":  0.00,
-    "3-1":  0.00,
-    "2-1":  0.00,
-    "1-1":  0.00,
-    "0-1":  0.02,
-    "3-2":  0.04, // full count; pitcher working corners under pressure
-    "2-2":  0.04,
-    "1-2":  0.05, // pitcher working edges to put batter away
-    "0-2":  0.06, // pitcher most likely to throw borderline or waste pitch
-  };
-
-  return COUNT_MODIFIERS[`${balls}-${strikes}`] ?? 0;
+  const key = `${balls}-${strikes}` as keyof typeof CREDIBILITY.COUNT_MODIFIERS;
+  return CREDIBILITY.COUNT_MODIFIERS[key] ?? 0;
 }
 
 // ---------------------------------------------------------------------------

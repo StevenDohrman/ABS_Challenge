@@ -194,9 +194,10 @@ export function AboutPage() {
           </p>
           <div className="space-y-4 pt-1">
             <Term name="Missed RE">
-              Run expectancy left on the table from missed opportunities. For
-              players this is batting-side misses; for teams it is batting-side
-              missed value only.
+              Run expectancy left on the table from missed opportunities. Player
+              leaderboards split batting misses (batter) and fielding misses
+              (catcher). Team leaderboards split batting and fielding missed RE.
+              Default sort uses the combined total.
             </Term>
             <Term name="Gained RE">
               Run expectancy captured on successful overturns — split into batting

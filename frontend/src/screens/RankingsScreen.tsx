@@ -121,10 +121,11 @@ export function RankingsScreen() {
       )}
 
       <p className="text-[11px] text-app-faint leading-relaxed">
-        Missed RE = postgame audit run expectancy left on the table (batting side).
-        Gained RE = run expectancy captured on successful overturns (batting or
-        fielding side). Challenge success % = overturned challenges ÷ challenges
-        used. Players with no challenges show — for success % sorts.
+        Missed RE = postgame audit run expectancy left on the table, split into
+        batting and fielding columns. Batting misses credit the batter; fielding
+        misses credit the catcher (not the pitcher). Gained RE = run expectancy
+        captured on successful overturns. Challenge success % = overturned
+        challenges ÷ challenges used.
       </p>
     </div>
   );
@@ -149,6 +150,8 @@ function PlayerCard({ row, activeSort }: { row: PlayerRankingRow; activeSort: Ra
         <p className="font-medium text-app truncate flex-1">{row.playerName || `Player ${row.playerId}`}</p>
       </div>
       <StatRow label="Missed RE" value={formatRe(row.totalMissedValue)} highlight={activeSort === "missedRe"} />
+      <StatRow label="Bat missed RE" value={formatRe(row.battingMissedValue)} />
+      <StatRow label="Fld missed RE" value={formatRe(row.fieldingMissedValue)} />
       <StatRow label="Bat gained RE" value={formatRe(row.battingGainedRe)} highlight={activeSort === "gainedRe"} />
       <StatRow label="Fld gained RE" value={formatRe(row.fieldingGainedRe)} />
       <StatRow label="Misses" value={String(row.missedOpportunities)} />
@@ -169,6 +172,7 @@ function TeamCard({ row, activeSort }: { row: TeamRankingRow; activeSort: Rankin
       </div>
       <p className="text-xs text-app-faint truncate">{row.teamName}</p>
       <StatRow label="Batting missed RE" value={formatRe(row.battingMissedValue)} highlight={activeSort === "missedRe"} />
+      <StatRow label="Fielding missed RE" value={formatRe(row.fieldingMissedValue)} />
       <StatRow label="Bat gained RE" value={formatRe(row.battingGainedRe)} highlight={activeSort === "gainedRe"} />
       <StatRow label="Fld gained RE" value={formatRe(row.fieldingGainedRe)} />
       <StatRow label="Misses" value={String(row.battingMissedCount)} />
@@ -199,6 +203,8 @@ function PlayerTable({
             <th className="px-3 py-2 font-medium">#</th>
             <th className="px-3 py-2 font-medium">Player</th>
             <th className={thClass(activeSort === "missedRe")}>Missed RE</th>
+            <th className={thClass(activeSort === "missedRe")}>Bat missed RE</th>
+            <th className={thClass(activeSort === "missedRe")}>Fld missed RE</th>
             <th className={thClass(activeSort === "gainedRe")}>Bat gained RE</th>
             <th className={thClass(activeSort === "gainedRe")}>Fld gained RE</th>
             <th className="px-3 py-2 font-medium text-right">Misses</th>
@@ -219,6 +225,16 @@ function PlayerTable({
                 activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
               }`}>
                 {formatRe(row.totalMissedValue)}
+              </td>
+              <td className={`px-3 py-2.5 text-right font-mono ${
+                activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
+              }`}>
+                {formatRe(row.battingMissedValue)}
+              </td>
+              <td className={`px-3 py-2.5 text-right font-mono ${
+                activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
+              }`}>
+                {formatRe(row.fieldingMissedValue)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
                 activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"
@@ -260,6 +276,7 @@ function TeamTable({
             <th className="px-3 py-2 font-medium">#</th>
             <th className="px-3 py-2 font-medium">Team</th>
             <th className={thClass(activeSort === "missedRe")}>Batting missed RE</th>
+            <th className={thClass(activeSort === "missedRe")}>Fielding missed RE</th>
             <th className={thClass(activeSort === "gainedRe")}>Bat gained RE</th>
             <th className={thClass(activeSort === "gainedRe")}>Fld gained RE</th>
             <th className="px-3 py-2 font-medium text-right">Misses</th>
@@ -283,6 +300,11 @@ function TeamTable({
                 activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
               }`}>
                 {formatRe(row.battingMissedValue)}
+              </td>
+              <td className={`px-3 py-2.5 text-right font-mono ${
+                activeSort === "missedRe" ? "text-amber-700 dark:text-amber-300" : "text-amber-700/90 dark:text-amber-300/90 hidden sm:table-cell"
+              }`}>
+                {formatRe(row.fieldingMissedValue)}
               </td>
               <td className={`px-3 py-2.5 text-right font-mono ${
                 activeSort === "gainedRe" ? "text-emerald-700 dark:text-emerald-300" : "text-emerald-700/80 dark:text-emerald-300/80 hidden sm:table-cell"

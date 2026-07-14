@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../db/prisma";
 import { gameHasTriggeredRecommendation } from "../db/recommendationRepository";
+import { mlbToday } from "../utils/mlbDates";
 import type { ScheduleResponseDto, ScheduleGameDto, GameAbstractState } from "../challenge.dto";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,13 +178,4 @@ function formatHalf(half?: string): string | null {
 function normalizeLiveOuts(outs: number | null): number | null {
   if (outs === null) return null;
   return Math.min(Math.max(0, outs), 2);
-}
-
-/**
- * MLB uses Eastern Time for official game dates (UTC-5 conservative offset).
- */
-function mlbToday(): string {
-  const etOffset = -5 * 60;
-  const etMs = Date.now() + etOffset * 60 * 1_000;
-  return new Date(etMs).toISOString().slice(0, 10);
 }

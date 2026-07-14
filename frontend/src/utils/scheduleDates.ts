@@ -1,11 +1,9 @@
-/** Matches backend MLB official-date cutoff (conservative ET offset). */
-export function mlbToday(): string {
-  const etOffset = -5 * 60;
-  const etMs = Date.now() + etOffset * 60 * 1_000;
-  return new Date(etMs).toISOString().slice(0, 10);
-}
+import { DEFAULT_RETENTION_DAYS } from "../constants/retention";
+import { mlbToday } from "./mlbTime";
 
-export const SCHEDULE_DAY_COUNT = 7;
+export { mlbToday };
+
+export const SCHEDULE_DAY_COUNT = DEFAULT_RETENTION_DAYS;
 
 export interface ScheduleDateOption {
   /** 0 = today, 6 = six days ago */

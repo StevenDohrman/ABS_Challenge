@@ -8,6 +8,10 @@ export interface PlayerRankingRow {
   challengesOverturned: number;
   overturnRate: number | null;
   missedOpportunities: number;
+  battingMissedCount: number;
+  battingMissedValue: number;
+  fieldingMissedCount: number;
+  fieldingMissedValue: number;
   totalMissedValue: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
@@ -26,6 +30,9 @@ export interface TeamRankingRow {
   overturnRate: number | null;
   battingMissedCount: number;
   battingMissedValue: number;
+  fieldingMissedCount: number;
+  fieldingMissedValue: number;
+  totalMissedValue: number;
   battingGainedRe: number;
   fieldingGainedRe: number;
   totalGainedRe: number;
