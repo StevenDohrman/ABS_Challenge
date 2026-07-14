@@ -904,6 +904,7 @@ The full stack runs end-to-end for live ABS challenge guidance, postgame audit, 
 - **Pitcher challenge hints** — display-only season pitch-mix context on live/pre-at-bat responses.
 - **Rankings** — incremental player/team aggregates (missed RE, batting/fielding gained RE, challenge success %).
 - **Branch export** — read-only game bundles for client-side forks.
+- **DB query batching** — Savant daily upserts (statlines, spray, OAA, sprint speed, pitch mix), lineup upserts, and count-performance persistence all use a shared raw-SQL bulk `INSERT ... ON CONFLICT DO UPDATE` helper (`backend/src/db/bulkUpsert.ts`) instead of fanning out one upsert per row; the six Savant daily ingest handlers now run serially instead of concurrently. The schedule endpoint's triggered-recommendation flags use one batched query instead of one per tracked game. See [`docs/PHASE8_DB_WRITE_BATCHING_OVERVIEW.md`](docs/PHASE8_DB_WRITE_BATCHING_OVERVIEW.md).
 
 ### Engine (`@abs/engine`)
 
@@ -979,7 +980,11 @@ Postgame audit uses MLB live feed pitch location. Audits batting (called strikes
 
 Local-storage branches with import/export, branch editor, preview grids, and `/branches` list. See Phase 8 under Development Phases.
 
-### 6. Phase 7: Engine tuning (remaining)
+### 6. ~~DB query batching (concurrent connection pressure)~~ (done)
+
+Replaced per-row concurrent upserts with bulk `INSERT ... ON CONFLICT DO UPDATE` statements for Savant daily ingest (statlines, spray, OAA, sprint speed, pitch mix), lineup updates, and count-performance persistence; serialized the six Savant daily ingest handlers so they no longer compete for `dbGate` slots concurrently; collapsed the schedule endpoint's N per-game triggered-recommendation lookups into one batched query. See [`docs/PHASE8_DB_WRITE_BATCHING_OVERVIEW.md`](docs/PHASE8_DB_WRITE_BATCHING_OVERVIEW.md) (and sub-docs 8A/8B/8C) for the full write-up, including deferred/optional items (game-detail bundle read, rankings reads).
+
+### 7. Phase 7: Engine tuning (remaining)
 
 **Priority — wire `SavantLineupJob` for batter count-state splits.**
 

@@ -5,8 +5,7 @@
  */
 
 import { prisma } from "./prisma";
-import { DB_LIMITS } from "./constants";
-import { mapSettledWithConcurrency } from "../utils/concurrency";
+import { bulkUpsert } from "./bulkUpsert";
 import type { GameLineupEntry } from "@abs/data-pipeline";
 import type { GameLineup } from "@prisma/client";
 
@@ -38,27 +37,47 @@ export async function upsertGameLineupEntry(
   });
 }
 
+const LINEUP_COLUMNS = [
+  "gamePk",
+  "teamId",
+  "playerId",
+  "battingOrder",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const LINEUP_UPDATE_COLUMNS = ["battingOrder", "fetchedAt", "updatedAt"];
+
+/**
+ * Bulk upsert a game's full lineup (both teams, ~18–26 rows) in a single
+ * `INSERT ... ON CONFLICT DO UPDATE` statement instead of fanning out one
+ * upsert per entry (Phase 8B).
+ */
 export async function upsertGameLineup(
   entries: GameLineupEntry[]
 ): Promise<void> {
   if (entries.length === 0) return;
 
-  const results = await mapSettledWithConcurrency(
-    entries,
-    DB_LIMITS.WRITE_CONCURRENCY,
-    (e) => upsertGameLineupEntry(e)
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
-    for (const failure of failures) {
-      const reason = failure.reason;
-      console.error(
-        `[lineupRepository] lineup upsert failed for game ${entries[0]?.gamePk}:`,
-        reason
-      );
-    }
+  try {
+    await bulkUpsert(entries, {
+      table: "game_lineups",
+      columns: [...LINEUP_COLUMNS],
+      conflictColumns: ["gamePk", "teamId", "playerId"],
+      updateColumns: LINEUP_UPDATE_COLUMNS,
+      toRow: (e) => [
+        e.gamePk,
+        e.teamId,
+        e.playerId,
+        e.battingOrder,
+        new Date(e.fetchedAt),
+        new Date(),
+      ],
+    });
+  } catch (err) {
     console.error(
-      `[lineupRepository] ${failures.length} of ${entries.length} lineup upserts failed`
+      `[lineupRepository] bulk upsert failed for game ${entries[0]?.gamePk} ` +
+      `(${entries.length} entries):`,
+      err
     );
   }
 }

@@ -11,7 +11,8 @@ import { INTERVALS, SEASONS } from "../db/constants";
 import { findGameLineups } from "../db/lineupRepository";
 import {
   findRecentlyRefreshedPerformancePlayerIds,
-  upsertPlayerCountPerformance,
+  bulkUpsertPlayerCountPerformance,
+  type PlayerCountPerformanceRow,
 } from "../db/countPerformanceRepository";
 
 export async function ingestCountPerformanceForGame(gamePk: number): Promise<void> {
@@ -37,27 +38,20 @@ export async function ingestCountPerformanceForGame(gamePk: number): Promise<voi
     }
 
     const job = new SavantLineupJob();
-    const persistPromises: Promise<void>[] = [];
+    const rows: PlayerCountPerformanceRow[] = [];
 
+    // Collect rollups in memory only — no DB writes inside the event
+    // handler. SavantLineupJob fetches players sequentially (batches of 3
+    // over HTTP), so `playerHistory` fires many times; writing on each fire
+    // would re-introduce uncapped per-player upserts (Phase 8B).
     job.on("playerHistory", (result) => {
       if (result.playerType !== "batter") return;
-
-      const work = (async () => {
-        const buckets = rollupCountPerformance(result.history);
-        await upsertPlayerCountPerformance(
-          result.playerId,
-          season,
-          buckets,
-          new Date()
-        );
-      })().catch((err) => {
-        console.error(
-          `[countPerformanceIngest] failed to persist player ${result.playerId}:`,
-          err
-        );
+      rows.push({
+        playerId: result.playerId,
+        season,
+        buckets: rollupCountPerformance(result.history),
+        fetchedAt: new Date(),
       });
-
-      persistPromises.push(work);
     });
 
     job.on("error", (err) => {
@@ -74,7 +68,7 @@ export async function ingestCountPerformanceForGame(gamePk: number): Promise<voi
     );
 
     await job.run(players, season);
-    await Promise.allSettled(persistPromises);
+    await bulkUpsertPlayerCountPerformance(rows);
   } catch (err) {
     console.error(`[countPerformanceIngest] failed for game ${gamePk}:`, err);
   }

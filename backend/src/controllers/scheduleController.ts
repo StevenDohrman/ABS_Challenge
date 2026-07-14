@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../db/prisma";
-import { gameHasTriggeredRecommendation } from "../db/recommendationRepository";
+import { findGamePksWithTriggeredRecommendations } from "../db/recommendationRepository";
 import { mlbToday } from "../utils/mlbDates";
 import type { ScheduleResponseDto, ScheduleGameDto, GameAbstractState } from "../challenge.dto";
 
@@ -101,15 +101,8 @@ export async function getTodaySchedule(
     );
 
     // ── 3. Check which tracked games have triggered recommendations ─────────
-    const triggeredFlags = await Promise.all(
-      [...trackedSet].map(async (pk) => ({
-        gamePk: pk,
-        hasTriggered: await gameHasTriggeredRecommendation(pk),
-      }))
-    );
-    triggeredSet = new Set(
-      triggeredFlags.filter((f) => f.hasTriggered).map((f) => f.gamePk)
-    );
+    // Single batched query (Phase 8C) instead of one lookup per tracked game.
+    triggeredSet = await findGamePksWithTriggeredRecommendations([...trackedSet]);
   } catch (dbErr) {
     console.warn("[scheduleController] DB unavailable — returning schedule without tracking data:", dbErr instanceof Error ? dbErr.message : dbErr);
   }

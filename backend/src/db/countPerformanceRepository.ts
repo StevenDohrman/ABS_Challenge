@@ -4,6 +4,7 @@
 
 import { INTERVALS } from "./constants";
 import { prisma } from "./prisma";
+import { bulkUpsert } from "./bulkUpsert";
 import type { Prisma } from "@prisma/client";
 import type { PlayerCountPerformanceMap } from "@abs/data-pipeline";
 import type { PlayerCountPerformance } from "@prisma/client";
@@ -50,6 +51,49 @@ export async function upsertPlayerCountPerformance(
     where: { playerId_season: { playerId, season } },
     update: sharedFields,
     create: { playerId, season, ...sharedFields },
+  });
+}
+
+export interface PlayerCountPerformanceRow {
+  playerId: number;
+  season: number;
+  buckets: PlayerCountPerformanceMap;
+  fetchedAt: Date;
+}
+
+const COUNT_PERFORMANCE_COLUMNS = [
+  "playerId",
+  "season",
+  "buckets",
+  "fetchedAt",
+  "updatedAt",
+] as const;
+
+const COUNT_PERFORMANCE_UPDATE_COLUMNS = ["buckets", "fetchedAt", "updatedAt"];
+
+/**
+ * Bulk upsert per-batter count-state wOBA rollups collected from a
+ * SavantLineupJob run — one statement instead of one upsert per batter
+ * (Phase 8B). `buckets` is JSONB, so its bound parameter is cast explicitly.
+ */
+export async function bulkUpsertPlayerCountPerformance(
+  rows: PlayerCountPerformanceRow[]
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  await bulkUpsert(rows, {
+    table: "player_count_performance",
+    columns: [...COUNT_PERFORMANCE_COLUMNS],
+    conflictColumns: ["playerId", "season"],
+    updateColumns: COUNT_PERFORMANCE_UPDATE_COLUMNS,
+    casts: { buckets: "jsonb" },
+    toRow: (r) => [
+      r.playerId,
+      r.season,
+      JSON.stringify(r.buckets),
+      r.fetchedAt,
+      new Date(),
+    ],
   });
 }
 
