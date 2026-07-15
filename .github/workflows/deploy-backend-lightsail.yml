@@ -1,0 +1,54 @@
+name: Deploy backend to Lightsail
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "data-pipeline/**"
+      - "engine/**"
+      - "package.json"
+      - "package-lock.json"
+      - "deploy/lightsail/**"
+      - ".github/workflows/deploy-backend-lightsail.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-lightsail
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR || '/opt/abs-challenge' }}"
+            BRANCH="${{ secrets.LIGHTSAIL_BRANCH || 'main' }}"
+
+            if [[ ! -f "${APP_DIR}/backend/.env" ]]; then
+              echo "Missing ${APP_DIR}/backend/.env — create it on the server first."
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/${BRANCH}"
+
+            npm ci
+            npm run backend:build
+            npx prisma migrate deploy --schema=backend/prisma/schema.prisma
+
+            sudo systemctl restart abs-backend
+            sleep 3
+            curl -fsS http://127.0.0.1:3001/health | head -c 500
+            echo ""
+            echo "Deploy complete."

@@ -5,6 +5,7 @@
   "description": "Backend API and orchestration layer for the Strike Zone Challenge Recommendation System",
   "main": "dist/server.js",
   "dependencies": {
+    "@abs/data-pipeline": "*",
     "@abs/engine": "*",
     "@prisma/client": "^6.19.3",
     "cors": "^2.8.5",

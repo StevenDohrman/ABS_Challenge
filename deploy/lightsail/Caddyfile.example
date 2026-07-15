@@ -1,0 +1,9 @@
+# Replace api.example.com with your API hostname.
+# Caddy obtains and renews HTTPS certificates automatically.
+#
+# Install: sudo cp Caddyfile.example /etc/caddy/Caddyfile && sudo systemctl reload caddy
+
+api.example.com {
+	encode gzip
+	reverse_proxy localhost:3001
+}

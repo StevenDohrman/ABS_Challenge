@@ -1,0 +1,19 @@
+[Unit]
+Description=ABS Challenge backend (API + live orchestrator)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/abs-challenge
+EnvironmentFile=/opt/abs-challenge/backend/.env
+ExecStart=/usr/bin/node backend/dist/server.js
+Restart=on-failure
+RestartSec=10
+# Savant startup + backfill can be CPU-heavy; allow a long stop before SIGKILL.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
