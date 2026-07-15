@@ -7,6 +7,12 @@
 #     --repo git@github.com:YOUR_ORG/ABS_Challenge.git
 #
 # Or copy this script to the server and run locally after cloning the repo.
+#
+# This script uses bash-only syntax ([[ ]]). If invoked via `sh script.sh`
+# (Ubuntu's /bin/sh is dash, which doesn't support [[ ]]), re-exec under bash.
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
 
 set -euo pipefail
 
