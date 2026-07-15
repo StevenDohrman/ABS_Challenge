@@ -2,7 +2,7 @@ name: Deploy backend to Lightsail
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "backend/**"
       - "data-pipeline/**"
@@ -32,7 +32,7 @@ jobs:
           script: |
             set -euo pipefail
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR || '/opt/abs-challenge' }}"
-            BRANCH="${{ secrets.LIGHTSAIL_BRANCH || 'main' }}"
+            BRANCH="${{ secrets.LIGHTSAIL_BRANCH || 'master' }}"
 
             if [[ ! -f "${APP_DIR}/backend/.env" ]]; then
               echo "Missing ${APP_DIR}/backend/.env — create it on the server first."

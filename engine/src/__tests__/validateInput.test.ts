@@ -2,6 +2,7 @@ import {
   validateChallengeDecisionInput,
   ChallengeInputValidationError,
 } from "../validation/validateInput";
+import { computeChallengeOutcomeExpectancies } from "../data/runExpectancy";
 import { makeGameState } from "./fixtures/gameState";
 import { makeDecisionInput } from "./fixtures/makeDecisionInput";
 import { aggressivePlayer } from "./fixtures/players";
@@ -89,5 +90,68 @@ describe("validateChallengeDecisionInput", () => {
   test("rejects NaN balls", () => {
     const input = makeDecisionInput(makeGameState({ balls: NaN as 0 }));
     expect(() => validateChallengeDecisionInput(input)).toThrow(/balls/);
+  });
+
+  // Regression: caller-supplied RE that was computed with count-state wOBA
+  // scaling must validate cleanly when countDeltaContext travels with the
+  // input. Previously the validator always recomputed "expected" RE with no
+  // scaling context, so any non-zero batter/league delta caused a spurious
+  // mismatch — this broke real precompute runs even though the RE was correct.
+  test("accepts RE computed with countDeltaContext when the context is included on the input", () => {
+    const gameState = makeGameState({ balls: 1, strikes: 2 });
+    const countDeltaContext = {
+      batterWobaByCount: { "1-2": 0.05 },
+      leagueWobaByCount: { "1-2": 0.187 },
+    };
+    const runners = {
+      first: gameState.runnerOnFirst,
+      second: gameState.runnerOnSecond,
+      third: gameState.runnerOnThird,
+    };
+    const { current, ifSucceeds, ifFails } = computeChallengeOutcomeExpectancies(
+      gameState.outs,
+      gameState.balls,
+      gameState.strikes,
+      runners,
+      countDeltaContext
+    );
+
+    const input = makeDecisionInput(gameState);
+    input.countDeltaContext = countDeltaContext;
+    input.currentRunExpectancy = current;
+    input.runExpectancyIfSuccessful = ifSucceeds;
+    input.runExpectancyIfFailed = ifFails;
+
+    expect(() => validateChallengeDecisionInput(input)).not.toThrow();
+  });
+
+  test("rejects RE computed with countDeltaContext when the context is dropped from the input", () => {
+    const gameState = makeGameState({ balls: 1, strikes: 2 });
+    const countDeltaContext = {
+      batterWobaByCount: { "1-2": 0.05 },
+      leagueWobaByCount: { "1-2": 0.187 },
+    };
+    const runners = {
+      first: gameState.runnerOnFirst,
+      second: gameState.runnerOnSecond,
+      third: gameState.runnerOnThird,
+    };
+    const { current, ifSucceeds, ifFails } = computeChallengeOutcomeExpectancies(
+      gameState.outs,
+      gameState.balls,
+      gameState.strikes,
+      runners,
+      countDeltaContext
+    );
+
+    // countDeltaContext intentionally omitted here — this is the bug scenario.
+    const input = makeDecisionInput(gameState);
+    input.currentRunExpectancy = current;
+    input.runExpectancyIfSuccessful = ifSucceeds;
+    input.runExpectancyIfFailed = ifFails;
+
+    expect(() => validateChallengeDecisionInput(input)).toThrow(
+      /currentRunExpectancy/
+    );
   });
 });

@@ -112,7 +112,8 @@ export function validateChallengeDecisionInput(
     gameState.outs,
     gameState.balls,
     gameState.strikes,
-    runners
+    runners,
+    input.countDeltaContext
   );
 
   for (const [field, value] of [

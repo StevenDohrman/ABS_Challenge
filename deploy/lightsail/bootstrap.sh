@@ -12,10 +12,10 @@ set -euo pipefail
 
 REPO_URL=""
 APP_DIR="/opt/abs-challenge"
-BRANCH="main"
+BRANCH="master"
 
 usage() {
-  echo "Usage: $0 --repo <git-url> [--branch main] [--app-dir /opt/abs-challenge]"
+  echo "Usage: $0 --repo <git-url> [--branch master] [--app-dir /opt/abs-challenge]"
   exit 1
 }
 

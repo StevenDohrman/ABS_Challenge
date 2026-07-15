@@ -224,6 +224,7 @@ export function buildChallengeInputForCount(
     gameState,
     playerContext: ctx.playerContext,
     pitchContext: ctx.pitchContext,
+    countDeltaContext: ctx.countDeltaContext,
     currentRunExpectancy: reValues.current,
     runExpectancyIfSuccessful: reValues.ifSucceeds,
     runExpectancyIfFailed: reValues.ifFails,

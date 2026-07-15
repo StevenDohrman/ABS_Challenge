@@ -4,6 +4,7 @@ import { PitchCallContext } from "./pitchContext.types";
 import { LeagueAverages } from "./leagueContext.types";
 import { BaserunningContextInput } from "./baserunningContext.types";
 import { LineupContextInput } from "./lineupContext.types";
+import { CountDeltaContext } from "../data/countDelta";
 
 export type ChallengeRecommendation = "AUTO_ALLOW" | "ALLOW" | "WARN" | "DENY";
 
@@ -31,6 +32,14 @@ export interface ChallengeDecisionInput {
    * This keeps the engine fully functional in tests and offline scenarios.
    */
   leagueAverages?: Partial<LeagueAverages>;
+
+  /**
+   * Batter/league wOBA-by-count used to scale the count-state RE delta when the
+   * caller computed the three RE fields below. Passed through so validateInput
+   * can recompute the same expected values — omitting this would make the
+   * consistency check compare scaled RE against unscaled RE and fail spuriously.
+   */
+  countDeltaContext?: CountDeltaContext | null;
 
   /**
    * Expected runs for the rest of the inning at the current count and base/out state.
