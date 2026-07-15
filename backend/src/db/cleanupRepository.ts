@@ -1,7 +1,10 @@
 /**
  * Data retention — purge game-related rows older than a configurable number
- * of days. Player stat snapshots are intentionally excluded; they are keyed
- * by player + season and are reused across the whole season.
+ * of days. Season-cumulative rankings data is intentionally excluded from
+ * purging (season totals + game-appearance rows), since it's keyed by
+ * player/team + season and is meant to accumulate for the whole season
+ * regardless of how long the underlying raw game rows are retained. See
+ * purgeRankingsForGames for details.
  *
  * Deletion order respects FK constraints:
  *   challenge_recommendations  (references live_pitch_events + games)

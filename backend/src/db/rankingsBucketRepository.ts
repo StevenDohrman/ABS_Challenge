@@ -170,16 +170,23 @@ export async function applyRankingsDelta(
     playerAppearanceIds: number[];
   },
   gamePk: number,
-  sign: 1 | -1 = 1
+  sign: 1 | -1 = 1,
+  options?: { skipSeasonTotals?: boolean }
 ): Promise<void> {
+  const skipSeasonTotals = options?.skipSeasonTotals ?? false;
+
   for (const playerDelta of delta.playerDeltas) {
     await applyPlayerDayBucket(playerDelta.playerId, gameDate, season, playerDelta, sign);
-    await applyPlayerSeasonTotal(playerDelta.playerId, season, playerDelta, sign);
+    if (!skipSeasonTotals) {
+      await applyPlayerSeasonTotal(playerDelta.playerId, season, playerDelta, sign);
+    }
   }
 
   for (const teamDelta of delta.teamDeltas) {
     await applyTeamDayBucket(teamDelta.teamId, gameDate, season, teamDelta, sign);
-    await applyTeamSeasonTotal(teamDelta.teamId, season, teamDelta, sign);
+    if (!skipSeasonTotals) {
+      await applyTeamSeasonTotal(teamDelta.teamId, season, teamDelta, sign);
+    }
   }
 
   if (sign === 1) {
@@ -209,6 +216,24 @@ export async function recordTeamGameAppearances(
   }
 }
 
+/**
+ * Reverse rankings contributions for games being purged by data retention.
+ *
+ * Only the per-day buckets are reversed here — day buckets are only ever
+ * queried within a recent rolling window (see resolveRankingsPeriod), so once
+ * a game falls outside the retention window its bucket row is already dead
+ * weight. Season totals are intentionally left untouched: they are meant to
+ * accumulate for the whole season regardless of how long raw game rows are
+ * retained (mirrors the player-stat-snapshot exclusion noted in
+ * cleanupRepository.ts). Reversing them here would silently turn "season"
+ * rankings into just another rolling window matching DATA_RETENTION_DAYS.
+ *
+ * Game-appearance rows (used for "gamesAppeared" in both week and season
+ * reads — season reads count appearances across the whole tracking window,
+ * not just the retention window) are intentionally NOT deleted for the same
+ * reason: they have no FK dependency on the purged Game/pitch rows, and
+ * removing them would silently undercount season-long games-appeared totals.
+ */
 export async function purgeRankingsForGames(gamePks: number[]): Promise<number> {
   if (gamePks.length === 0) return 0;
 
@@ -227,17 +252,12 @@ export async function purgeRankingsForGames(gamePks: number[]): Promise<number> 
       contribution.season,
       delta,
       contribution.gamePk,
-      -1
+      -1,
+      { skipSeasonTotals: true }
     );
   }
 
   await prisma.rankingsContribution.deleteMany({
-    where: { gamePk: { in: gamePks } },
-  });
-  await prisma.rankingPlayerGameAppearance.deleteMany({
-    where: { gamePk: { in: gamePks } },
-  });
-  await prisma.rankingTeamGameAppearance.deleteMany({
     where: { gamePk: { in: gamePks } },
   });
 
