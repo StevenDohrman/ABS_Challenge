@@ -48,7 +48,8 @@ echo "==> Installing git, curl, build tools"
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl ca-certificates build-essential
 
 echo "==> Installing Node.js 20"
-if ! command -v node >/dev/null || [[ "$(node -p process.versions.node.split('.')[0])" -lt 20 ]]; then
+NODE_MAJOR="$(node -v 2>/dev/null | cut -c2- | cut -d. -f1)"
+if ! command -v node >/dev/null || [ "${NODE_MAJOR:-0}" -lt 20 ]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
 fi
