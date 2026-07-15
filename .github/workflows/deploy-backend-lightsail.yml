@@ -45,7 +45,7 @@ jobs:
 
             npm ci
             npm run backend:build
-            npx prisma migrate deploy --schema=backend/prisma/schema.prisma
+            npm exec --workspace=backend -- prisma migrate deploy
 
             sudo systemctl restart abs-backend
             sleep 3
