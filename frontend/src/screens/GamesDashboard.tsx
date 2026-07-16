@@ -104,8 +104,14 @@ export function GamesDashboard() {
       {!serverOnline && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3">
           <p className="text-sm text-red-700 dark:text-red-300">
-            Backend at <span className="font-mono">localhost:3001</span> is unreachable.
-            Run <span className="font-mono">npm run backend:dev</span> to start it.
+            {import.meta.env.DEV ? (
+              <>
+                Backend at <span className="font-mono">localhost:3001</span> is unreachable.
+                Run <span className="font-mono">npm run backend:dev</span> to start it.
+              </>
+            ) : (
+              "Unable to reach the server right now. Please try again in a moment."
+            )}
           </p>
         </div>
       )}
