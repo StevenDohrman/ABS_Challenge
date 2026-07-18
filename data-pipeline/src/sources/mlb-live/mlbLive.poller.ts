@@ -7,6 +7,7 @@ import {
   parseHistoricalAtBatSnapshots,
   parseMissedAtBatSnapshots,
   parseGameLineups,
+  parsePlayerNamesFromFeed,
   pitchKey,
 } from "./mlbLive.parser";
 import {
@@ -38,12 +39,15 @@ export interface GamePoller {
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "lineupUpdate", listener: (entries: GameLineupEntry[]) => void): this;
+  /** Display names keyed by playerId, read from the feed's player dictionary. */
+  on(event: "playerNames", listener: (names: Record<number, string>) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
   emit(event: "atBatStart", snapshot: MlbAtBatSnapshot): boolean;
   emit(event: "gameBackfill", payload: GameBackfillPayload): boolean;
   emit(event: "pitchEvent", pitchEvent: MlbLivePitchEvent): boolean;
   emit(event: "gameOver", payload: { gamePk: number }): boolean;
   emit(event: "lineupUpdate", entries: GameLineupEntry[]): boolean;
+  emit(event: "playerNames", names: Record<number, string>): boolean;
   emit(event: "error", err: Error): boolean;
 }
 
@@ -122,6 +126,15 @@ export class GamePoller extends EventEmitter {
       const lineups = parseGameLineups(feed, fetchedAt);
       if (lineups.length > 0) {
         this.emit("lineupUpdate", lineups);
+      }
+
+      // The feed's player dictionary covers every player who has appeared —
+      // starters, bench, bullpen, and mid-game callups — with no qualifying
+      // threshold, unlike Savant's season leaderboard exports. Re-emitted on
+      // every poll (cheap dictionary read) so late substitutions are captured.
+      const playerNames = parsePlayerNamesFromFeed(feed);
+      if (Object.keys(playerNames).length > 0) {
+        this.emit("playerNames", playerNames);
       }
 
       const currentAtBatIndex = feed.liveData.plays.currentPlay?.about.atBatIndex ?? -1;

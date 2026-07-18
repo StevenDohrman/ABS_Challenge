@@ -18,7 +18,7 @@ import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository
 import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
 import { upsertPitcherPitchMixBatch } from "../db/pitcherPitchMixRepository";
 import { upsertGameLineup } from "../db/lineupRepository";
-import { recordNamesFromPitchRow } from "../db/playerNameRepository";
+import { recordNamesFromPitchRow, recordPlayerNames } from "../db/playerNameRepository";
 import { SEASONS } from "../db/constants";
 import { persistLeagueAverages } from "./leagueAveragesStore";
 import { trackTeamGameAppearances } from "./rankingsIncrementalService";
@@ -264,6 +264,28 @@ export async function handleLineupUpdate(
       `[ingestService] failed to upsert game lineup for game ${gamePk}:`,
       err
     );
+  }
+}
+
+/**
+ * Persist display names read from the live feed's player dictionary.
+ * Covers every player who has appeared in the game (starters, bench, bullpen,
+ * mid-game callups) with no qualifying threshold — unlike Savant-sourced names,
+ * which only cover players on Savant's season leaderboard exports.
+ */
+export async function handlePlayerNames(
+  names: Record<number, string>
+): Promise<void> {
+  const entries = Object.entries(names).map(([id, fullName]) => ({
+    playerId: Number(id),
+    fullName,
+  }));
+  if (entries.length === 0) return;
+
+  try {
+    await recordPlayerNames(entries);
+  } catch (err) {
+    console.error("[ingestService] failed to record player names:", err);
   }
 }
 

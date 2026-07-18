@@ -48,6 +48,7 @@ import {
   handlePitcherPitchMix,
   handleLineupUpdate,
   handleLeagueAverages,
+  handlePlayerNames,
   reconcileChallengeCounts,
 } from "./services/ingestService";
 import { precomputeAtBatRecommendations } from "./services/challengeService";
@@ -59,6 +60,7 @@ import {
 } from "./services/postgameScheduler";
 import { scanAndBackfillFinalGames } from "./services/finalGameBackfillService";
 import { backfillMissingRankingsContributions } from "./services/rankingsBackfillService";
+import { backfillPlayerNamesFromLiveFeeds } from "./services/playerNameBackfillService";
 import { purgeOldGames } from "./db/cleanupRepository";
 import {
   enqueuePipelineDbWork,
@@ -100,6 +102,7 @@ export async function startOrchestrator(): Promise<void> {
   await runFinalGameBackfill();
   scheduleFinalGameBackfill();
   void runRankingsBackfill();
+  void runPlayerNameBackfill();
   await runCleanupJob();     // Purge old data at startup and schedule daily reruns.
   scheduleCleanupJob();
 }
@@ -185,6 +188,16 @@ function startLivePollJob(): void {
     await enqueuePipelineDbWork(
       `count-performance game=${gamePk}`,
       () => ingestCountPerformanceForGame(gamePk),
+      "low"
+    );
+  });
+
+  job.on("playerNames", async (names) => {
+    const count = Object.keys(names).length;
+    if (count === 0) return;
+    await enqueuePipelineDbWork(
+      `player-names count=${count}`,
+      () => handlePlayerNames(names),
       "low"
     );
   });
@@ -299,6 +312,22 @@ async function runRankingsBackfill(): Promise<void> {
     console.log("[orchestrator] rankings backfill complete");
   } catch (err) {
     console.error("[orchestrator] rankings backfill error:", err);
+  }
+}
+
+/**
+ * Re-fetch the live feed for every tracked game to backfill player names
+ * Savant's leaderboard thresholds missed (rookies, backups, low-usage bats).
+ * Runs once at startup; going forward, GamePoller.playerNames keeps the
+ * registry current without needing this re-fetch.
+ */
+async function runPlayerNameBackfill(): Promise<void> {
+  try {
+    console.log("[orchestrator] running player name backfill from live feeds");
+    await backfillPlayerNamesFromLiveFeeds();
+    console.log("[orchestrator] player name backfill complete");
+  } catch (err) {
+    console.error("[orchestrator] player name backfill error:", err);
   }
 }
 
