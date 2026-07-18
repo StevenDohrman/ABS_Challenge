@@ -32,6 +32,8 @@ export interface LivePollJob {
   on(event: "pitchEvent", listener: (event: MlbLivePitchEvent) => void): this;
   on(event: "gameOver", listener: (payload: { gamePk: number }) => void): this;
   on(event: "lineupUpdate", listener: (entries: GameLineupEntry[]) => void): this;
+  /** Display names keyed by playerId, read from the feed's player dictionary. */
+  on(event: "playerNames", listener: (names: Record<number, string>) => void): this;
   on(event: "error", listener: (err: Error) => void): this;
 }
 
@@ -102,6 +104,7 @@ export class LivePollJob extends EventEmitter {
     poller.on("atBatStart", (snapshot) => this.emit("atBatStart", snapshot));
     poller.on("gameBackfill", (payload) => this.emit("gameBackfill", payload));
     poller.on("lineupUpdate", (entries) => this.emit("lineupUpdate", entries));
+    poller.on("playerNames", (names) => this.emit("playerNames", names));
     poller.on("error", (err) => this.emit("error", err));
     poller.on("gameOver", ({ gamePk }) => {
       this.emit("gameOver", { gamePk });
