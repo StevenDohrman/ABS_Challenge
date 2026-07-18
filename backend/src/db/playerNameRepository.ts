@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { fetchPeopleNames } from "@abs/data-pipeline";
 
 export function normalizePlayerName(value: string | null | undefined): string | null {
   if (value == null) return null;
@@ -66,6 +67,41 @@ export async function recordPlayerNames(
   return updated;
 }
 
+/**
+ * Resolve any playerIds not already in the registry directly against the MLB
+ * People endpoint (works for any valid player, active or historical, with no
+ * playing-time threshold), and persist the result so future lookups skip the
+ * network round trip. Failures are swallowed — callers fall back to the
+ * `Player <id>` placeholder rather than breaking on a network hiccup.
+ */
+async function resolveAndCacheMissingNames(
+  missingIds: number[]
+): Promise<Map<number, string>> {
+  const resolved = new Map<number, string>();
+  if (missingIds.length === 0) return resolved;
+
+  try {
+    const fetched = await fetchPeopleNames(missingIds);
+    const entries = Object.entries(fetched).map(([id, fullName]) => ({
+      playerId: Number(id),
+      fullName,
+    }));
+    if (entries.length > 0) {
+      await recordPlayerNames(entries);
+      for (const entry of entries) {
+        if (entry.fullName) resolved.set(entry.playerId, entry.fullName);
+      }
+    }
+  } catch (err) {
+    console.error(
+      `[playerNameRegistry] MLB people lookup failed for ${missingIds.length} id(s):`,
+      err
+    );
+  }
+
+  return resolved;
+}
+
 export async function loadPlayerNamesByIds(
   playerIds: number[]
 ): Promise<Map<number, string>> {
@@ -76,7 +112,17 @@ export async function loadPlayerNamesByIds(
     select: { playerId: true, fullName: true },
   });
 
-  return new Map(rows.map((r) => [r.playerId, r.fullName]));
+  const names = new Map(rows.map((r) => [r.playerId, r.fullName]));
+
+  const missingIds = playerIds.filter((id) => !names.has(id));
+  if (missingIds.length > 0) {
+    const resolved = await resolveAndCacheMissingNames(missingIds);
+    for (const [id, fullName] of resolved) {
+      names.set(id, fullName);
+    }
+  }
+
+  return names;
 }
 
 export function extractChallengerNameFromPayload(rawPayload: unknown): string | null {

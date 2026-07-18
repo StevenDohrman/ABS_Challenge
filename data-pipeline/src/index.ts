@@ -28,7 +28,7 @@ export type {
   PlayerCountPerformanceMap,
 } from "./sources/savant/countPerformance";
 
-export { fetchLiveFeed } from "./sources/mlb-live/mlbLive.client";
+export { fetchLiveFeed, fetchPeopleNames } from "./sources/mlb-live/mlbLive.client";
 export {
   fetchGamesForDate,
   fetchFinalGames,

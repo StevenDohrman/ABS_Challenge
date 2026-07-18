@@ -73,6 +73,51 @@ export async function fetchLiveFeedDiff(
   return data;
 }
 
+interface MlbPeopleResponse {
+  people?: Array<{ id: number; fullName?: string }>;
+}
+
+const PEOPLE_LOOKUP_BATCH_SIZE = 50;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/**
+ * Resolve full names for arbitrary MLB person IDs via the People endpoint.
+ * Works for any valid player, active or historical, with no playing-time
+ * threshold — unlike Savant's season leaderboard exports. Used as a direct
+ * fallback for player IDs that show up in rankings/audits without a name.
+ */
+export async function fetchPeopleNames(
+  personIds: number[]
+): Promise<Record<number, string>> {
+  const unique = [...new Set(personIds)].filter(
+    (id) => Number.isFinite(id) && id > 0
+  );
+  if (unique.length === 0) return {};
+
+  const names: Record<number, string> = {};
+
+  for (const batch of chunk(unique, PEOPLE_LOOKUP_BATCH_SIZE)) {
+    const { data } = await mlbHttp.get<MlbPeopleResponse>(
+      `${MLB_STATS_BASE_V1}/people`,
+      { params: { personIds: batch.join(",") } }
+    );
+    for (const person of data.people ?? []) {
+      if (person?.id && person.fullName) {
+        names[person.id] = person.fullName;
+      }
+    }
+  }
+
+  return names;
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
