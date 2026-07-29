@@ -1,6 +1,10 @@
 /**
  * Schedules postgame challenge audit when a game goes Final.
  * Uses MLB live feed pitchData — no Savant CSV delay.
+ *
+ * Before auditing, reconciles the Final archived feed against the DB so any
+ * at-bats/pitches missed by the live poller (which stops as soon as status is
+ * Final) are ingested first.
  */
 
 import { findGame } from "../db/gameRepository";
@@ -14,6 +18,10 @@ export function schedulePostgameAudit(gamePk: number): void {
       const game = await findGame(gamePk);
       if (!game || game.postgameAuditedAt) return;
       if (game.status !== "Final") return;
+
+      // Dynamic import avoids a cycle with finalGameBackfillService → this module.
+      const { reconcileFinalIngestGaps } = await import("./finalGameBackfillService");
+      await reconcileFinalIngestGaps(gamePk);
 
       console.log(`[postgameScheduler] running postgame audit for game ${gamePk}`);
       await runPostgameAudit(gamePk);

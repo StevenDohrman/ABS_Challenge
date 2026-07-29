@@ -12,7 +12,7 @@
  */
 
 import type { MlbAtBatSnapshot, MlbLivePitchEvent, SavantBatterStatline, SavantBatterSprayProfile, SavantFielderOaa, SavantSprintSpeed, SavantPitcherPitchMix, ActiveGame, GameLineupEntry, LeagueAveragesSnapshot } from "@abs/data-pipeline";
-import { upsertGame, markGameFinal, markGameIngested, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
+import { upsertGame, markGameFinal, upsertAtBatSnapshot, upsertPitchEvent, findGame, recomputeChallengesRemaining, reconcileAllChallengeCounts } from "../db/gameRepository";
 import { upsertBatterStatlines, patchPlayerBattingHand } from "../db/playerRepository";
 import { upsertSprayProfiles, upsertFielderOaa } from "../db/defensiveRepository";
 import { upsertSprintSpeed } from "../db/sprintSpeedRepository";
@@ -61,11 +61,15 @@ export async function reconcileChallengeCounts(): Promise<void> {
 
 /**
  * Update the game status to Final when the poller emits a gameOver event.
+ *
+ * Does not set ingestedAt — that flag means "DB matches the Final feed."
+ * Gap-fill happens in reconcileFinalIngestGaps (via postgameScheduler) so
+ * late at-bats/pitches missed between the last In Progress poll and Final
+ * are still collected before audit.
  */
 export async function handleGameOver(gamePk: number): Promise<void> {
   try {
     await markGameFinal(gamePk);
-    await markGameIngested(gamePk);
     console.log(`[ingestService] game ${gamePk} marked Final`);
   } catch (err) {
     console.error(

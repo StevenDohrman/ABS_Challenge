@@ -16,6 +16,7 @@
  *
  *   LivePollJob.gameOver    → ingestService.handleGameOver (queued)
  *                           → postgameScheduler.schedulePostgameAudit
+ *                             (reconciles Final-feed at-bat/pitch gaps first)
  *
  *   SavantDailyJob.batterStatlines       → ingestService.handleBatterStatlines
  *   SavantDailyJob.leagueAverages        → ingestService.handleLeagueAverages
