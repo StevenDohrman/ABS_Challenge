@@ -85,7 +85,12 @@ export async function gameNeedsFinalBackfill(
 }
 
 /**
- * Skip feed fetch when the game is Final and already ingested, or ingest is running.
+ * Skip feed fetch when the game is fully done (Final + ingested + audited),
+ * or when live ingest is still running.
+ *
+ * Intentionally does NOT skip on ingestedAt alone: live gameOver used to set
+ * ingestedAt before a Final-feed reconcile, leaving late at-bats missing.
+ * Unaudited Final games are re-checked so gaps can still be filled.
  */
 export async function shouldSkipFinalBackfillFetch(
   gamePk: number
@@ -95,7 +100,11 @@ export async function shouldSkipFinalBackfillFetch(
   }
 
   const game = await findGame(gamePk);
-  if (game?.status === "Final" && game.ingestedAt) {
+  if (
+    game?.status === "Final" &&
+    game.ingestedAt &&
+    game.postgameAuditedAt
+  ) {
     return "ingested";
   }
 
@@ -144,6 +153,71 @@ async function replayPitchEvents(events: MlbLivePitchEvent[]): Promise<void> {
   for (const event of sorted) {
     await ingestPitchAndTriggerRecommendation(event);
   }
+}
+
+/**
+ * Fetch the Final archived feed and ingest any at-bats/pitches the live poll
+ * missed (typically late-inning plays that finished between the last In Progress
+ * poll and gameOver). Idempotent — only writes missing snapshots/pitches.
+ *
+ * Marks ingestedAt once the feed is Final and counts have been reconciled.
+ * Returns true when any gap was filled.
+ */
+export async function reconcileFinalIngestGaps(gamePk: number): Promise<boolean> {
+  const fetchedAt = new Date().toISOString();
+  const feed = await fetchLiveFeed(gamePk);
+
+  if (feed.gameData?.status?.abstractGameState !== "Final") {
+    console.log(
+      `[finalGameBackfill] game=${gamePk} — reconcile skipped, feed not Final`
+    );
+    return false;
+  }
+
+  const payload = buildFinalGameBackfillPayload(feed, fetchedAt);
+  const pitchEvents = parsePitchEvents(feed, fetchedAt);
+
+  await ensureGameFinalized(gamePk, inferFinalizedAtFromFeed(feed));
+
+  if (payload.snapshots.length === 0) {
+    console.warn(
+      `[finalGameBackfill] game=${gamePk} — reconcile found no at-bats in feed`
+    );
+    await markGameIngested(gamePk);
+    return false;
+  }
+
+  const needsBackfill = await gameNeedsFinalBackfill(
+    gamePk,
+    payload.snapshots.length,
+    pitchEvents.length
+  );
+
+  if (!needsBackfill) {
+    await markGameIngested(gamePk);
+    return false;
+  }
+
+  console.log(
+    `[finalGameBackfill] game=${gamePk} — reconciling ingest gaps: feed has ` +
+      `${payload.snapshots.length} at-bats, ${pitchEvents.length} pitches`
+  );
+
+  const lineups = parseGameLineups(feed, fetchedAt);
+  if (lineups.length > 0) {
+    await handleLineupUpdate(lineups);
+  }
+
+  await new Promise<void>((resolve) => {
+    void processGameBackfill(payload, resolve);
+  });
+
+  await replayPitchEvents(pitchEvents);
+  await recomputeChallengesRemaining(gamePk);
+  await markGameIngested(gamePk);
+
+  console.log(`[finalGameBackfill] game=${gamePk} — ingest gap reconcile complete`);
+  return true;
 }
 
 /**
