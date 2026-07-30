@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { to: "/rankings", label: "Rankings" },
   { to: "/about", label: "About" },
   { to: "/how-it-works", label: "How it works" },
+  { to: "/contact", label: "Contact" },
 ] as const;
 
 export function AppLayout() {
