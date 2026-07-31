@@ -62,6 +62,27 @@ export function AboutPage() {
         </p>
       </header>
 
+      <Section title="Why this exists">
+        <Card>
+          <p className="text-sm text-app-secondary leading-relaxed">
+            ABS gives each team a small number of challenges on ball/strike calls.
+            Using one well is high leverage; using one poorly costs a later opportunity.
+            This app exists to make that tradeoff concrete in run expectancy —
+            during the game for batting-side called strikes, and after the game for
+            both batting and fielding misses that the zone data says should have been
+            challenged. It is an independent analytics tool for fans and analysts, not
+            an official MLB product or zone ruling.
+          </p>
+          <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">
+            Questions or feature ideas? See{" "}
+            <Link to="/contact" className="underline hover:text-app-muted">
+              Contact
+            </Link>
+            .
+          </p>
+        </Card>
+      </Section>
+
       <Section title="What this app does">
         <Card>
           <p className="text-sm text-app-secondary leading-relaxed">
@@ -133,14 +154,17 @@ export function AboutPage() {
       <Section title="Postgame analysis">
         <Card>
           <p className="text-sm text-app-muted leading-relaxed">
-            Runs shortly after a game goes Final using pitch location already
-            stored from the MLB live feed — no Baseball Savant CSV wait.
+            Runs shortly after a game goes Final. Before auditing, the backend
+            reconciles the archived live feed so any late at-bats or pitches missed
+            during live polling are filled in. Pitch location comes from the MLB
+            live feed already stored in the database — no Baseball Savant CSV wait.
           </p>
           <BulletList
             items={[
               "Batting audits — called strikes checked against plate-crossing coordinates and MLB zone labels.",
               "Fielding audits — called balls checked the same way (zone says strike, live call was ball).",
               "Missed opportunities — zone disagrees with the live call and overturning would add positive run expectancy, but no successful challenge occurred.",
+              "Player attribution — batting misses credit the batter; fielding misses credit the catcher (not the pitcher).",
               "Bad challenges — a challenge was used despite a low-value live recommendation (DENY or WARN).",
               "Total missed value — sum of calculated run-expectancy swing across all missed opportunities, including when a team was out of challenges.",
               "Team splits — missed value attributed by challenging side (batting team for strike misses, fielding team for ball misses).",
@@ -196,8 +220,9 @@ export function AboutPage() {
             <Term name="Missed RE">
               Run expectancy left on the table from missed opportunities. Player
               leaderboards split batting misses (batter) and fielding misses
-              (catcher). Team leaderboards split batting and fielding missed RE.
-              Default sort uses the combined total.
+              (catcher); player default sort uses the combined total. Team
+              leaderboards show batting and fielding missed RE separately; team
+              Missed RE sort uses batting missed value.
             </Term>
             <Term name="Gained RE">
               Run expectancy captured on successful overturns — split into batting
@@ -258,10 +283,21 @@ export function AboutPage() {
         </Card>
       </Section>
 
-      <footer className="text-xs text-app-faint font-mono leading-relaxed">
-        Data sources: MLB Stats API (schedule, live feed, pitch locations for
-        postgame audit). Daily batter, fielder, league, and pitcher context from
-        Baseball Savant.
+      <footer className="text-xs text-app-faint font-mono leading-relaxed space-y-1">
+        <p>
+          Data sources: MLB Stats API (schedule, live feed, pitch locations for
+          postgame audit). Daily batter, fielder, league, and pitcher context from
+          Baseball Savant.
+        </p>
+        <p>
+          <Link to="/contact" className="underline hover:text-app-muted">
+            Contact
+          </Link>
+          {" · "}
+          <Link to="/how-it-works" className="underline hover:text-app-muted">
+            How it works
+          </Link>
+        </p>
       </footer>
     </div>
   );

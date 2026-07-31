@@ -53,7 +53,10 @@ export function HowItWorksPage() {
         <h1 className="text-2xl font-bold tracking-tight">How it works</h1>
         <p className="text-app-secondary leading-relaxed text-sm">
           End-to-end flow from daily ingest through live recommendations,
-          postgame audit, rankings, and optional local game branches.
+          postgame audit, rankings, and optional local game branches. The goal is
+          simple: turn scarce ABS challenges into clearer run-expectancy decisions —
+          live for batting-side called strikes, and after the game for batting and
+          fielding misses the zone data says were left on the table.
         </p>
       </header>
 
@@ -113,11 +116,13 @@ export function HowItWorksPage() {
       <Section title="4. Postgame audit">
         <StepList
           items={[
-            "When a tracked game goes Final, postgameAuditService runs using pitch location already in live_pitch_events.",
+            "When a tracked game goes Final, the backend reconciles the archived live feed against the database so any late at-bats or pitches missed during live polling are filled in.",
+            "Then postgameAuditService runs using pitch location already in live_pitch_events.",
             "Batting: each called strike is compared to MLB zone labels and plate coordinates.",
             "Fielding: each called ball is checked the same way (zone says strike, live call was ball).",
             "If the zone disagrees with the live call, the service computes the raw run-expectancy swing from overturning that call.",
             "A missed opportunity is counted when that swing is positive and no overturn occurred on review.",
+            "Player credit: batting misses go to the batter; fielding misses go to the catcher on the defensive lineup (not the pitcher).",
             "Bad challenges are flagged when a challenge was used despite DENY or WARN at trigger time.",
             "Results are stored, shown on the game page, and increment player/team rankings.",
           ]}
@@ -139,8 +144,8 @@ export function HowItWorksPage() {
         </p>
         <BulletList
           items={[
-            "Players — missed RE (batting + fielding split), batting/fielding gained RE, miss count, challenges used, success %.",
-            "Teams — batting and fielding missed RE, batting/fielding gained RE, challenges used, success %.",
+            "Players — batting and fielding missed RE (batter / catcher), batting/fielding gained RE, miss count, challenges used, success %. Default Missed RE sort uses the combined total.",
+            "Teams — batting and fielding missed RE, batting/fielding gained RE, challenges used, success %. Missed RE sort uses batting missed value.",
             "Last 7 days — rolling window aligned with the schedule browser and DB retention.",
             "Season — running totals from program start (set TRACKING_START_DATE on deploy).",
           ]}
@@ -228,6 +233,16 @@ export function HowItWorksPage() {
           </div>
         </div>
       </Section>
+
+      <footer className="text-xs text-app-faint font-mono leading-relaxed">
+        <Link to="/about" className="underline hover:text-app-muted">
+          About
+        </Link>
+        {" · "}
+        <Link to="/contact" className="underline hover:text-app-muted">
+          Contact
+        </Link>
+      </footer>
     </div>
   );
 }

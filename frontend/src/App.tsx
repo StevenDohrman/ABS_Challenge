@@ -4,6 +4,7 @@ import { GamesDashboard } from "./screens/GamesDashboard";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { AboutPage } from "./screens/AboutPage";
 import { HowItWorksPage } from "./screens/HowItWorksPage";
+import { ContactPage } from "./screens/ContactPage";
 import { RankingsScreen } from "./screens/RankingsScreen";
 import { BranchEditorScreen } from "./gameBranch/screens/BranchEditorScreen";
 import { BranchesScreen } from "./gameBranch/screens/BranchesScreen";
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="branches" element={<BranchesScreen />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="how-it-works" element={<HowItWorksPage />} />
+          <Route path="contact" element={<ContactPage />} />
           <Route path="rankings" element={<RankingsScreen />} />
         </Route>
       </Routes>
