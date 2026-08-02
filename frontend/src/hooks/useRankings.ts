@@ -5,10 +5,19 @@ import type {
   PlayerRankingRow,
   RankingsLeaderboardSort,
   RankingsPeriod,
+  RankingsSide,
   RankingsSortOrder,
   TeamRankingRow,
 } from "../api/types";
-import { sortPlayerRows, sortTeamRows } from "../utils/rankingsSort";
+import {
+  coerceSortForSide,
+  defaultOrderForSort,
+  isRankingsSide,
+  isRankingsSortKey,
+  nextSortState,
+  sortPlayerRows,
+  sortTeamRows,
+} from "../utils/rankingsSort";
 
 type ViewMode = "players" | "teams";
 
@@ -23,13 +32,20 @@ export interface RankingsMeta {
 }
 
 function parseSort(value: string | null): RankingsLeaderboardSort {
-  if (value === "challengeSuccess") return "challengeSuccess";
-  if (value === "gainedRe") return "gainedRe";
+  if (isRankingsSortKey(value)) return value;
+  // Legacy URL aliases
+  if (value === "totalMissedValue") return "missedRe";
+  if (value === "totalGainedRe") return "gainedRe";
+  if (value === "overturnRate") return "challengeSuccess";
   return "missedRe";
 }
 
 function parseOrder(value: string | null): RankingsSortOrder {
   return value === "asc" ? "asc" : "desc";
+}
+
+function parseSide(value: string | null): RankingsSide {
+  return isRankingsSide(value) ? value : "all";
 }
 
 export function useRankings() {
@@ -41,8 +57,10 @@ export function useRankings() {
   const [period, setPeriod] = useState<RankingsPeriod>(
     searchParams.get("period") === "season" ? "season" : "week"
   );
-  const [sort, setSort] = useState<RankingsLeaderboardSort>(
-    parseSort(searchParams.get("sort"))
+  const initialSide = parseSide(searchParams.get("side"));
+  const [side, setSide] = useState<RankingsSide>(initialSide);
+  const [sort, setSort] = useState<RankingsLeaderboardSort>(() =>
+    coerceSortForSide(parseSort(searchParams.get("sort")), initialSide)
   );
   const [order, setOrder] = useState<RankingsSortOrder>(
     parseOrder(searchParams.get("order"))
@@ -58,12 +76,14 @@ export function useRankings() {
     (
       nextView: ViewMode,
       nextPeriod: RankingsPeriod,
+      nextSide: RankingsSide,
       nextSort: RankingsLeaderboardSort,
       nextOrder: RankingsSortOrder
     ) => {
       const params: Record<string, string> = {};
       if (nextView === "teams") params.view = "teams";
       if (nextPeriod === "season") params.period = "season";
+      if (nextSide !== "all") params.side = nextSide;
       if (nextSort !== "missedRe") params.sort = nextSort;
       if (nextOrder !== "desc") params.order = nextOrder;
       setSearchParams(params, { replace: true });
@@ -106,38 +126,52 @@ export function useRankings() {
   }, [period, load]);
 
   const sortedPlayerRows = useMemo(
-    () => sortPlayerRows(playerRows, sort, order),
-    [playerRows, sort, order]
+    () => sortPlayerRows(playerRows, sort, order, side),
+    [playerRows, sort, order, side]
   );
 
   const sortedTeamRows = useMemo(
-    () => sortTeamRows(teamRows, sort, order),
-    [teamRows, sort, order]
+    () => sortTeamRows(teamRows, sort, order, side),
+    [teamRows, sort, order, side]
   );
 
   const setViewAndSync = (next: ViewMode) => {
     setView(next);
-    syncParams(next, period, sort, order);
+    syncParams(next, period, side, sort, order);
   };
 
   const setPeriodAndSync = (next: RankingsPeriod) => {
     setPeriod(next);
-    syncParams(view, next, sort, order);
+    syncParams(view, next, side, sort, order);
   };
 
-  const setSortAndSync = (next: RankingsLeaderboardSort) => {
-    setSort(next);
-    syncParams(view, period, next, order);
+  const setSideAndSync = (next: RankingsSide) => {
+    const nextSort = coerceSortForSide(sort, next);
+    setSide(next);
+    setSort(nextSort);
+    syncParams(view, period, next, nextSort, order);
   };
 
-  const setOrderAndSync = (next: RankingsSortOrder) => {
-    setOrder(next);
-    syncParams(view, period, sort, next);
+  const cycleSortColumn = (column: RankingsLeaderboardSort) => {
+    const next = nextSortState(sort, order, column);
+    setSort(next.sort);
+    setOrder(next.order);
+    syncParams(view, period, side, next.sort, next.order);
+  };
+
+  /** Mobile select: pick a column without flipping when unchanged. */
+  const selectSortColumn = (column: RankingsLeaderboardSort) => {
+    if (column === sort) return;
+    const nextOrder = defaultOrderForSort(column);
+    setSort(column);
+    setOrder(nextOrder);
+    syncParams(view, period, side, column, nextOrder);
   };
 
   return {
     view,
     period,
+    side,
     sort,
     order,
     meta,
@@ -147,17 +181,36 @@ export function useRankings() {
     sortedTeamRows,
     setViewAndSync,
     setPeriodAndSync,
-    setSortAndSync,
-    setOrderAndSync,
+    setSideAndSync,
+    cycleSortColumn,
+    selectSortColumn,
   };
 }
 
 export function orderLabel(sort: RankingsLeaderboardSort, order: RankingsSortOrder): string {
-  if (sort === "missedRe") {
-    return order === "desc" ? "Highest missed RE first" : "Lowest missed RE first";
+  const dir = order === "desc" ? "high → low" : "low → high";
+  switch (sort) {
+    case "name":
+      return order === "asc" ? "Name A → Z" : "Name Z → A";
+    case "missedRe":
+      return `Missed RE ${dir}`;
+    case "battingMissedRe":
+      return `Bat missed RE ${dir}`;
+    case "fieldingMissedRe":
+      return `Fld missed RE ${dir}`;
+    case "gainedRe":
+      return `Gained RE ${dir}`;
+    case "battingGainedRe":
+      return `Bat gained RE ${dir}`;
+    case "fieldingGainedRe":
+      return `Fld gained RE ${dir}`;
+    case "misses":
+      return `Misses ${dir}`;
+    case "challenges":
+      return `Challenges ${dir}`;
+    case "challengeSuccess":
+      return order === "desc" ? "Best success % first" : "Worst success % first";
+    default:
+      return `Sorted ${dir}`;
   }
-  if (sort === "gainedRe") {
-    return order === "desc" ? "Most gained RE first" : "Least gained RE first";
-  }
-  return order === "desc" ? "Best success % first" : "Worst success % first";
 }

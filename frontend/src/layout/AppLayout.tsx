@@ -12,7 +12,7 @@ const NAV_LINKS = [
 export function AppLayout() {
   return (
     <div className="min-h-screen app-shell font-display">
-      <div className="max-w-2xl mx-auto px-3 py-4 sm:px-4 sm:py-8">
+      <div className="max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-3 py-4 sm:px-4 sm:py-8">
         <header className="mb-5 sm:mb-6 pb-4 border-b border-app">
           <div className="flex items-center justify-between gap-3">
             <Link

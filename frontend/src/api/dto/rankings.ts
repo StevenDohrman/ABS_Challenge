@@ -40,7 +40,22 @@ export interface TeamRankingRow {
   gamesAppeared: number;
 }
 
-export type RankingsLeaderboardSort = "missedRe" | "gainedRe" | "challengeSuccess";
+/** Client-side column sorts (URL ?sort=). */
+export type RankingsLeaderboardSort =
+  | "name"
+  | "missedRe"
+  | "battingMissedRe"
+  | "fieldingMissedRe"
+  | "gainedRe"
+  | "battingGainedRe"
+  | "fieldingGainedRe"
+  | "misses"
+  | "challenges"
+  | "challengeSuccess";
+
+/** RE side filter (URL ?side=). Success % stays combined under batting/fielding. */
+export type RankingsSide = "all" | "batting" | "fielding";
+
 export type RankingsSortOrder = "asc" | "desc";
 
 export interface RankingsResponse {

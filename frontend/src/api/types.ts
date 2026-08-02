@@ -26,6 +26,7 @@ export type {
   PlayerRankingRow,
   TeamRankingRow,
   RankingsLeaderboardSort,
+  RankingsSide,
   RankingsSortOrder,
   RankingsBundleResponse,
 } from "./dto/rankings";
