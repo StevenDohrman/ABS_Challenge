@@ -3,6 +3,7 @@ import {
   formatRate,
   formatRe,
   formatSignedDecimal,
+  formatSuccessRate,
   formatTimestamp,
 } from "./format";
 
@@ -35,6 +36,18 @@ describe("formatRate", () => {
   it("rounds to whole percent", () => {
     expect(formatRate(0.456)).toBe("46%");
     expect(formatRate(1)).toBe("100%");
+  });
+});
+
+describe("formatSuccessRate", () => {
+  it("returns em dash when unused or null", () => {
+    expect(formatSuccessRate(null, 0, 0)).toBe("—");
+    expect(formatSuccessRate(1, 0, 0)).toBe("—");
+  });
+
+  it("includes overturned/used", () => {
+    expect(formatSuccessRate(1, 2, 2)).toBe("100% (2/2)");
+    expect(formatSuccessRate(0.5, 1, 2)).toBe("50% (1/2)");
   });
 });
 

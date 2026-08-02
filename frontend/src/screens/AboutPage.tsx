@@ -213,24 +213,25 @@ export function AboutPage() {
               rankings page
             </Link>{" "}
             aggregates tracked games across players and teams. Switch between a
-            rolling last-7-days window and season-to-date totals. Sort by missed
-            value, gained value, or challenge success rate.
+            rolling last-7-days window and season-to-date totals, and filter All /
+            Batting / Fielding. Click a column header to sort; click again to
+            reverse direction.
           </p>
           <div className="space-y-4 pt-1">
             <Term name="Missed RE">
               Run expectancy left on the table from missed opportunities. Player
               leaderboards split batting misses (batter) and fielding misses
-              (catcher); player default sort uses the combined total. Team
-              leaderboards show batting and fielding missed RE separately; team
-              Missed RE sort uses batting missed value.
+              (catcher). The Batting / Fielding filter shows only that side’s RE
+              and miss counts.
             </Term>
             <Term name="Gained RE">
-              Run expectancy captured on successful overturns — split into batting
-              and fielding contributions on both player and team leaderboards.
+              Run expectancy captured on successful overturns — total plus batting
+              and fielding splits on the All view; side filters show that side only.
             </Term>
             <Term name="Challenge success %">
-              Overturned challenges divided by challenges used. Players or teams
-              with no challenges show — when sorting by success rate.
+              Overturned ÷ used for challenges actually taken (batting and fielding
+              combined), shown as percent with overturned/used. Misses are separate
+              and do not lower this rate. Side filters do not split success % yet.
             </Term>
           </div>
           <p className="text-xs text-app-faint leading-relaxed border-t border-app pt-3">

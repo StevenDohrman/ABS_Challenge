@@ -144,8 +144,9 @@ export function HowItWorksPage() {
         </p>
         <BulletList
           items={[
-            "Players — batting and fielding missed RE (batter / catcher), batting/fielding gained RE, miss count, challenges used, success %. Default Missed RE sort uses the combined total.",
-            "Teams — batting and fielding missed RE, batting/fielding gained RE, challenges used, success %. Missed RE sort uses batting missed value.",
+            "Players / Teams, Last 7 days / Season, and All / Batting / Fielding toggles stay at the top.",
+            "Click any column header to sort by that field; click again to flip high→low / low→high (Player/Team starts A→Z).",
+            "Batting / Fielding filters show that side’s missed RE, gained RE, and misses; success % stays combined (challenges taken on both sides).",
             "Last 7 days — rolling window aligned with the schedule browser and DB retention.",
             "Season — running totals from program start (set TRACKING_START_DATE on deploy).",
           ]}

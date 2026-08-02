@@ -16,6 +16,16 @@ export function formatRate(rate: number | null): string {
   return `${Math.round(rate * 100)}%`;
 }
 
+/** Success % with overturned/used, e.g. "80% (4/5)". */
+export function formatSuccessRate(
+  rate: number | null,
+  overturned: number,
+  used: number
+): string {
+  if (used <= 0 || rate === null) return "—";
+  return `${formatRate(rate)} (${overturned}/${used})`;
+}
+
 /** Scheduled start time from ISO string. */
 export function formatScheduledTime(iso: string): string {
   try {
