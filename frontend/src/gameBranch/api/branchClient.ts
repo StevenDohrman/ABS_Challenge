@@ -111,6 +111,12 @@ export async function previewBranchGrid(
   return fetchJsonWithCredentials(`${BASE}/${branchId}/preview-grid`, { method: "POST" });
 }
 
+export async function deleteBranchOnServer(
+  branchId: string
+): Promise<ApiResult<undefined>> {
+  return fetchJsonWithCredentials(`${BASE}/${branchId}`, { method: "DELETE" });
+}
+
 export async function importBranchDocument(
   doc: BranchDocument
 ): Promise<ApiResult<{ branchId: string; branch: BranchDocument }>> {

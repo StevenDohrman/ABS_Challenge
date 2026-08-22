@@ -157,7 +157,7 @@ describe("applyPlay", () => {
   it("third strikeout ends the half inning", () => {
     const sit = { ...baseDoc.situation, outs: 2 };
     const result = applyPlay(baseDoc, sit, "strikeout");
-    expect(result.description).toContain("Third out");
+    expect(result.description.toLowerCase()).toContain("third out");
     expect(result.situation.outs).toBe(0);
     expect(result.situation.halfInning).toBe("bottom");
     expect(result.situation.runners).toEqual({});

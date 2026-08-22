@@ -16,14 +16,10 @@ import { loadPlayerNamesByIds } from "../db/playerNameRepository";
 import { findAllForGame } from "../db/recommendationRepository";
 import { toGameAtBatHistoryDto } from "../dto/recommendation";
 import type { GameAbstractState, ScheduleGameDto } from "../dto/schedule";
-import type {
-  BranchCheckpoint,
-  BranchSituation,
-  GameExportBundleDto,
-  TeamBranchState,
-} from "../branch/branchTypes";
+import type { BranchSituation, GameExportBundleDto, TeamBranchState } from "../branch/branchTypes";
 import { GAME_RULES } from "../db/constants";
 import { BranchNotEligibleError } from "./branchEligibilityService";
+import { resolveForkSituation } from "./gameExportSituation";
 
 export { BranchNotEligibleError };
 
@@ -126,53 +122,57 @@ function probablePitcherId(
   return undefined;
 }
 
-function snapshotToSituation(
-  snap: {
-    inning: number;
-    halfInning: string;
-    outs: number;
-    runnerOnFirst: boolean;
-    runnerOnSecond: boolean;
-    runnerOnThird: boolean;
-    runnerFirstId?: number | null;
-    runnerSecondId?: number | null;
-    runnerThirdId?: number | null;
-    homeScore: number;
-    awayScore: number;
-    batterId: number;
-    pitcherId: number;
-    battingTeamId: number;
-    fieldingTeamId: number;
-  },
+function mergeLineupRows(
+  feedRows: Array<{ teamId: number; playerId: number; battingOrder: number }>,
+  dbRows: Array<{ teamId: number; playerId: number; battingOrder: number }>,
+  homeTeamId: number,
+  awayTeamId: number
+): Array<{ teamId: number; playerId: number; battingOrder: number }> {
+  const pick = (teamId: number) => {
+    const fromFeed = feedRows.filter((row) => row.teamId === teamId);
+    if (fromFeed.length > 0) return fromFeed;
+    return dbRows.filter((row) => row.teamId === teamId);
+  };
+  return [...pick(homeTeamId), ...pick(awayTeamId)];
+}
+
+/** Current linescore / matchup — null when the feed has no batter and pitcher yet. */
+function situationFromLiveFeed(
+  feed: Awaited<ReturnType<typeof fetchLiveFeed>>,
+  homeTeamId: number,
+  awayTeamId: number,
   homeChallenges: number,
-  awayChallenges: number,
-  liveCount?: { balls: number; strikes: number }
-): BranchSituation {
-  const half = snap.halfInning === "bottom" ? "bottom" : "top";
+  awayChallenges: number
+): BranchSituation | null {
+  const liveSnapshot = parseGameSnapshot(feed, new Date().toISOString());
+  if (!liveSnapshot.batterId || !liveSnapshot.pitcherId) return null;
+
+  const offense = feed.liveData.linescore?.offense;
+  const half = liveSnapshot.halfInning;
   return {
-    inning: snap.inning,
+    inning: liveSnapshot.inning,
     halfInning: half,
-    balls: liveCount?.balls ?? 0,
-    strikes: liveCount?.strikes ?? 0,
-    outs: Math.min(Math.max(0, snap.outs), 2),
+    balls: liveSnapshot.balls,
+    strikes: liveSnapshot.strikes,
+    outs: liveSnapshot.outs,
     runners: {
-      first: snap.runnerOnFirst ? snap.runnerFirstId ?? undefined : undefined,
-      second: snap.runnerOnSecond ? snap.runnerSecondId ?? undefined : undefined,
-      third: snap.runnerOnThird ? snap.runnerThirdId ?? undefined : undefined,
+      first: liveSnapshot.runnerOnFirst ? offense?.first?.id : undefined,
+      second: liveSnapshot.runnerOnSecond ? offense?.second?.id : undefined,
+      third: liveSnapshot.runnerOnThird ? offense?.third?.id : undefined,
     },
-    homeScore: snap.homeScore,
-    awayScore: snap.awayScore,
-    batterId: snap.batterId,
-    pitcherId: snap.pitcherId,
-    battingTeamId: snap.battingTeamId,
-    fieldingTeamId: snap.fieldingTeamId,
+    homeScore: liveSnapshot.homeScore,
+    awayScore: liveSnapshot.awayScore,
+    batterId: liveSnapshot.batterId,
+    pitcherId: liveSnapshot.pitcherId,
+    battingTeamId: half === "top" ? awayTeamId : homeTeamId,
+    fieldingTeamId: half === "top" ? homeTeamId : awayTeamId,
     homeChallengesRemaining: homeChallenges,
     awayChallengesRemaining: awayChallenges,
   };
 }
 
-function seedPregameSituation(
-  feed: Awaited<ReturnType<typeof fetchLiveFeed>>,
+function pregameFallbackSituation(
+  feed: Awaited<ReturnType<typeof fetchLiveFeed>> | null,
   homeTeamId: number,
   awayTeamId: number,
   homeOrder: number[],
@@ -181,37 +181,12 @@ function seedPregameSituation(
   awayChallenges: number,
   schedule: ScheduleGameDto
 ): BranchSituation {
-  const liveSnapshot = parseGameSnapshot(feed, new Date().toISOString());
-  const offense = feed.liveData.linescore?.offense;
-  const defensePitcher = feed.liveData.linescore?.defense?.pitcher?.id;
-
-  if (liveSnapshot.batterId && liveSnapshot.pitcherId) {
-    const half = liveSnapshot.halfInning;
-    return {
-      inning: liveSnapshot.inning,
-      halfInning: half,
-      balls: liveSnapshot.balls,
-      strikes: liveSnapshot.strikes,
-      outs: liveSnapshot.outs,
-      runners: {
-        first: liveSnapshot.runnerOnFirst ? offense?.first?.id : undefined,
-        second: liveSnapshot.runnerOnSecond ? offense?.second?.id : undefined,
-        third: liveSnapshot.runnerOnThird ? offense?.third?.id : undefined,
-      },
-      homeScore: liveSnapshot.homeScore,
-      awayScore: liveSnapshot.awayScore,
-      batterId: liveSnapshot.batterId,
-      pitcherId: liveSnapshot.pitcherId,
-      battingTeamId: half === "top" ? awayTeamId : homeTeamId,
-      fieldingTeamId: half === "top" ? homeTeamId : awayTeamId,
-      homeChallengesRemaining: homeChallenges,
-      awayChallengesRemaining: awayChallenges,
-    };
-  }
-
-  const awayBatter = awayOrder[0] ?? 0;
+  const defensePitcher = feed?.liveData.linescore?.defense?.pitcher?.id;
   const homePitcher =
-    defensePitcher ?? probablePitcherId(feed, "home") ?? homeOrder[0] ?? 0;
+    defensePitcher ??
+    (feed ? probablePitcherId(feed, "home") : undefined) ??
+    homeOrder[0] ??
+    0;
 
   return {
     inning: 1,
@@ -222,7 +197,7 @@ function seedPregameSituation(
     runners: {},
     homeScore: schedule.homeScore ?? 0,
     awayScore: schedule.awayScore ?? 0,
-    batterId: awayBatter,
+    batterId: awayOrder[0] ?? 0,
     pitcherId: homePitcher,
     battingTeamId: awayTeamId,
     fieldingTeamId: homeTeamId,
@@ -232,7 +207,8 @@ function seedPregameSituation(
 }
 
 /**
- * Assemble a read-only fork bundle from canonical DB + one MLB live feed fetch.
+ * Assemble a read-only fork bundle from the current MLB live feed, with DB
+ * snapshots as fallback when the feed has no current matchup.
  * No branch or fork rows are written to the database.
  */
 export async function buildGameExportBundle(
@@ -293,25 +269,20 @@ export async function buildGameExportBundle(
   const homeTeamId = schedule.homeTeamId;
   const awayTeamId = schedule.awayTeamId;
 
-  let dbLineupRows = await findGameLineups(gamePk);
-  if (dbLineupRows.length === 0 && feed) {
-    const parsed = parseGameLineups(feed, new Date().toISOString());
-    dbLineupRows = parsed.map((e) => ({
-      id: 0,
-      gamePk: e.gamePk,
-      teamId: e.teamId,
-      playerId: e.playerId,
-      battingOrder: e.battingOrder,
-      fetchedAt: new Date(e.fetchedAt),
-      updatedAt: new Date(),
-    }));
-  }
-
-  const lineupDto = dbLineupRows.map((r) => ({
+  const dbLineupRows = await findGameLineups(gamePk);
+  const feedLineupRows = feed
+    ? parseGameLineups(feed, new Date().toISOString()).map((e) => ({
+        teamId: e.teamId,
+        playerId: e.playerId,
+        battingOrder: e.battingOrder,
+      }))
+    : [];
+  const dbLineupDto = dbLineupRows.map((r) => ({
     teamId: r.teamId,
     playerId: r.playerId,
     battingOrder: r.battingOrder,
   }));
+  const lineupDto = mergeLineupRows(feedLineupRows, dbLineupDto, homeTeamId, awayTeamId);
 
   const boxBatters = feed
     ? {
@@ -331,43 +302,30 @@ export async function buildGameExportBundle(
 
   const bench = feed ? parseGameBench(feed) : { home: [], away: [] };
   const bullpen = feed ? parseGameBullpen(feed) : { home: [], away: [] };
-  const liveSnapshot = feed ? parseGameSnapshot(feed, new Date().toISOString()) : null;
 
   const snapshots = await prisma.liveGameSnapshot.findMany({
     where: { gamePk },
     orderBy: { atBatIndex: "asc" },
   });
 
-  let checkpoint: BranchCheckpoint = { label: "Pregame / warmup" };
-  let situationSeed = snapshots.at(-1);
+  const liveSituation = feed
+    ? situationFromLiveFeed(feed, homeTeamId, awayTeamId, homeChallenges, awayChallenges)
+    : null;
+  const liveAtBatIndex = feed?.liveData.plays.currentPlay?.about.atBatIndex;
 
-  if (options.checkpointAtBatIndex != null) {
-    situationSeed =
-      snapshots.find((s) => s.atBatIndex === options.checkpointAtBatIndex) ??
-      situationSeed;
-    checkpoint = {
-      atBatIndex: options.checkpointAtBatIndex,
-      label: `At-bat ${options.checkpointAtBatIndex}`,
-    };
-  } else if (situationSeed) {
-    checkpoint = {
-      atBatIndex: situationSeed.atBatIndex,
-      label: "Latest snapshot",
-    };
-  }
+  const resolved = resolveForkSituation({
+    checkpointAtBatIndex: options.checkpointAtBatIndex,
+    snapshots,
+    liveSituation,
+    liveAtBatIndex,
+    homeChallenges,
+    awayChallenges,
+  });
 
-  let situation: BranchSituation;
-  if (situationSeed) {
-    situation = snapshotToSituation(
-      situationSeed,
-      homeChallenges,
-      awayChallenges,
-      liveSnapshot
-        ? { balls: liveSnapshot.balls, strikes: liveSnapshot.strikes }
-        : undefined
-    );
-  } else if (feed) {
-    situation = seedPregameSituation(
+  const checkpoint = resolved.checkpoint;
+  const situation =
+    resolved.situation ??
+    pregameFallbackSituation(
       feed,
       homeTeamId,
       awayTeamId,
@@ -377,24 +335,6 @@ export async function buildGameExportBundle(
       awayChallenges,
       schedule
     );
-  } else {
-    situation = {
-      inning: 1,
-      halfInning: "top",
-      balls: 0,
-      strikes: 0,
-      outs: 0,
-      runners: {},
-      homeScore: schedule.homeScore ?? 0,
-      awayScore: schedule.awayScore ?? 0,
-      batterId: awayOrder[0] ?? 0,
-      pitcherId: homeOrder[0] ?? 0,
-      battingTeamId: awayTeamId,
-      fieldingTeamId: homeTeamId,
-      homeChallengesRemaining: homeChallenges,
-      awayChallengesRemaining: awayChallenges,
-    };
-  }
 
   const defenses = feed
     ? resolveTeamDefenses(feed)

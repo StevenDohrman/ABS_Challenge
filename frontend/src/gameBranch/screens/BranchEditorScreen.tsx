@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { DisclosureChevron } from "../../components/ui/DisclosureChevron";
 import { GameDetailSkeleton } from "../../components/ui/LoadingSkeleton";
 import {
   fetchBranch,
@@ -334,33 +335,7 @@ export function BranchEditorScreen() {
         />
       </div>
 
-      <PlayShortcuts onPlay={onPlay} />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <LineupPanel
-          doc={branch}
-          side="away"
-          onSwap={(slot, benchId) => tryPinchHit("away", slot, benchId)}
-        />
-        <LineupPanel
-          doc={branch}
-          side="home"
-          onSwap={(slot, benchId) => tryPinchHit("home", slot, benchId)}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <DefensePanel
-          doc={branch}
-          side="away"
-          onAssign={(slot, playerId) => tryDefenseAssign("away", slot, playerId)}
-        />
-        <DefensePanel
-          doc={branch}
-          side="home"
-          onAssign={(slot, playerId) => tryDefenseAssign("home", slot, playerId)}
-        />
-      </div>
+      <PlayShortcuts situation={branch.situation} onPlay={onPlay} />
 
       {branch.previewGrid && (
         <BranchPreviewPanel
@@ -368,6 +343,36 @@ export function BranchEditorScreen() {
           computedAt={branch.previewGridComputedAt}
         />
       )}
+
+      <CollapsibleModule title="Lineup substitutions">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LineupPanel
+            doc={branch}
+            side="away"
+            onSwap={(slot, benchId) => tryPinchHit("away", slot, benchId)}
+          />
+          <LineupPanel
+            doc={branch}
+            side="home"
+            onSwap={(slot, benchId) => tryPinchHit("home", slot, benchId)}
+          />
+        </div>
+      </CollapsibleModule>
+
+      <CollapsibleModule title="Defense substitutions">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DefensePanel
+            doc={branch}
+            side="away"
+            onAssign={(slot, playerId) => tryDefenseAssign("away", slot, playerId)}
+          />
+          <DefensePanel
+            doc={branch}
+            side="home"
+            onAssign={(slot, playerId) => tryDefenseAssign("home", slot, playerId)}
+          />
+        </div>
+      </CollapsibleModule>
 
       <BranchHistoryPanel history={branch.atBatHistory} />
 
@@ -394,6 +399,31 @@ export function BranchEditorScreen() {
           Copy JSON
         </button>
       </div>
+    </div>
+  );
+}
+
+function CollapsibleModule({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded-2xl border border-app app-surface-subtle">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-4 py-3 min-h-11 text-sm font-semibold text-app"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{title}</span>
+        <DisclosureChevron open={open} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }

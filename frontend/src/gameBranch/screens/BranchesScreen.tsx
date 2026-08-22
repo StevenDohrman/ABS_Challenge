@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { BranchListCard } from "../components/BranchListCard";
 import { ImportBranchPanel } from "../components/ImportBranchPanel";
+import { deleteBranchOnServer } from "../api/branchClient";
 import {
   listLocalBranches,
   localBranchCount,
@@ -18,14 +19,15 @@ export function BranchesScreen() {
     setBranches(listLocalBranches());
   }, []);
 
-  const handleDelete = (branchId: string) => {
+  const handleDelete = async (branchId: string) => {
     const entry = branches.find((b) => b.branchId === branchId);
     const label = entry
       ? `${entry.awayTeamAbbrev ?? "Away"} @ ${entry.homeTeamAbbrev ?? "Home"}`
       : "this branch";
-    if (!window.confirm(`Remove ${label} from this browser? Your edits will be lost.`)) {
+    if (!window.confirm(`Remove ${label}? Your edits will be lost.`)) {
       return;
     }
+    await deleteBranchOnServer(branchId);
     removeLocalBranch(branchId);
     refresh();
   };
