@@ -24,9 +24,9 @@
  *   SavantDailyJob.fielderOaa            → ingestService.handleFielderOaa
  *   SavantDailyJob.pitcherPitchMix       → ingestService.handlePitcherPitchMix
  *
- * SavantDailyJob is run once at startup (to load pregame data) and re-run
- * daily at a scheduled time. In production, replace the 24-hour interval with
- * a cron job or a scheduled task runner.
+ * SavantDailyJob runs at startup only when league averages are older than
+ * 24 hours (or missing). Otherwise the next run is scheduled for the remaining
+ * time in that window, then every 24 hours while the process stays up.
  */
 
 import { LivePollJob, SavantDailyJob } from "@abs/data-pipeline";
@@ -72,6 +72,11 @@ import {
 import { getDataRetentionDays, INTERVALS, SEASONS } from "./db/constants";
 import { hydrateLeagueAveragesFromDb } from "./services/leagueAveragesStore";
 import { ingestCountPerformanceForGame } from "./services/countPerformanceIngestService";
+import { findLastSavantDailyRunAt } from "./db/savantDailyFreshness";
+import {
+  formatDurationMs,
+  msUntilNextSavantDaily,
+} from "./services/savantDailySchedule";
 
 const SAVANT_DAILY_INTERVAL_MS = INTERVALS.TWENTY_FOUR_HOURS_MS;
 const FINAL_BACKFILL_INTERVAL_MS = INTERVALS.SIX_HOURS_MS;
@@ -92,13 +97,12 @@ export async function startOrchestrator(): Promise<void> {
   //      precomputed, so recommendations use real stats instead of defaults.
   // The daily rerun is concurrency-capped (DB_LIMITS.WRITE_CONCURRENCY), so it
   // is safe to run alongside live polling later in the process lifetime.
-  await runSavantDailyJob();
+  await bootstrapSavantDailyJob();
   // Repair any challenge counts left corrupted by earlier restarts BEFORE live
   // polling begins, so the first poll's backfill re-precomputes historical
   // at-bats using the corrected counts (a 0 count forces every grid to DENY).
   await reconcileChallengeCounts();
   startLivePollJob();
-  scheduleSavantDailyJob();  // Then schedule daily reruns.
   await resumePendingPostgameAudits();
   await runFinalGameBackfill();
   scheduleFinalGameBackfill();
@@ -276,12 +280,40 @@ export async function runSavantDailyJob(): Promise<void> {
   console.log("[orchestrator] SavantDailyJob complete");
 }
 
-function scheduleSavantDailyJob(): void {
-  setInterval(() => {
+export async function bootstrapSavantDailyJob(): Promise<void> {
+  const lastRunAt = await findLastSavantDailyRunAt(SEASONS.CURRENT);
+  const waitMs = msUntilNextSavantDaily(
+    lastRunAt,
+    new Date(),
+    SAVANT_DAILY_INTERVAL_MS
+  );
+
+  if (waitMs <= 0) {
+    await runSavantDailyJob();
+    scheduleSavantDailyJob(SAVANT_DAILY_INTERVAL_MS);
+    return;
+  }
+
+  const ageMs = SAVANT_DAILY_INTERVAL_MS - waitMs;
+  console.log(
+    `[orchestrator] SavantDailyJob skipped — last run ${formatDurationMs(ageMs)} ago, ` +
+      `next in ${formatDurationMs(waitMs)}`
+  );
+  scheduleSavantDailyJob(waitMs);
+}
+
+function scheduleSavantDailyJob(firstDelayMs: number): void {
+  const run = () =>
     runSavantDailyJob().catch((err) => {
       console.error("[orchestrator] SavantDailyJob scheduled run error:", err);
     });
-  }, SAVANT_DAILY_INTERVAL_MS);
+
+  setTimeout(() => {
+    void run();
+    setInterval(() => {
+      void run();
+    }, SAVANT_DAILY_INTERVAL_MS);
+  }, firstDelayMs);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
