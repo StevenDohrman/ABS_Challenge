@@ -164,6 +164,30 @@ describe("applyPlay", () => {
   });
 });
 
+describe("branchReducer PINCH_RUN", () => {
+  it("puts the bench player on the same base and removes the outgoing runner", () => {
+    const loaded = {
+      ...baseDoc,
+      situation: { ...baseDoc.situation, runners: { first: 201 } },
+      teams: {
+        ...baseDoc.teams,
+        away: { ...baseDoc.teams.away, bench: [250], battingOrder: [201, 204] },
+      },
+      forkSnapshot: {
+        situation: baseDoc.situation,
+        teams: baseDoc.teams,
+        checkpoint: {},
+        playerNames: {},
+      },
+    };
+    const next = branchReducer(loaded, { type: "PINCH_RUN", base: "first", benchPlayerId: 250 });
+    expect(next?.situation.runners.first).toBe(250);
+    expect(next?.teams.away.battingOrder[0]).toBe(250);
+    expect(next?.teams.away.removedFromGame).toContain(201);
+    expect(next?.teams.away.bench).not.toContain(250);
+  });
+});
+
 describe("endHalfInning", () => {
   it("switches to home batting on bottom half", () => {
     const ended = endHalfInning(baseDoc, { ...baseDoc.situation, outs: 3 });

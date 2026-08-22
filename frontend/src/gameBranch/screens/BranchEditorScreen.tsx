@@ -27,13 +27,14 @@ import {
 } from "../state/branchTypes";
 import {
   isBlowout,
+  listReplacementOptions,
   validateDefensiveSubstitution,
   validatePinchHit,
   validatePitcherChange,
 } from "../rules/substitutions";
 import { writeLocalBranch, readLocalBranch } from "../storage/localCache";
 import { createBranchSync } from "../storage/sessionSync";
-import { validateRunners } from "../rules/runners";
+import { advanceRunner, retireRunner, validateRunners } from "../rules/runners";
 import { applyPlay, type PlayType } from "../rules/plays";
 
 export function BranchEditorScreen() {
@@ -244,13 +245,69 @@ export function BranchEditorScreen() {
 
   if (!branch) return <EmptyState title="Branch unavailable." />;
 
-  const toggleBase = (base: "first" | "second" | "third") => {
-    const current = branch.situation.runners[base];
-    if (current != null) {
-      applyAndSync({ type: "SET_RUNNER", base, playerId: undefined });
-    } else {
-      applyAndSync({ type: "SET_RUNNER", base, playerId: branch.situation.batterId });
+  const battingSide = sideForTeam(branch, branch.situation.battingTeamId);
+  const battingTeam = branch.teams[battingSide];
+  const onBaseIds = new Set(
+    [branch.situation.runners.first, branch.situation.runners.second, branch.situation.runners.third]
+      .filter((id): id is number => id != null)
+  );
+  const placeOptions = battingTeam.battingOrder
+    .filter((id) => !onBaseIds.has(id))
+    .map((playerId) => ({ playerId }));
+
+  const getBenchOptions = (outgoingId: number) => {
+    const slotIndex = battingTeam.battingOrder.indexOf(outgoingId);
+    if (slotIndex < 0) return [];
+    return listReplacementOptions(
+      battingTeam,
+      { kind: "lineup", slotIndex, playerId: outgoingId },
+      isBlowout(branch.situation)
+    ).map((opt) => ({
+      playerId: opt.playerId,
+      disabled: opt.disabled,
+      reason: opt.reason,
+    }));
+  };
+
+  const onAdvanceRunner = (base: "first" | "second" | "third") => {
+    const result = advanceRunner(branch.situation, base);
+    if (!result) return;
+    setSubError(null);
+    setPlayNote(result.description);
+    applyAndSync({ type: "APPLY_PLAY", situation: result.situation });
+  };
+
+  const onRetireRunner = (base: "first" | "second" | "third") => {
+    const result = retireRunner(branch, branch.situation, base);
+    if (!result) return;
+    setSubError(null);
+    setPlayNote(result.description);
+    applyAndSync({ type: "APPLY_PLAY", situation: result.situation });
+  };
+
+  const onPinchRun = (base: "first" | "second" | "third", benchPlayerId: number) => {
+    const outgoing = branch.situation.runners[base];
+    if (outgoing == null) return;
+    const slotIndex = battingTeam.battingOrder.indexOf(outgoing);
+    if (slotIndex < 0) {
+      showSubError("That runner is not in the batting order.");
+      return;
     }
+    const warnings = validatePinchHit(
+      battingTeam,
+      outgoing,
+      benchPlayerId,
+      battingTeam.removedFromGame,
+      isBlowout(branch.situation)
+    );
+    const block = warnings.find((w) => w.level === "block");
+    if (block) {
+      showSubError(block.message);
+      return;
+    }
+    setSubError(null);
+    setPlayNote("Pinch runner");
+    applyAndSync({ type: "PINCH_RUN", base, benchPlayerId });
   };
 
   const onPlay = (play: PlayType) => {
@@ -306,7 +363,18 @@ export function BranchEditorScreen() {
         }
       />
 
-      <DiamondField runners={branch.situation.runners} onToggleBase={toggleBase} />
+      <DiamondField
+        runners={branch.situation.runners}
+        playerNames={branch.playerNames}
+        getBenchOptions={getBenchOptions}
+        placeOptions={placeOptions}
+        onAdvance={onAdvanceRunner}
+        onOut={onRetireRunner}
+        onPinchRun={onPinchRun}
+        onPlace={(base, playerId) =>
+          applyAndSync({ type: "SET_RUNNER", base, playerId })
+        }
+      />
       {runnerWarnings.length > 0 && (
         <ul className="text-xs text-amber-300/90 space-y-1">
           {runnerWarnings.map((w) => (

@@ -105,6 +105,7 @@ export type BranchAction =
   | { type: "LOAD"; doc: BranchDocument }
   | { type: "PATCH_SITUATION"; patch: Partial<BranchSituation> }
   | { type: "SET_RUNNER"; base: keyof BranchRunners; playerId?: number }
+  | { type: "PINCH_RUN"; base: keyof BranchRunners; benchPlayerId: number }
   | { type: "PATCH_TEAMS"; side: BranchSide; patch: Partial<TeamBranchState> }
   | { type: "SWAP_BENCH_TO_LINEUP"; side: BranchSide; slotIndex: number; benchPlayerId: number }
   | { type: "CHANGE_PITCHER"; side: BranchSide; pitcherId: number }
@@ -166,6 +167,28 @@ export function branchReducer(
       return clearPreview({
         ...state,
         situation: { ...state.situation, runners },
+      });
+    }
+    case "PINCH_RUN": {
+      const outgoing = state.situation.runners[action.base];
+      if (outgoing == null) return state;
+      const side = sideForTeam(state, state.situation.battingTeamId);
+      const team = teamBySide(state, side);
+      const slotIndex = team.battingOrder.indexOf(outgoing);
+      if (slotIndex < 0) return state;
+
+      const swapped = branchReducer(state, {
+        type: "SWAP_BENCH_TO_LINEUP",
+        side,
+        slotIndex,
+        benchPlayerId: action.benchPlayerId,
+      });
+      if (!swapped || swapped === state) return state;
+
+      return branchReducer(swapped, {
+        type: "SET_RUNNER",
+        base: action.base,
+        playerId: action.benchPlayerId,
       });
     }
     case "PATCH_TEAMS": {
